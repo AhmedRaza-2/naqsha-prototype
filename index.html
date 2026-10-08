@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Naqsha AI - Plot to 3D Walkthrough</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    { "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">N</span> Naqsha<span class="ai">AI</span> <small>prototype</small></div>
+    <ol class="steps" id="steps">
+      <li data-s="1">Plot</li><li data-s="2">Layout</li><li data-s="3">Design</li><li data-s="4">Walkthrough</li>
+    </ol>
+  </header>
+
+  <main>
+    <section id="s1" class="step">
+      <h1>Apna ghar, plot size se shuru</h1>
+      <p class="lead">Enter your plot size, pick a layout, choose a facade style, then walk through the house in 3D.</p>
+      <div class="card form">
+        <label class="field wide">Describe it (English / Roman Urdu)
+          <input id="nl" placeholder="e.g. 10 marla 3 bedroom ghar  or  30x60 4 bed">
+        </label>
+        <div class="presets" id="presets"></div>
+        <div class="row">
+          <label class="field">Width (ft)<input id="pw" type="number" min="18" max="120" value="25"></label>
+          <label class="field">Depth (ft)<input id="pd" type="number" min="30" max="200" value="45"></label>
+          <label class="field">Bedrooms
+            <select id="pb"><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
+          </label>
+        </div>
+        <div class="info" id="plotinfo"></div>
+        <button class="btn primary" id="gen">Generate layouts</button>
+      </div>
+    </section>
+
+    <section id="s2" class="step" hidden>
+      <h2>Choose a layout</h2>
+      <p class="lead" id="s2sub"></p>
+      <div class="grid3" id="layouts"></div>
+      <div class="split">
+        <div class="card"><h3>Rule check <span id="chkscore"></span></h3><ul class="checks" id="checks"></ul></div>
+        <div class="card"><h3>Indicative cost</h3><div id="cost"></div>
+          <p class="fine">Covered area x rough 2026 Pakistan construction rates, single storey. For orientation only.</p></div>
+      </div>
+      <div class="nav"><button class="btn" data-go="1">Back</button><button class="btn primary" id="to3" disabled>Use this layout</button></div>
+    </section>
+
+    <section id="s3" class="step" hidden>
+      <h2>Choose a design</h2>
+      <p class="lead">Front elevation for your selected layout.</p>
+      <div class="grid3" id="styles"></div>
+      <div class="nav"><button class="btn" data-go="2">Back</button><button class="btn primary" id="to4" disabled>Enter 3D walkthrough</button></div>
+    </section>
+  </main>
+
+  <div id="viewer" hidden>
+    <div id="vhost"></div>
+    <div class="hud top-left"><div class="room" id="hudroom">-</div><div class="hint" id="hudhint"></div></div>
+    <div class="hud top-right">
+      <button class="btn sm" id="vmode">Overview</button>
+      <button class="btn sm" id="vroof">Hide roof</button>
+      <button class="btn sm" id="vreset">Reset</button>
+      <button class="btn sm" id="vback">Exit</button>
+    </div>
+  </div>
+
+  <footer>Concept only. Not an approved, stamped or structural drawing. Setbacks are indicative; confirm with your development authority and a registered architect.</footer>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
