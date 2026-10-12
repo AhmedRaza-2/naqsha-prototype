@@ -47,6 +47,18 @@ def main():
     (OUT / "images").mkdir(parents=True)
     (OUT / "review").mkdir()
     rows, review = [], 0
+    # Early crawls deduped per plot-size folder only, so one plan can sit in several folders under the same hash.
+    # Deduplicate globally (near-duplicates too), preferring 'strong' records, so train/val/test never share a plan.
+    recs.sort(key=lambda r: (not r.get("ok"), len(r.get("rooms", [])) * -1, -r.get("n_dims", 0)))
+    kept_hashes, uniq = [], []
+    for r in recs:
+        v = int(r["phash"], 16)
+        if any(bin(v ^ k).count("1") <= 5 for k in kept_hashes):
+            continue
+        kept_hashes.append(v)
+        uniq.append(r)
+    print(f"{len(recs)} records -> {len(uniq)} unique after global dedupe")
+    recs = uniq
     for r in recs:
         src = ROOT / r["file"]
         if not src.exists():
