@@ -91,7 +91,7 @@ def main():
             fo.write(json.dumps(r, ensure_ascii=False) + "\n")
             if r["ok"]:
                 good += 1
-                d = ROOT / "verified" / f"{r['size']}_marla"
+                d = ROOT / "verified" / r.get("group", f"{r['size']}_marla")
                 d.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(ROOT / r["file"], d / Path(r["file"]).name)
             if i % 25 == 0:
