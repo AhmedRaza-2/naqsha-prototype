@@ -76,9 +76,9 @@ def main():
     ap.add_argument("--workers", type=int, default=1, help="parallel processes; on some machines >1 is slower because ONNX already uses all cores")
     ap.add_argument("--limit", type=int, default=0)
     a = ap.parse_args()
-    recs = [json.loads(l) for l in (ROOT / "manifest.jsonl").read_text().splitlines() if l]
+    recs = [json.loads(l) for l in (ROOT / "manifest.jsonl").read_text(encoding="utf-8").splitlines() if l]
     out = ROOT / "verified.jsonl"
-    done = {json.loads(l)["file"] for l in out.read_text().splitlines() if l} if out.exists() else set()
+    done = {json.loads(l)["file"] for l in out.read_text(encoding="utf-8").splitlines() if l} if out.exists() else set()
     todo = [r for r in recs if r["file"] not in done]
     if a.limit:
         todo = todo[: a.limit]
