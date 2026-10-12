@@ -67,7 +67,10 @@ _urls = {}
 class LoggingDownloader(ImageDownloader):
     def download(self, task, default_ext, timeout=8, max_retry=1, overwrite=False, **kwargs):
         # fail fast on dead/blocked image hosts instead of retrying 3x with long timeouts
-        return super().download(task, default_ext, timeout=timeout, max_retry=max_retry, overwrite=overwrite, **kwargs)
+        try:
+            return super().download(task, default_ext, timeout=timeout, max_retry=max_retry, overwrite=overwrite, **kwargs)
+        except Exception:  # e.g. PIL DecompressionBombError on a huge image: skip it, keep the thread alive
+            return False
 
     def process_meta(self, task):
         with _lock:
