@@ -60,3 +60,9 @@ footer { text-align: center; font-size: 12px; color: var(--mut); padding: 20px; 
 .room { background: rgba(20,30,26,.78); color: #fff; padding: 8px 14px; border-radius: 10px; font-weight: 600; }
 .hint { background: rgba(255,255,255,.88); padding: 6px 10px; border-radius: 8px; font-size: 12px; max-width: 360px; }
 [hidden] { display: none !important; }
+
+/* planner preferences (washrooms, bigger rooms) */
+.prefs { margin: 14px 0 4px; border: 1px solid var(--line, #dcd8cb); border-radius: 12px; padding: 10px 14px; background: #faf8f2; }
+.prefs summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.prefs[open] summary { margin-bottom: 10px; }
+.formerr { color: #a23b2c; font-size: 14px; margin: 8px 0 0; }

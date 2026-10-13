@@ -6,6 +6,9 @@ export const OPEN = new Set(['lawn', 'void', 'porch', 'courtyard', 'garage', 'ba
 export const BEDS = new Set(['bed', 'master']);
 const TYPES = new Set([...OPEN, ...BEDS, 'bath', 'kitchen', 'lounge', 'drawing', 'dining', 'stairs', 'store', 'lobby', 'passage', 'prayer', 'study', 'servant', 'dress', 'other']);
 const r2 = (v) => Math.round(v * 100) / 100;
+export const FOCUS_VALUES = ['balanced', 'bedrooms', 'lounge', 'kitchen'];
+// typical share of built area taken by bedrooms in balanced plans (by bedroom count); "bigger bedrooms" = 4 points above
+const BED_BASE = { 2: 0.42, 3: 0.43, 4: 0.50, 5: 0.55, 6: 0.57 };
 
 // ---------------------------------------------------------------- text form
 const ROOM = /^([a-z]+)(?: ([\d.]+))?(?: \+bath ([\d.]+)x([\d.]+) ([LR]))?$/;
@@ -13,10 +16,12 @@ const ROOM = /^([a-z]+)(?: ([\d.]+))?(?: \+bath ([\d.]+)x([\d.]+) ([LR]))?$/;
 /** Text -> plan. Throws on malformed text. Implicit last widths and the 'rest' depth are resolved to the remainder. */
 export function parse(text) {
   const lines = text.trim().split('\n').map((l) => l.trim()).filter(Boolean);
-  const m = lines.length ? lines[0].match(/^PLOT ([\d.]+)x([\d.]+) BEDS (\d+)$/) : null;
+  const m = lines.length ? lines[0].match(/^PLOT ([\d.]+)x([\d.]+) BEDS (\d+)(?: BATHS (\d+))?(?: FOCUS ([a-z]+))?$/) : null;
   if (!m) throw new Error('bad header');
   const W = parseFloat(m[1]), D = parseFloat(m[2]);
   const plan = { plot: { w: W, d: D }, beds: parseInt(m[3], 10), bands: [] };
+  if (m[4] !== undefined) plan.baths = parseInt(m[4], 10);
+  if (m[5] !== undefined) plan.focus = m[5];
   let usedD = 0;
   lines.slice(1).forEach((ln, li) => {
     const h = ln.match(/^([\d.]+|rest): (.+)$/);
@@ -174,6 +179,9 @@ export function check(plan, beds = plan.beds) {
   const nb = (count.bed || 0) + (count.master || 0);
   for (const need of ['kitchen', 'drawing', 'lobby']) if (!count[need]) { add('err', `missing ${need}`); errs++; }
   if (beds != null && nb !== beds) { add('err', 'bed count', `asked for ${beds}, plan has ${nb}`); errs++; }
+  const nbath = plan.bands.reduce((s, b) => s + b.rooms.filter((r) => r.bath).length, 0);
+  if (plan.baths != null && nbath !== plan.baths) { add('err', 'bath count', `asked for ${plan.baths}, plan has ${nbath}`); errs++; }
+  if (plan.focus != null && !FOCUS_VALUES.includes(plan.focus)) { add('err', 'focus value', String(plan.focus)); errs++; }
   if (errs) return out;
 
   const rule = ruleFor(W, D);
@@ -231,6 +239,14 @@ export function check(plan, beds = plan.beds) {
   add(kit.some((k) => hasWindow(k, rects)) ? 'ok' : 'warn', 'kitchen ventilation');
   const dark = mains.filter((r) => (BEDS.has(r.t) || r.t === 'drawing') && !hasWindow(r, rects)).map((r) => r.t);
   add(dark.length ? 'warn' : 'ok', 'natural light', dark.join(','));
+  if (['bedrooms', 'lounge', 'kitchen'].includes(plan.focus)) {
+    const built = mains.reduce((s, r) => s + r.w * r.d, 0);
+    const share = (ts) => mains.filter((r) => ts.includes(r.t)).reduce((s, r) => s + r.w * r.d, 0) / built;
+    const f = plan.focus;
+    const [got, need] = f === 'bedrooms' ? [share(['bed', 'master']), (BED_BASE[nb] ?? 0.57) + 0.04]
+      : f === 'lounge' ? [share(['lounge']), 0.20] : [share(['kitchen']), 0.10];
+    add(got >= need ? 'ok' : 'warn', `bigger ${f}`, `${Math.round(got * 100)}% of built area, wanted ${Math.round(need * 100)}%`);
+  }
   return out;
 }
 

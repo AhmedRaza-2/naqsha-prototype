@@ -53,12 +53,26 @@ function decode(ids) {
   return out;
 }
 
-const fmt = (v) => (Number.isInteger(v) ? String(v) : String(v));
+const fmt = (v) => String(v);
+
+/** The request text the model was trained on. Models trained before washroom/focus support only know PLOT and BEDS. */
+function requestText({ w, d, beds, baths, focus }) {
+  let t = `PLOT ${fmt(w)}x${fmt(d)} BEDS ${beds}`;
+  if (stoi.has('BATHS') && baths != null) t += ` BATHS ${baths}`;
+  if (stoi.has('FOCUS') && focus) t += ` FOCUS ${focus}`;
+  return t;
+}
+
+/** True when the loaded model understands the washroom and bigger-rooms preferences. */
+export async function supportsPreferences() {
+  await load();
+  return stoi.has('BATHS') && stoi.has('FOCUS');
+}
 
 /** Sample `n` plans for the request. Returns the text of each (may be invalid, the caller checks them). */
-async function sample({ w, d, beds }, { n = 12, temperature = 0.8, maxNew = 140 } = {}, onStatus) {
+async function sample(request, { n = 12, temperature = 0.8, maxNew = 140 } = {}, onStatus) {
   const { ort, session } = await load(onStatus);
-  const prompt = `PLOT ${fmt(w)}x${fmt(d)} BEDS ${beds}`;
+  const prompt = requestText(request);
   const start = [vocab.bos, ...encode(prompt), vocab.nl];
   const B = n;
   let k = new ort.Tensor('float32', new Float32Array(0), [LAYERS, B, HEADS, 0, HEAD_DIM]);

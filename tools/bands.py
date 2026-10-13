@@ -30,6 +30,11 @@ TYPES = OPEN | BEDS | {"bath", "kitchen", "lounge", "drawing", "dining", "stairs
                        "prayer", "study", "servant", "dress", "other"}
 
 
+FOCUS_VALUES = ("balanced", "bedrooms", "lounge", "kitchen")
+# typical share of the built area taken by bedrooms (by bedroom count) in balanced plans; "bigger bedrooms" = 4 points above
+BED_BASE = {2: 0.42, 3: 0.43, 4: 0.50, 5: 0.55, 6: 0.57}
+
+
 def rule_for(W, D):
     """Indicative setbacks (same numbers as js/layout.js). Verify against CDA/LDA/RDA/DHA before building."""
     m = W * D / MARLA
@@ -48,7 +53,7 @@ def max_beds(W, D):
 def serialize(plan):
     """Text form. The last room of every band has no width and the last band has depth 'rest': they are whatever is
     left of the plot, so the sums are exact by construction (a language model cannot be trusted to add)."""
-    lines = [f"PLOT {plan['plot']['w']:g}x{plan['plot']['d']:g} BEDS {plan['beds']}"]
+    lines = [prompt_for(plan["plot"]["w"], plan["plot"]["d"], plan["beds"], plan.get("baths"), plan.get("focus"))]
     nb = len(plan["bands"])
     for bi, b in enumerate(plan["bands"]):
         toks = []
@@ -62,8 +67,12 @@ def serialize(plan):
     return "\n".join(lines)
 
 
-def prompt_for(W, D, beds):
-    return f"PLOT {W:g}x{D:g} BEDS {beds}"
+def prompt_for(W, D, beds, baths=None, focus=None):
+    """The request the model is conditioned on. baths = total washrooms, focus = which rooms to make bigger."""
+    s = f"PLOT {W:g}x{D:g} BEDS {beds}"
+    if baths is not None: s += f" BATHS {baths}"
+    if focus: s += f" FOCUS {focus}"
+    return s
 
 
 _ROOM = re.compile(r"^([a-z]+)(?: ([\d.]+))?(?: \+bath ([\d.]+)x([\d.]+) ([LR]))?$")
@@ -73,11 +82,13 @@ def parse(text):
     """Text -> plan dict. Raises ValueError on any malformed line (a model output that fails here is invalid).
     Implicit widths/depth are resolved to the remainder (may come out <= 0, which check() reports as an error)."""
     lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
-    m = re.match(r"^PLOT ([\d.]+)x([\d.]+) BEDS (\d+)$", lines[0]) if lines else None
+    m = re.match(r"^PLOT ([\d.]+)x([\d.]+) BEDS (\d+)(?: BATHS (\d+))?(?: FOCUS ([a-z]+))?$", lines[0]) if lines else None
     if not m:
         raise ValueError("bad header")
     W, D = float(m[1]), float(m[2])
     plan = {"plot": {"w": W, "d": D}, "beds": int(m[3]), "bands": []}
+    if m[4] is not None: plan["baths"] = int(m[4])
+    if m[5] is not None: plan["focus"] = m[5]
     used_d = 0.0
     for li, ln in enumerate(lines[1:]):
         h = re.match(r"^([\d.]+|rest): (.+)$", ln)
@@ -249,6 +260,9 @@ def check(plan, beds=None):
     for need in ("kitchen", "drawing", "lobby"):
         if not types[need]: add("err", f"missing {need}"); errs += 1
     if beds is not None and nb != beds: add("err", "bed count", f"asked for {beds}, plan has {nb}"); errs += 1
+    nbath = sum(1 for b in plan["bands"] for r in b["rooms"] if r.get("bath"))
+    if plan.get("baths") is not None and nbath != plan["baths"]: add("err", "bath count", f"asked for {plan['baths']}, plan has {nbath}"); errs += 1
+    if plan.get("focus") not in (None, *FOCUS_VALUES): add("err", "focus value", str(plan.get("focus"))); errs += 1
     if errs:
         return out
 
@@ -300,6 +314,13 @@ def check(plan, beds=None):
     add("ok" if any(_has_window(k, rects) for k in kit) else "warn", "kitchen ventilation")
     dark = [r["t"] for r in mains if r["t"] in BEDS | {"drawing"} and not _has_window(r, rects)]
     add("warn" if dark else "ok", "natural light", ",".join(dark))
+    if plan.get("focus") in ("bedrooms", "lounge", "kitchen"):
+        built = sum(r["w"] * r["d"] for r in mains)
+        share = lambda ts: sum(r["w"] * r["d"] for r in mains if r["t"] in ts) / built
+        f = plan["focus"]
+        got, need = ((share({"bed", "master"}), BED_BASE.get(nb, 0.57) + 0.04) if f == "bedrooms"
+                     else (share({"lounge"}), 0.20) if f == "lounge" else (share({"kitchen"}), 0.10))
+        add("ok" if got >= need else "warn", "bigger " + f, f"{got:.0%} of built area, wanted {need:.0%}")
     return out
 
 
@@ -328,9 +349,11 @@ def _split(total, items):
     return out
 
 
-def generate(W, D, beds, rng):
+def generate(W, D, beds, rng, baths=None, focus="balanced"):
     """One randomised Pakistani-style layout: lawn / front band (drawing, lobby, guest beds) / middle band
-    (kitchen, dining, lounge) / back band (bedrooms) / rear setback. Mirrors js/layout.js with jitter."""
+    (kitchen, dining, lounge) / back band (bedrooms) / rear setback. Mirrors js/layout.js with jitter.
+    baths = total washrooms (bedrooms + 0..2: attached to every bedroom, plus a guest bath, plus a common bath off the
+    lounge). focus = which rooms get more of the built area (balanced / bedrooms / lounge / kitchen)."""
     rule = rule_for(W, D)
     s = rule["side"]
     Bw = W - 2 * s
@@ -342,7 +365,13 @@ def generate(W, D, beds, rng):
     nbeds = max(2, min(beds, 3 if narrow else k + 2))
     back, extra = min(nbeds, k), nbeds - min(nbeds, k)
     u = rng.uniform
-    f, m = u(0.22, 0.32), u(0.25, 0.36)
+    if baths is None: baths = nbeds + 1
+    if not (nbeds <= baths <= nbeds + 2): return None
+    guest, common = baths >= nbeds + 1, baths >= nbeds + 2
+    if focus == "bedrooms": f, m = u(0.19, 0.25), u(0.19, 0.25)          # deep back band = bigger bedrooms
+    elif focus == "lounge": f, m = u(0.21, 0.27), u(0.38, 0.44)          # deep middle band = bigger hall
+    elif focus == "kitchen": f, m = u(0.22, 0.28), u(0.31, 0.37)
+    else: f, m = u(0.22, 0.32), u(0.25, 0.36)
     depths = _split(Bd, [{"wt": f}, {"wt": m}, {"wt": 1 - f - m}])
 
     # front band
@@ -371,7 +400,8 @@ def generate(W, D, beds, rng):
         mid = ["kitchen", "dining", "lounge"] + (["courtyard"] if court else [])
         rng.shuffle(mid)
         if narrow or rng.random() < 0.28: mid.remove("dining")
-        wts = {"kitchen": u(0.2, 0.3), "dining": u(0.22, 0.3), "lounge": u(0.42, 0.56)} if "dining" in mid else {"kitchen": u(0.28, 0.38), "lounge": u(0.62, 0.72)}
+        kw, lw = (u(0.30, 0.40), u(0.40, 0.50)) if focus == "kitchen" else (u(0.18, 0.24), u(0.52, 0.62)) if focus == "lounge" else (u(0.2, 0.3), u(0.42, 0.56))
+        wts = {"kitchen": kw, "dining": u(0.22, 0.3), "lounge": lw} if "dining" in mid else {"kitchen": min(kw + 0.08, 0.46) if focus != "lounge" else u(0.26, 0.32), "lounge": u(0.62, 0.72) if focus != "kitchen" else u(0.54, 0.62)}
         wts["courtyard"] = 0.0
         cw = round(u(4, 5.5) * 2) / 2
         mw = _split(Bw, [{"fixed": cw} if t == "courtyard" else {"wt": wts[t]} for t in mid])
@@ -405,16 +435,22 @@ def generate(W, D, beds, rng):
         r["bath"] = [4.5 if r["w"] < 11 else rng.choice([5, 5.5]), min(rng.choice([7, 7.5, 8]), depths[2] - 3), sd]
     for i, r in enumerate(front):
         if r["t"] in ("bed", "drawing"):
+            if r["t"] == "drawing" and not guest: continue                   # no guest washroom requested
             away = "L" if i > lob_i else "R"
             r["bath"] = ([4.5 if r["w"] < 11 else 5, min(rng.choice([6.5, 7]), depths[0] - 3), away] if r["t"] == "bed"
                          else [4.5, min(rng.choice([6, 6.5, 7]), depths[0] - 3), away])
+
+    if common:                                                              # common washroom, entered from the lounge
+        lo = next(r for r in middle if r["t"] == "lounge")
+        if lo["w"] < 11: return None
+        lo["bath"] = [rng.choice([4.5, 5]), min(rng.choice([6, 6.5, 7]), depths[1] - 3), rng.choice("LR")]
 
     pad = [{"t": "void", "w": s}] if s else []
     bands = [{"d": rule["front"], "rooms": [{"t": "lawn", "w": W}]}]
     for d_, rooms in zip(depths, (front, middle, backb)):
         bands.append({"d": d_, "rooms": pad + rooms + pad})
     bands.append({"d": rear, "rooms": [{"t": "void", "w": W}]})
-    return {"plot": {"w": W, "d": D}, "beds": nbeds, "bands": bands}
+    return {"plot": {"w": W, "d": D}, "beds": nbeds, "baths": baths, "focus": focus, "bands": bands}
 
 
 WIDTHS = [20, 22, 24, 25, 26, 27, 28, 30, 30, 32, 33, 35, 35, 36, 38, 40, 42, 45, 50, 50, 55, 60]
@@ -445,21 +481,23 @@ def build(n, seed=0, min_score=1.0):
         size_bin = rng.choice(open_bins) if open_bins else None
         W, D = sample_plot(rng, size_bin)
         beds = rng.randint(2, 6)
+        baths = beds + rng.choice([0, 1, 1, 2])                                # a guest washroom is the usual case
+        focus = rng.choices(FOCUS_VALUES, [0.4, 0.2, 0.2, 0.2])[0]
         for _ in range(12):
-            plan = generate(W, D, beds, rng)
+            plan = generate(W, D, beds, rng, baths, focus)
             if plan is None or plan["beds"] != beds:         # generator clamps; only keep what was actually asked for
                 continue
             cs = check(plan, plan["beds"])
             if score(cs) >= min_score: break
             rej.update(failed(cs))
         else:
-            infeasible[(W, D, beds)] += 1
+            infeasible[(W, D, beds, baths, focus)] += 1
             continue
         txt = serialize(plan)
         if txt in seen: continue
         seen.add(txt)
         if size_bin: got[size_bin] += 1
-        rows.append({"prompt": prompt_for(W, D, plan["beds"]), "completion": txt.split("\n", 1)[1], "plot": [W, D], "beds": plan["beds"],
+        rows.append({"prompt": prompt_for(W, D, plan["beds"], baths, focus), "baths": baths, "focus": focus, "completion": txt.split("\n", 1)[1], "plot": [W, D], "beds": plan["beds"],
                      "score": round(score(cs), 3), "failed": failed(cs)})
     return rows, tried, rej
 

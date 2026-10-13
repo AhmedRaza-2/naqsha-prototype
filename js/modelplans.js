@@ -8,6 +8,7 @@ const TITLE = {
   setbacks: 'Setbacks applied', coverage: 'Plot coverage', 'min room sizes': 'Minimum room sizes', 'attached baths': 'Attached baths',
   'entrance on road side': 'Entrance on the road side', 'every room reachable': 'Every room reachable', 'guest privacy': 'Guest privacy',
   'bedroom not opening into kitchen': 'Bedrooms vs kitchen', 'kitchen ventilation': 'Kitchen ventilation', 'natural light': 'Natural light',
+  'bigger bedrooms': 'Bigger bedrooms', 'bigger lounge': 'Bigger hall', 'bigger kitchen': 'Bigger kitchen',
 };
 const OK_TEXT = {
   setbacks: 'Front, rear and side setbacks are kept for this plot size (indicative; verify with your development authority).',
@@ -20,6 +21,9 @@ const OK_TEXT = {
   'bedroom not opening into kitchen': 'No bedroom opens directly into the kitchen.',
   'kitchen ventilation': 'The kitchen has an outside wall or light well for a window.',
   'natural light': 'Bedrooms and the drawing room have an outside window.',
+  'bigger bedrooms': 'Bedrooms take a larger share of the house, as you asked.',
+  'bigger lounge': 'The hall (lounge) takes a larger share of the house, as you asked.',
+  'bigger kitchen': 'The kitchen takes a larger share of the house, as you asked.',
 };
 
 /** One drafted plan -> planner layout object, with doors and windows from the planner's own finalize(). */
@@ -54,7 +58,8 @@ export function planToLayout(item, index) {
     const parent = byRect.get(b.parent);
     if (!parent) continue;
     const guest = parent.type === 'drawing';
-    const bath = { id: `bath_${parent.id}`, type: guest ? 'gbath' : 'bath', name: guest ? 'Guest Bath' : 'Bath', parent: parent.id, x: b.x, z: b.y, w: b.w, d: b.d };
+    const common = parent.type === 'lounge';
+    const bath = { id: `bath_${parent.id}`, type: guest ? 'gbath' : 'bath', name: guest ? 'Guest Bath' : common ? 'Common Bath' : 'Bath', parent: parent.id, x: b.x, z: b.y, w: b.w, d: b.d };
     rooms.push(bath);
     parent.att = bath;
   }
@@ -73,7 +78,7 @@ export function planToLayout(item, index) {
 }
 
 /** Layouts for a plot and bedroom count, drafted by the trained model. Empty list if the model gives nothing valid. */
-export async function modelLayouts(plot, beds, onStatus) {
-  const items = await draftPlans({ w: plot.w, d: plot.d, beds }, { n: 12, top: 3, onStatus });
+export async function modelLayouts(plot, prefs, onStatus) {
+  const items = await draftPlans({ w: plot.w, d: plot.d, ...prefs }, { n: 12, top: 3, onStatus });
   return items.map((it, i) => planToLayout(it, i));
 }

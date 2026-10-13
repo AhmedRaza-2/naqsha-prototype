@@ -3,6 +3,7 @@ import { planSVG, elevationSVG } from './svg.js';
 import { STYLES, STYLE_IDS } from './styles.js';
 import { createViewer } from './scene.js';
 import { modelLayouts } from './modelplans.js';
+import { supportsPreferences } from './model.js';
 
 const $ = (id) => document.getElementById(id);
 const S = { plot: null, beds: 3, layouts: [], sel: null, style: null, viewer: null };
@@ -47,19 +48,60 @@ $('nl').addEventListener('input', () => {
     else { const a = +m[1] * MARLA; const w = Math.round(Math.sqrt(a * 0.55)); $('pw').value = w; $('pd').value = Math.round(a / w); }
   }
   if ((m = t.match(/(\d)\s*(?:bed|kamr|room|bhk)/))) $('pb').value = Math.min(5, Math.max(2, +m[1]));
+  if ((m = t.match(/(\d)\s*(?:bath|washroom|wc|toilet)/))) { syncBaths(+m[1]); $('prefs').open = true; }
+  if (/big\w*\s+(?:hall|lounge|tv)/.test(t)) { $('pfocus').value = 'lounge'; $('prefs').open = true; }
+  else if (/big\w*\s+(?:bed|room)/.test(t)) { $('pfocus').value = 'bedrooms'; $('prefs').open = true; }
+  else if (/big\w*\s+kitchen/.test(t)) { $('pfocus').value = 'kitchen'; $('prefs').open = true; }
   readPlot();
 });
 
+// ---------- preferences: washrooms and bigger rooms ----------
+const maxBedsFor = (marla) => (marla <= 6 ? 2 : marla <= 14 ? 4 : 6);
+function syncBaths(want) {
+  const beds = +$('pb').value;
+  const sel = $('pbaths');
+  const keep = want ?? +sel.value;
+  sel.innerHTML = '';
+  [[beds, 'One per bedroom, attached'], [beds + 1, 'Attached + a guest washroom'], [beds + 2, 'Attached + guest + a common washroom']].forEach(([n, label]) => {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = `${n}: ${label}`;
+    sel.appendChild(o);
+  });
+  sel.value = [beds, beds + 1, beds + 2].includes(keep) ? keep : beds + 1;
+}
+$('pb').addEventListener('change', () => syncBaths());
+syncBaths();
+
+/** Returns an error message, or '' when the request is fine. Also nudges the bedroom count to what the plot can hold. */
+function validateRequest() {
+  const w = +$('pw').value, d = +$('pd').value, beds = +$('pb').value;
+  if (!Number.isFinite(w) || !Number.isFinite(d)) return 'Enter the plot width and depth in feet.';
+  if (w < 18 || w > 120) return 'Plot width should be between 18 and 120 ft.';
+  if (d < 30 || d > 200) return 'Plot depth should be between 30 and 200 ft.';
+  const marla = (w * d) / MARLA;
+  if (marla < 3 || marla > 60) return 'Naqsha plans plots from 3 marla to 3 kanal.';
+  if (beds > maxBedsFor(marla)) return `A single floor on ${marla.toFixed(1)} marla fits up to ${maxBedsFor(marla)} bedrooms. Choose fewer bedrooms.`;
+  return '';
+}
+
 $('gen').onclick = async () => {
   S.plot = readPlot();
-  if (S.plot.w < 18 || S.plot.d < 30) return alert('Plot is too small for this prototype (min 18 x 30 ft).');
+  const problem = validateRequest();
+  $('formerr').hidden = !problem;
+  $('formerr').textContent = problem;
+  if (problem) return;
   S.beds = +$('pb').value;
+  S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value };
   const btn = $('gen'), label = btn.textContent;
   btn.disabled = true;
   let layouts = [];
+  S.note = '';
+  const wantsPrefs = S.prefs.baths !== S.beds + 1 || S.prefs.focus !== 'balanced';
   try {
     if (new URLSearchParams(location.search).has('rules')) throw new Error('?rules: model skipped on purpose');
-    layouts = await modelLayouts(S.plot, S.beds, (msg) => (btn.textContent = msg));
+    layouts = await modelLayouts(S.plot, S.prefs, (msg) => (btn.textContent = msg));
+    if (wantsPrefs && layouts.length && !(await supportsPreferences())) S.note = 'The model loaded here does not know washroom or size preferences yet, so these are its standard layouts.';
+    if (wantsPrefs && !layouts.length) S.note = 'No layout met every preference on this plot, so these are rule-based layouts.';
   } catch (err) {
     console.warn('Trained model unavailable, using the rule-based layouts instead.', err);
   }
@@ -75,7 +117,7 @@ $('gen').onclick = async () => {
 // ---------- step 2 ----------
 function renderLayouts() {
   const L0 = S.layouts[0];
-  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedrooms${L0.beds !== S.beds ? ` (limited from ${S.beds} for this plot width)` : ''}. ${L0.source === 'model' ? 'Drafted by the Naqsha model and rule-checked.' : 'Three rule-generated options.'}`;
+  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedrooms${L0.beds !== S.beds ? ` (limited from ${S.beds} for this plot width)` : ''}. ${L0.source === 'model' ? 'Drafted by the Naqsha model and rule-checked.' : 'Three rule-generated options.'}${S.note ? ` ${S.note}` : ''}`;
   const host = $('layouts');
   host.innerHTML = '';
   S.layouts.forEach((L) => {
@@ -148,10 +190,14 @@ $('vback').onclick = () => {
 readPlot();
 show(1);
 
-// hand-over from the landing page: ?q=10+marla+3+bed fills the box and generates straight away
-const handedOver = new URLSearchParams(location.search).get('q');
-if (handedOver) {
-  $('nl').value = handedOver;
+// hand-over from the landing page: ?q=10+marla+3+bed&w=35&d=65&baths=4&focus=lounge fills the form and generates straight away
+const qs = new URLSearchParams(location.search);
+if (qs.get('q')) {
+  $('nl').value = qs.get('q');
   $('nl').dispatchEvent(new Event('input'));
+  if (qs.get('w') && qs.get('d')) { $('pw').value = qs.get('w'); $('pd').value = qs.get('d'); readPlot(); }
+  syncBaths(qs.get('baths') ? +qs.get('baths') : undefined);
+  if (['balanced', 'bedrooms', 'lounge', 'kitchen'].includes(qs.get('focus'))) $('pfocus').value = qs.get('focus');
+  if (qs.get('baths') || (qs.get('focus') && qs.get('focus') !== 'balanced')) $('prefs').open = true;
   $('gen').click();
 }

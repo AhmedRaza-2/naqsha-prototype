@@ -36,7 +36,25 @@
             <select id="pb"><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
           </label>
         </div>
+        <details class="prefs" id="prefs">
+          <summary>More preferences</summary>
+          <div class="row">
+            <label class="field">Washrooms (total)
+              <select id="pbaths"></select>
+            </label>
+            <label class="field">Make bigger
+              <select id="pfocus">
+                <option value="balanced" selected>Nothing in particular</option>
+                <option value="bedrooms">Bedrooms</option>
+                <option value="lounge">Hall (lounge)</option>
+                <option value="kitchen">Kitchen</option>
+              </select>
+            </label>
+          </div>
+          <p class="fine" id="prefnote"></p>
+        </details>
         <div class="info" id="plotinfo"></div>
+        <p class="formerr" id="formerr" role="alert" hidden></p>
         <button class="btn primary" id="gen">Generate layouts</button>
       </div>
     </section>

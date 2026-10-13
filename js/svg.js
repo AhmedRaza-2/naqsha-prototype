@@ -41,19 +41,23 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true } = {}) {
     }
   }
   if (labels) {
+    const fmtFt = (v) => { const h = Math.round(v * 2) / 2; return Number.isInteger(h) ? h : h.toFixed(1); };   // full room size to the half foot; an attached bath sits inside its room
+    const halo = 'paint-order="stroke" stroke="#f4f2ea" stroke-width="2.4" stroke-linejoin="round"';
+    const fit = (txt, fs, maxPx) => Math.max(5.2, Math.min(fs, maxPx / (txt.length * 0.56)));   // shrink text that would not fit its room
     for (const r of L.rooms) {
       const cx = X(r.x + r.w / 2), cy = Y(r.z + r.d / 2);
       const small = r.parent || r.w * s < 62;
       const fs = r.parent ? 7 : small ? 8 : 9.5;
-      const nm = r.parent ? 'Bath' : r.name.replace('Bedroom', 'Bed').replace('Master Bed', 'Master Bed').replace('Drawing Room', 'Drawing').replace('Lounge & Dining', 'Lounge/Dining');
+      const nm = r.parent ? (r.name === 'Guest Bath' ? 'Guest bath' : r.name === 'Common Bath' ? 'Common bath' : 'Bath')
+        : r.name.replace('Bedroom', 'Bed').replace('Master Bed', 'Master Bed').replace('Drawing Room', 'Drawing').replace('Lounge & Dining', 'Lounge/Dining');
       let tx = cx, ty = cy;
-      if (r.parent) { tx = X(r.x + r.w / 2); ty = Y(r.z + r.d / 2); }
+      if (r.parent) { tx = X(r.x + r.w / 2); ty = Y(r.z + r.d / 2) - 3; }
       else if (r.att) { ty = Y(r.z + r.d / 2) + (r.att.z > r.z + r.d / 2 ? 0 : 0); tx = X(r.x + (r.att.x > r.x ? (r.w - r.att.w) / 2 : r.att.w + (r.w - r.att.w) / 2)); }
-      o += `<text x="${tx}" y="${ty}" font-size="${fs}" text-anchor="middle" fill="#222" font-weight="${r.parent ? 400 : 600}">${nm}</text>`;
-      if (!r.parent && r.w * s > 40) {
-        const fmtFt = (v) => (Number.isInteger(v) ? v : v.toFixed(1));   // full room size, the attached bath sits inside it
-        o += `<text x="${tx}" y="${ty + 10}" font-size="7.5" text-anchor="middle" fill="#555">${fmtFt(r.w)}' x ${fmtFt(r.d)}'</text>`;
-      }
+      const maxPx = r.w * s - 4;
+      const size = `${fmtFt(r.w)}' x ${fmtFt(r.d)}'`;
+      o += `<text x="${tx}" y="${ty}" font-size="${fit(nm, fs, maxPx)}" text-anchor="middle" fill="#222" font-weight="${r.parent ? 500 : 600}" ${halo}>${nm}</text>`;
+      // every room shows its size, washrooms and the kitchen included
+      o += `<text x="${tx}" y="${ty + (r.parent ? 8 : 10)}" font-size="${fit(size, r.parent ? 6.4 : 7.5, maxPx)}" text-anchor="middle" fill="#444" ${halo}>${size}</text>`;
     }
   }
   o += `<text x="${X(W / 2)}" y="${Y(0) + 13}" font-size="9" text-anchor="middle" fill="#666">${W} ft</text>`;

@@ -11,7 +11,7 @@ Metrics (per generated plan unless stated):
   copied     generated plan is identical to a training plan (memorisation check)
 Baseline: the random rule-based generator, one try per prompt.
 """
-import argparse, json, random, sys
+import argparse, json, random, re, sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -36,15 +36,17 @@ def run(model, prompts, samples, temperature, top_k, train_set, bs=256):
             text = L.decode(ids)
             r, failed = L.reward(p, ids)
             parse = "unparseable" not in failed
-            want = int(p.split("BEDS ")[1])
+            want = int(re.search(r"BEDS (\d+)", p)[1])
             try:
                 plan = bands.parse(p + "\n" + text)
                 nb = sum(r_["t"] in bands.BEDS for b in plan["bands"] for r_ in b["rooms"])
                 cs = bands.check(plan, plan["beds"])
                 valid = not any(c[0] == "err" for c in cs)
+                bath_ok = not any(c[1] == "bath count" for c in cs)
+                focus_ok = not any(c[1].startswith("bigger ") and c[0] != "ok" for c in cs) and not any(c[1] == "focus value" for c in cs)
             except Exception:
-                nb, valid = -1, False
-            group.append(dict(text=text, reward=r, parse=parse, valid=valid, bed_ok=nb == want, perfect=r == 1.0,
+                nb, valid, bath_ok, focus_ok = -1, False, False, False
+            group.append(dict(text=text, reward=r, parse=parse, valid=valid, bed_ok=nb == want, bath_ok=bath_ok, focus_ok=focus_ok, perfect=r == 1.0,
                               copied=(p, text) in train_set, failed=failed))
         res.append(group)
     return res
@@ -54,7 +56,7 @@ def summarize(res, prompts, name):
     flat = [g for grp in res for g in grp]
     n = len(flat)
     pct = lambda k: 100 * sum(g[k] for g in flat) / n
-    out = {"model": name, "plans": n, "parse%": pct("parse"), "valid%": pct("valid"), "bed_ok%": pct("bed_ok"),
+    out = {"model": name, "plans": n, "parse%": pct("parse"), "valid%": pct("valid"), "bed_ok%": pct("bed_ok"), "bath_ok%": pct("bath_ok"), "focus_ok%": pct("focus_ok"),
            "mean_score": sum(g["reward"] for g in flat) / n, "perfect%": pct("perfect"), "copied%": pct("copied"),
            "best@N": sum(max(g["reward"] for g in grp) for grp in res) / len(res),
            "distinct/N": sum(len({g["text"] for g in grp}) / len(grp) for grp in res) / len(res)}
@@ -75,14 +77,15 @@ def baseline(prompts, seed=0):
     res = []
     for p in prompts:
         W, D = map(float, p.split()[1].split("x"))
-        want = int(p.split("BEDS ")[1])
-        plan = bands.generate(int(W) if W == int(W) else W, int(D) if D == int(D) else D, want, rng)
+        want = int(re.search(r"BEDS (\d+)", p)[1])
+        bm, fm = re.search(r"BATHS (\d+)", p), re.search(r"FOCUS ([a-z]+)", p)
+        plan = bands.generate(int(W) if W == int(W) else W, int(D) if D == int(D) else D, want, rng, int(bm[1]) if bm else None, fm[1] if fm else "balanced")
         if plan is None or plan["beds"] != want:
-            res.append([dict(text="", reward=0.0, parse=True, valid=False, bed_ok=False, perfect=False, copied=False, failed=["generator"])])
+            res.append([dict(text="", reward=0.0, parse=True, valid=False, bed_ok=False, bath_ok=False, focus_ok=False, perfect=False, copied=False, failed=["generator"])])
         else:
             cs = bands.check(plan, want)
             res.append([dict(text=bands.serialize(plan), reward=bands.score(cs), parse=True, valid=not any(c[0] == "err" for c in cs),
-                             bed_ok=True, perfect=bands.score(cs) == 1.0, copied=False, failed=bands.failed(cs))])
+                             bed_ok=True, bath_ok=True, focus_ok=not any(c[1].startswith("bigger ") and c[0] != "ok" for c in cs), perfect=bands.score(cs) == 1.0, copied=False, failed=bands.failed(cs))])
     return res
 
 

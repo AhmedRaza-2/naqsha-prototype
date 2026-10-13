@@ -15,7 +15,7 @@ import bands  # noqa: E402  (validator / parser used for evaluation and as the R
 
 # ---------------------------------------------------------------- tokenizer
 NUMS = [f"{v / 2:g}" for v in range(1, 301)]                       # 0.5 .. 150 on the 0.5 ft grid
-WORDS = ["PLOT", "BEDS", "rest", "bath", "L", "R"] + sorted(bands.TYPES - {"bath"})
+WORDS = ["PLOT", "BEDS", "BATHS", "FOCUS", "rest", "bath", "L", "R", "balanced", "bedrooms"] + sorted(bands.TYPES - {"bath"})
 PUNCT = ["\n", ":", "|", "+", "x"]
 VOCAB = ["<pad>", "<bos>", "<eos>"] + PUNCT + WORDS + NUMS
 STOI = {t: i for i, t in enumerate(VOCAB)}
