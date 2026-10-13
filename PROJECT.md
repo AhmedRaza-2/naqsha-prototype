@@ -1,6 +1,6 @@
 # Naqsha AI: Plot Size to House Layout to 3D Walkthrough
 
-Project brief, research summary and current status. Last updated: 2026-10-13.
+Project brief, research summary and current status. Last updated: 2026-10-13 (layout-model section 3.5 added).
 
 ---
 
@@ -29,7 +29,7 @@ It is a semester/prototype project, not a replacement for a registered architect
 - **Demand.** Basic plans cost roughly Rs 10,000 to 50,000 from a naqsha nawees, or Rs 15 to 80 per sq ft from architects. Design is about 1 to 3% of build cost, so value lies in exploring options early and avoiding mistakes, not in price.
 - **Competitors.** MakaanPlan and Unrean (Pakistan); NakshaAI, Cadbull AI, GrehYug (India); Maket.ai, Planner 5D, RoomSketcher and others (global). None combine open data, an explainable local-bylaw checker and a published evaluation.
 - **Approach (state of the art).** Fine-tune a small language model on real plans, then apply reinforcement learning with verifiable rewards (a rule checker as the reward). References found in this session: Mila's RLVR floor-plan paper (NeurIPS 2025), Autodesk FLOORA (Qwen3 0.6B/1.7B), FloorplanVLM and Raster2Seq (image to JSON/polygons), and the ResPlan dataset (17,000 vector plans, CC BY 4.0).
-- **Unverified.** Names cited in the first research report (HypergraphFormer, FML markup) were **not found** in a later search; do not rely on them. ResPlan's claimed South Asian origin is also unconfirmed and should be checked by plotting samples.
+- **Partly verified.** HypergraphFormer (arXiv 2605.18932) and a markup-based vector floor-plan paper (arXiv 2604.04859) did appear in a later search, but only summaries were seen; read the papers before citing. ResPlan's claimed South Asian origin is also unconfirmed and should be checked by plotting samples.
 - **Bylaw numbers** in the prototype come from architecture-firm blogs. Verify them against official CDA/LDA/RDA/DHA documents before claiming compliance.
 
 ---
@@ -86,6 +86,20 @@ Notes:
 Three plans annotated (G01 to G03) in absolute coordinates; 35 more selected for later. A side-by-side render check showed that **positions estimated by eye are only about plus or minus 3 ft** and leave gaps, although room sizes (from printed labels) are reliable. Absolute-coordinate annotation will not be scaled up.
 
 **Decision pending:** switch to a **band format** (ordered rows from road to back, rooms left to right with printed widths). It is easier to read, tiles without gaps, scale-free, and matches the output of the rule-based generator.
+
+### 3.5 Layout model (deep-learning core, in `tools/bands.py` and `ml/`)
+
+Scope: plot size + bedroom count in, house layouts out. Method follows the current literature (Mila RLVR, NeurIPS 2025): an autoregressive transformer, then reinforcement learning with the rule checker as reward.
+
+- **Band format** (`tools/bands.py`): rows from road to back, rooms left to right with widths; the last width/depth of each row is implicit so sums are exact. Includes parser, mirror augmentation, validator/reward (`check`, `score`) and a randomised synthetic generator.
+- **Synthetic data** (`data/synth/`, git-ignored): 30,000 valid layouts (26,977 train / 1,525 val / 1,498 test); val and test use plot sizes never seen in training.
+- **Model** (`ml/layoutlm.py`): word-level tokenizer (334 tokens) and a GPT-style transformer written from scratch (about 4.9M parameters at d=256, 6 layers).
+- **Stage A** `ml/train.py` (supervised), **Stage B** `ml/rl.py` (GRPO-style RL, validator reward), **evaluation** `ml/evaluate.py` (validity, bedroom-count accuracy, rule score, diversity, memorisation, best-of-N, vs rule-based baseline). Kaggle steps: `ml/KAGGLE.md`.
+- **Results (Kaggle, run v5; 142 held-out plot sizes incl. small plots, 4 samples each):** supervised model 99.3% valid / 82.4% perfect; after RL 99.8% valid / 87.5% perfect / mean score 0.984; rule-based generator (1 try) 73.2% valid / 47.2% perfect. Small plots (<=6 marla) score 0.995 vs 0.34 for the baseline. 0% of outputs copy a training plan.
+- **Data lessons (ablation material):** run 1 (loose data, 50% perfect plans) 46% perfect; run 2 (perfect-only, unbalanced) collapsed on small plots (0.25); run 3 (perfect + size-balanced) 89% perfect but test set had no small plots; run v5 (stratified split) fixes that.
+- **Parallel/distributed:** parallel data generation (3.5x on 8 workers), fp16 + 2-GPU DistributedDataParallel (epoch 83 s -> 13 s), key/value-cache sampling, parallel reward scoring, RL and evaluation overlapped on separate GPUs (whole pipeline 7.5 min). `ml/bench_gpu.sh` for a clean per-step table is not yet run.
+- **Landing page** (`landing/`, Vite + React + Tailwind v4 + Motion + Lenis + Three.js): scroll-driven house hero (gate and door open, light floods into the next section), plot-size form that hands over to the planner via `?q=`, how-it-works, measured results, footer. Dev: `cd landing && npm run dev` (port 5174); planner: `python -m http.server 5173` at the repo root.
+- **Known limits:** single storey only (5 marla fits 2, sometimes 3 bedrooms); real-plan annotation in band format not started; model is not yet connected to the web app.
 
 ---
 

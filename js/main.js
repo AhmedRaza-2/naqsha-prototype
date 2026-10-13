@@ -134,3 +134,11 @@ $('vback').onclick = () => {
 
 readPlot();
 show(1);
+
+// hand-over from the landing page: ?q=10+marla+3+bed fills the box and generates straight away
+const handedOver = new URLSearchParams(location.search).get('q');
+if (handedOver) {
+  $('nl').value = handedOver;
+  $('nl').dispatchEvent(new Event('input'));
+  $('gen').click();
+}

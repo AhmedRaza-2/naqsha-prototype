@@ -1,2 +1,8 @@
 data/
 __pycache__/
+runs/
+runs_*.log
+kaggle_upload/
+out/
+landing/node_modules/
+landing/dist/

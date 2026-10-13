@@ -1,0 +1,108 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/* Palette (from the brief): Earth #3A2F2C, Steel Blue #394845, Ash #C8D0C8, Linen #EFEAE2, Off-white #FBF8F1.
+   One accent (Steel Blue), one theme per mode, one radius system:
+   surfaces (cards, inputs, panels) 14px, interactive controls (buttons, chips, nav) full pill. */
+:root {
+  --bg: #fbf8f1;
+  --bg-alt: #efeae2;
+  --ink: #3a2f2c;
+  --ink-soft: rgb(58 47 44 / 0.74);
+  --line: #c8d0c8;
+  --accent: #394845;
+  --accent-ink: #fbf8f1;
+  --glass: rgb(251 248 241 / 0.72);
+  --err: #a23b2c;
+  /* plan fills */
+  --p-bed: #e3e8e1;
+  --p-master: #d3dbd3;
+  --p-bath: #bfcbc7;
+  --p-kitchen: #cfdad5;
+  --p-lounge: #ebe5d9;
+  --p-drawing: #e6decf;
+  --p-dining: #dce4e0;
+  --p-lobby: #f6f2e9;
+  --p-lawn: #dbe5d8;
+  --p-line: #3a2f2c;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #2b2320;
+    --bg-alt: #342b28;
+    --ink: #efeae2;
+    --ink-soft: rgb(239 234 226 / 0.76);
+    --line: #4d5a56;
+    --accent: #c8d0c8;
+    --accent-ink: #2b2320;
+    --glass: rgb(43 35 32 / 0.72);
+    --err: #f0a898;
+    --p-bed: #3b4541;
+    --p-master: #46524d;
+    --p-bath: #566660;
+    --p-kitchen: #44524d;
+    --p-lounge: #43382f;
+    --p-drawing: #4a3d32;
+    --p-dining: #3d4a49;
+    --p-lobby: #3a322d;
+    --p-lawn: #3a463f;
+    --p-line: #efeae2;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
+  --color-bg: var(--bg);
+  --color-alt: var(--bg-alt);
+  --color-ink: var(--ink);
+  --color-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-glass: var(--glass);
+  --color-err: var(--err);
+  --radius-surface: 0.875rem;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+body { margin: 0; min-height: 100dvh; overflow-x: clip; }
+
+::selection { background: var(--accent); color: var(--accent-ink); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+.display { letter-spacing: -0.035em; line-height: 1.02; font-weight: 560; text-wrap: balance; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+/* hero stays a daylight scene in both colour schemes, so its text uses the fixed palette */
+.hero-ink { color: #3a2f2c; }
+
+@keyframes load { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
+@keyframes march { to { stroke-dashoffset: -2.4; } }
+.march { animation: march 1.1s linear infinite; }
+
+html[data-motion='off'] .march { animation: none; }
+html[data-motion='off'] *, html[data-motion='off'] *::before, html[data-motion='off'] *::after {
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
