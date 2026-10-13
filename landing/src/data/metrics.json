@@ -1,0 +1,20 @@
+{
+  "note": "568 plans for 142 plot sizes the model never saw during training, from 3 marla to 3 kanal. Synthetic test set; evaluation on real plans is in progress.",
+  "rows": [
+    {
+      "label": "Plans that pass every structural check",
+      "model": 99.6,
+      "baseline": 73.2
+    },
+    {
+      "label": "Plans with the bedroom count you asked for",
+      "model": 99.8,
+      "baseline": 73.2
+    },
+    {
+      "label": "Plans that also pass every design rule",
+      "model": 84.3,
+      "baseline": 47.2
+    }
+  ]
+}

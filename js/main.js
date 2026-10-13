@@ -2,6 +2,7 @@ import { PRESETS, MARLA, ruleFor, generateAll, estimateCost } from './layout.js'
 import { planSVG, elevationSVG } from './svg.js';
 import { STYLES, STYLE_IDS } from './styles.js';
 import { createViewer } from './scene.js';
+import { modelLayouts } from './modelplans.js';
 
 const $ = (id) => document.getElementById(id);
 const S = { plot: null, beds: 3, layouts: [], sel: null, style: null, viewer: null };
@@ -49,11 +50,23 @@ $('nl').addEventListener('input', () => {
   readPlot();
 });
 
-$('gen').onclick = () => {
+$('gen').onclick = async () => {
   S.plot = readPlot();
   if (S.plot.w < 18 || S.plot.d < 30) return alert('Plot is too small for this prototype (min 18 x 30 ft).');
   S.beds = +$('pb').value;
-  S.layouts = generateAll(S.plot, S.beds);
+  const btn = $('gen'), label = btn.textContent;
+  btn.disabled = true;
+  let layouts = [];
+  try {
+    if (new URLSearchParams(location.search).has('rules')) throw new Error('?rules: model skipped on purpose');
+    layouts = await modelLayouts(S.plot, S.beds, (msg) => (btn.textContent = msg));
+  } catch (err) {
+    console.warn('Trained model unavailable, using the rule-based layouts instead.', err);
+  }
+  if (!layouts.length) layouts = generateAll(S.plot, S.beds);     // rule-based fallback (also used when the model finds no valid plan)
+  btn.disabled = false;
+  btn.textContent = label;
+  S.layouts = layouts;
   S.sel = null;
   renderLayouts();
   show(2);
@@ -62,7 +75,7 @@ $('gen').onclick = () => {
 // ---------- step 2 ----------
 function renderLayouts() {
   const L0 = S.layouts[0];
-  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedrooms${L0.beds !== S.beds ? ` (limited from ${S.beds} for this plot width)` : ''}. Three rule-generated options.`;
+  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedrooms${L0.beds !== S.beds ? ` (limited from ${S.beds} for this plot width)` : ''}. ${L0.source === 'model' ? 'Drafted by the Naqsha model and rule-checked.' : 'Three rule-generated options.'}`;
   const host = $('layouts');
   host.innerHTML = '';
   S.layouts.forEach((L) => {

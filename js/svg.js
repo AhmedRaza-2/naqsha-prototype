@@ -51,8 +51,8 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true } = {}) {
       else if (r.att) { ty = Y(r.z + r.d / 2) + (r.att.z > r.z + r.d / 2 ? 0 : 0); tx = X(r.x + (r.att.x > r.x ? (r.w - r.att.w) / 2 : r.att.w + (r.w - r.att.w) / 2)); }
       o += `<text x="${tx}" y="${ty}" font-size="${fs}" text-anchor="middle" fill="#222" font-weight="${r.parent ? 400 : 600}">${nm}</text>`;
       if (!r.parent && r.w * s > 40) {
-        const nw = r.att ? r.w - r.att.w : r.w;
-        o += `<text x="${tx}" y="${ty + 10}" font-size="7.5" text-anchor="middle" fill="#555">${nw.toFixed(0)}' x ${r.d.toFixed(0)}'</text>`;
+        const fmtFt = (v) => (Number.isInteger(v) ? v : v.toFixed(1));   // full room size, the attached bath sits inside it
+        o += `<text x="${tx}" y="${ty + 10}" font-size="7.5" text-anchor="middle" fill="#555">${fmtFt(r.w)}' x ${fmtFt(r.d)}'</text>`;
       }
     }
   }

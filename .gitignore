@@ -1,4 +1,4 @@
-data/
+/data/
 __pycache__/
 runs/
 runs_*.log

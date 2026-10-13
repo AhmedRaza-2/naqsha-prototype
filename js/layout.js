@@ -123,7 +123,7 @@ function shared(a, b) {
   return null;
 }
 
-function finalize(L) {
+export function finalize(L) {
   const { rooms, B, rule } = L;
   const mains = rooms.filter((r) => !r.type.endsWith('bath'));
   const openings = [], links = [];

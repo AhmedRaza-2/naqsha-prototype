@@ -1,0 +1,682 @@
+{
+ "plot": {
+  "w": 38,
+  "d": 59
+ },
+ "marla": 10.0,
+ "beds": 3,
+ "plans": [
+  {
+   "text": "PLOT 38x59 BEDS 3\n12: lawn\n13: void 3 | drawing 26.5 +bath 4.5x7 R | lobby 5.5 | void\n15: void 3 | kitchen 8 | dining 8.5 | lounge 15.5 | void\n14: void 3 | master 12 +bath 5x7 L | bed 10 +bath 4.5x7.5 R | bed 10 +bath 4.5x7.5 L | void\nrest: void",
+   "rooms": [
+    {
+     "i": 0,
+     "t": "lawn",
+     "x": 0.0,
+     "y": 0.0,
+     "w": 38,
+     "d": 12,
+     "parent": null
+    },
+    {
+     "i": 1,
+     "t": "void",
+     "x": 0.0,
+     "y": 12.0,
+     "w": 3,
+     "d": 13.0,
+     "parent": null
+    },
+    {
+     "i": 2,
+     "t": "drawing",
+     "x": 3.0,
+     "y": 12.0,
+     "w": 26.5,
+     "d": 13.0,
+     "parent": null
+    },
+    {
+     "i": 3,
+     "t": "lobby",
+     "x": 29.5,
+     "y": 12.0,
+     "w": 5.5,
+     "d": 13.0,
+     "parent": null
+    },
+    {
+     "i": 4,
+     "t": "void",
+     "x": 35.0,
+     "y": 12.0,
+     "w": 3,
+     "d": 13.0,
+     "parent": null
+    },
+    {
+     "i": 5,
+     "t": "void",
+     "x": 0.0,
+     "y": 25.0,
+     "w": 3,
+     "d": 15.0,
+     "parent": null
+    },
+    {
+     "i": 6,
+     "t": "kitchen",
+     "x": 3.0,
+     "y": 25.0,
+     "w": 8.0,
+     "d": 15.0,
+     "parent": null
+    },
+    {
+     "i": 7,
+     "t": "dining",
+     "x": 11.0,
+     "y": 25.0,
+     "w": 8.5,
+     "d": 15.0,
+     "parent": null
+    },
+    {
+     "i": 8,
+     "t": "lounge",
+     "x": 19.5,
+     "y": 25.0,
+     "w": 15.5,
+     "d": 15.0,
+     "parent": null
+    },
+    {
+     "i": 9,
+     "t": "void",
+     "x": 35.0,
+     "y": 25.0,
+     "w": 3,
+     "d": 15.0,
+     "parent": null
+    },
+    {
+     "i": 10,
+     "t": "void",
+     "x": 0.0,
+     "y": 40.0,
+     "w": 3,
+     "d": 14.0,
+     "parent": null
+    },
+    {
+     "i": 11,
+     "t": "master",
+     "x": 3.0,
+     "y": 40.0,
+     "w": 12.0,
+     "d": 14.0,
+     "parent": null
+    },
+    {
+     "i": 12,
+     "t": "bed",
+     "x": 15.0,
+     "y": 40.0,
+     "w": 10.0,
+     "d": 14.0,
+     "parent": null
+    },
+    {
+     "i": 13,
+     "t": "bed",
+     "x": 25.0,
+     "y": 40.0,
+     "w": 10.0,
+     "d": 14.0,
+     "parent": null
+    },
+    {
+     "i": 14,
+     "t": "void",
+     "x": 35.0,
+     "y": 40.0,
+     "w": 3,
+     "d": 14.0,
+     "parent": null
+    },
+    {
+     "i": 15,
+     "t": "void",
+     "x": 0.0,
+     "y": 54.0,
+     "w": 38,
+     "d": 5,
+     "parent": null
+    },
+    {
+     "i": 16,
+     "t": "bath",
+     "x": 25.0,
+     "y": 18.0,
+     "w": 4.5,
+     "d": 7,
+     "parent": 2
+    },
+    {
+     "i": 17,
+     "t": "bath",
+     "x": 3.0,
+     "y": 47.0,
+     "w": 5,
+     "d": 7,
+     "parent": 11
+    },
+    {
+     "i": 18,
+     "t": "bath",
+     "x": 20.5,
+     "y": 46.5,
+     "w": 4.5,
+     "d": 7.5,
+     "parent": 12
+    },
+    {
+     "i": 19,
+     "t": "bath",
+     "x": 25.0,
+     "y": 46.5,
+     "w": 4.5,
+     "d": 7.5,
+     "parent": 13
+    }
+   ],
+   "checks": [
+    {
+     "name": "setbacks",
+     "ok": true
+    },
+    {
+     "name": "coverage",
+     "ok": true
+    },
+    {
+     "name": "min room sizes",
+     "ok": true
+    },
+    {
+     "name": "attached baths",
+     "ok": true
+    },
+    {
+     "name": "entrance on road side",
+     "ok": true
+    },
+    {
+     "name": "every room reachable",
+     "ok": true
+    },
+    {
+     "name": "guest privacy",
+     "ok": true
+    },
+    {
+     "name": "bedroom not opening into kitchen",
+     "ok": true
+    },
+    {
+     "name": "kitchen ventilation",
+     "ok": true
+    },
+    {
+     "name": "natural light",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "text": "PLOT 38x59 BEDS 3\n12: lawn\n11.5: void 3 | drawing 25 +bath 4.5x6 R | lobby 7 | void\n12: void 3 | kitchen 9 | lounge 23 | void\n18.5: void 3 | master 12.5 +bath 5.5x7 R | bed 10 +bath 4.5x8 L | bed 9.5 +bath 4.5x7 R | void\nrest: void",
+   "rooms": [
+    {
+     "i": 0,
+     "t": "lawn",
+     "x": 0.0,
+     "y": 0.0,
+     "w": 38,
+     "d": 12,
+     "parent": null
+    },
+    {
+     "i": 1,
+     "t": "void",
+     "x": 0.0,
+     "y": 12.0,
+     "w": 3,
+     "d": 11.5,
+     "parent": null
+    },
+    {
+     "i": 2,
+     "t": "drawing",
+     "x": 3.0,
+     "y": 12.0,
+     "w": 25.0,
+     "d": 11.5,
+     "parent": null
+    },
+    {
+     "i": 3,
+     "t": "lobby",
+     "x": 28.0,
+     "y": 12.0,
+     "w": 7.0,
+     "d": 11.5,
+     "parent": null
+    },
+    {
+     "i": 4,
+     "t": "void",
+     "x": 35.0,
+     "y": 12.0,
+     "w": 3,
+     "d": 11.5,
+     "parent": null
+    },
+    {
+     "i": 5,
+     "t": "void",
+     "x": 0.0,
+     "y": 23.5,
+     "w": 3,
+     "d": 12.0,
+     "parent": null
+    },
+    {
+     "i": 6,
+     "t": "kitchen",
+     "x": 3.0,
+     "y": 23.5,
+     "w": 9.0,
+     "d": 12.0,
+     "parent": null
+    },
+    {
+     "i": 7,
+     "t": "lounge",
+     "x": 12.0,
+     "y": 23.5,
+     "w": 23.0,
+     "d": 12.0,
+     "parent": null
+    },
+    {
+     "i": 8,
+     "t": "void",
+     "x": 35.0,
+     "y": 23.5,
+     "w": 3,
+     "d": 12.0,
+     "parent": null
+    },
+    {
+     "i": 9,
+     "t": "void",
+     "x": 0.0,
+     "y": 35.5,
+     "w": 3,
+     "d": 18.5,
+     "parent": null
+    },
+    {
+     "i": 10,
+     "t": "master",
+     "x": 3.0,
+     "y": 35.5,
+     "w": 12.5,
+     "d": 18.5,
+     "parent": null
+    },
+    {
+     "i": 11,
+     "t": "bed",
+     "x": 15.5,
+     "y": 35.5,
+     "w": 10.0,
+     "d": 18.5,
+     "parent": null
+    },
+    {
+     "i": 12,
+     "t": "bed",
+     "x": 25.5,
+     "y": 35.5,
+     "w": 9.5,
+     "d": 18.5,
+     "parent": null
+    },
+    {
+     "i": 13,
+     "t": "void",
+     "x": 35.0,
+     "y": 35.5,
+     "w": 3,
+     "d": 18.5,
+     "parent": null
+    },
+    {
+     "i": 14,
+     "t": "void",
+     "x": 0.0,
+     "y": 54.0,
+     "w": 38,
+     "d": 5,
+     "parent": null
+    },
+    {
+     "i": 15,
+     "t": "bath",
+     "x": 23.5,
+     "y": 17.5,
+     "w": 4.5,
+     "d": 6,
+     "parent": 2
+    },
+    {
+     "i": 16,
+     "t": "bath",
+     "x": 10.0,
+     "y": 47.0,
+     "w": 5.5,
+     "d": 7,
+     "parent": 10
+    },
+    {
+     "i": 17,
+     "t": "bath",
+     "x": 15.5,
+     "y": 46.0,
+     "w": 4.5,
+     "d": 8,
+     "parent": 11
+    },
+    {
+     "i": 18,
+     "t": "bath",
+     "x": 30.5,
+     "y": 47.0,
+     "w": 4.5,
+     "d": 7,
+     "parent": 12
+    }
+   ],
+   "checks": [
+    {
+     "name": "setbacks",
+     "ok": true
+    },
+    {
+     "name": "coverage",
+     "ok": true
+    },
+    {
+     "name": "min room sizes",
+     "ok": true
+    },
+    {
+     "name": "attached baths",
+     "ok": true
+    },
+    {
+     "name": "entrance on road side",
+     "ok": true
+    },
+    {
+     "name": "every room reachable",
+     "ok": true
+    },
+    {
+     "name": "guest privacy",
+     "ok": true
+    },
+    {
+     "name": "bedroom not opening into kitchen",
+     "ok": true
+    },
+    {
+     "name": "kitchen ventilation",
+     "ok": true
+    },
+    {
+     "name": "natural light",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "text": "PLOT 38x59 BEDS 3\n12: lawn\n13: void 3 | drawing 25.5 +bath 4.5x6 R | lobby 6.5 | void\n12.5: void 3 | kitchen 8.5 | lounge 15.5 | dining 8 | void\n16.5: void 3 | master 12 +bath 5.5x7 R | bed 10 +bath 4.5x7 L | bed 10 +bath 4.5x7.5 R | void\nrest: void",
+   "rooms": [
+    {
+     "i": 0,
+     "t": "lawn",
+     "x": 0.0,
+     "y": 0.0,
+     "w": 38,
+     "d": 12,
+     "parent": null
+    },
+    {
+     "i": 1,
+     "t": "void",
+     "x": 0.0,
+     "y": 12.0,
+     "w": 3,
+     "d": 13.0,
+     "parent": null
+    },
+    {
+     "i": 2,
+     "t": "drawing",
+     "x": 3.0,
+     "y": 12.0,
+     "w": 25.5,
+     "d": 13.0,
+     "parent": null
+    },
+    {
+     "i": 3,
+     "t": "lobby",
+     "x": 28.5,
+     "y": 12.0,
+     "w": 6.5,
+     "d": 13.0,
+     "parent": null
+    },
+    {
+     "i": 4,
+     "t": "void",
+     "x": 35.0,
+     "y": 12.0,
+     "w": 3,
+     "d": 13.0,
+     "parent": null
+    },
+    {
+     "i": 5,
+     "t": "void",
+     "x": 0.0,
+     "y": 25.0,
+     "w": 3,
+     "d": 12.5,
+     "parent": null
+    },
+    {
+     "i": 6,
+     "t": "kitchen",
+     "x": 3.0,
+     "y": 25.0,
+     "w": 8.5,
+     "d": 12.5,
+     "parent": null
+    },
+    {
+     "i": 7,
+     "t": "lounge",
+     "x": 11.5,
+     "y": 25.0,
+     "w": 15.5,
+     "d": 12.5,
+     "parent": null
+    },
+    {
+     "i": 8,
+     "t": "dining",
+     "x": 27.0,
+     "y": 25.0,
+     "w": 8.0,
+     "d": 12.5,
+     "parent": null
+    },
+    {
+     "i": 9,
+     "t": "void",
+     "x": 35.0,
+     "y": 25.0,
+     "w": 3,
+     "d": 12.5,
+     "parent": null
+    },
+    {
+     "i": 10,
+     "t": "void",
+     "x": 0.0,
+     "y": 37.5,
+     "w": 3,
+     "d": 16.5,
+     "parent": null
+    },
+    {
+     "i": 11,
+     "t": "master",
+     "x": 3.0,
+     "y": 37.5,
+     "w": 12.0,
+     "d": 16.5,
+     "parent": null
+    },
+    {
+     "i": 12,
+     "t": "bed",
+     "x": 15.0,
+     "y": 37.5,
+     "w": 10.0,
+     "d": 16.5,
+     "parent": null
+    },
+    {
+     "i": 13,
+     "t": "bed",
+     "x": 25.0,
+     "y": 37.5,
+     "w": 10.0,
+     "d": 16.5,
+     "parent": null
+    },
+    {
+     "i": 14,
+     "t": "void",
+     "x": 35.0,
+     "y": 37.5,
+     "w": 3,
+     "d": 16.5,
+     "parent": null
+    },
+    {
+     "i": 15,
+     "t": "void",
+     "x": 0.0,
+     "y": 54.0,
+     "w": 38,
+     "d": 5,
+     "parent": null
+    },
+    {
+     "i": 16,
+     "t": "bath",
+     "x": 24.0,
+     "y": 19.0,
+     "w": 4.5,
+     "d": 6,
+     "parent": 2
+    },
+    {
+     "i": 17,
+     "t": "bath",
+     "x": 9.5,
+     "y": 47.0,
+     "w": 5.5,
+     "d": 7,
+     "parent": 11
+    },
+    {
+     "i": 18,
+     "t": "bath",
+     "x": 15.0,
+     "y": 47.0,
+     "w": 4.5,
+     "d": 7,
+     "parent": 12
+    },
+    {
+     "i": 19,
+     "t": "bath",
+     "x": 30.5,
+     "y": 46.5,
+     "w": 4.5,
+     "d": 7.5,
+     "parent": 13
+    }
+   ],
+   "checks": [
+    {
+     "name": "setbacks",
+     "ok": true
+    },
+    {
+     "name": "coverage",
+     "ok": true
+    },
+    {
+     "name": "min room sizes",
+     "ok": true
+    },
+    {
+     "name": "attached baths",
+     "ok": true
+    },
+    {
+     "name": "entrance on road side",
+     "ok": true
+    },
+    {
+     "name": "every room reachable",
+     "ok": true
+    },
+    {
+     "name": "guest privacy",
+     "ok": true
+    },
+    {
+     "name": "bedroom not opening into kitchen",
+     "ok": true
+    },
+    {
+     "name": "kitchen ventilation",
+     "ok": true
+    },
+    {
+     "name": "natural light",
+     "ok": true
+    }
+   ]
+  }
+ ]
+}
