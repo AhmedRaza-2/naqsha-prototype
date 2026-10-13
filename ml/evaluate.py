@@ -101,7 +101,7 @@ def main():
     a = ap.parse_args()
     test = [json.loads(l) for l in open(f"{a.data}/test.jsonl", encoding="utf-8")]
     random.Random(0).shuffle(test)
-    prompts = sorted({r["prompt"] for r in test})[: a.n]
+    prompts = list(dict.fromkeys(r["prompt"] for r in test))[: a.n]      # test rows are already shuffled: a random sample of requests
     train_set = {(r["prompt"], r["completion"]) for r in map(json.loads, open(f"{a.data}/train.jsonl", encoding="utf-8"))}
     rows = [summarize(baseline(prompts), prompts, "rule-based generator (1 try)")]
     for c in a.ckpt:

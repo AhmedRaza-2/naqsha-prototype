@@ -80,6 +80,7 @@ function validateRequest() {
   if (d < 30 || d > 200) return 'Plot depth should be between 30 and 200 ft.';
   const marla = (w * d) / MARLA;
   if (marla < 3 || marla > 60) return 'Naqsha plans plots from 3 marla to 3 kanal.';
+  if ($('pfocus').value === 'kitchen' && marla <= 6) return 'A bigger kitchen needs more than 6 marla. Choose another option.';
   if (beds > maxBedsFor(marla)) return `A single floor on ${marla.toFixed(1)} marla fits up to ${maxBedsFor(marla)} bedrooms. Choose fewer bedrooms.`;
   return '';
 }

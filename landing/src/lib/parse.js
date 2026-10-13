@@ -58,6 +58,9 @@ export function maxBeds(marla) {
   return 6;
 }
 
+/** Whether a 'make bigger' choice can work on a plot (a bigger kitchen has almost no valid layouts up to 6 marla). */
+export const focusAllowed = (id, marla) => !(id === 'kitchen' && marla != null && marla <= 6);
+
 export const FOCUS = [
   { id: 'balanced', label: 'Balanced' },
   { id: 'bedrooms', label: 'Bedrooms' },

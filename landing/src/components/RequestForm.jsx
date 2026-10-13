@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { ArrowRight, CaretDown, CircleNotch, SlidersHorizontal, WarningCircle } from '@phosphor-icons/react';
-import { FOCUS, LIMITS, bathOptions, feetError, maxBeds, parsePlot } from '../lib/parse.js';
+import { FOCUS, LIMITS, bathOptions, feetError, focusAllowed, maxBeds, parsePlot } from '../lib/parse.js';
 
 const APP_URL = import.meta.env.VITE_APP_URL || '../index.html';
 const BEDS = [2, 3, 4, 5];
@@ -60,6 +60,7 @@ export default function RequestForm() {
   const baOpts = bathOptions(effBeds);
   const effBaths = baOpts.some((o) => o.n === baths) ? baths : effBeds + 1;
   const bathHint = baOpts.find((o) => o.n === effBaths).hint;
+  const effFocus = focusAllowed(focus, plot?.marla) ? focus : 'balanced';
 
   const plotHelp = feetOk
     ? `${plot.w} x ${plot.d} ft, about ${(Math.round(plot.marla * 10) / 10).toString()} marla`
@@ -77,7 +78,7 @@ export default function RequestForm() {
     setBusy(true);
     const dims = feetOk ? { w: plot.w, d: plot.d } : { w: parsed.w, d: parsed.d };
     const label = feetOk ? `${dims.w}x${dims.d}` : text.trim();
-    const qs = new URLSearchParams({ q: `${label} ${effBeds} bed`, w: dims.w, d: dims.d, baths: effBaths, focus });
+    const qs = new URLSearchParams({ q: `${label} ${effBeds} bed`, w: dims.w, d: dims.d, baths: effBaths, focus: effFocus });
     const url = `${APP_URL}${APP_URL.includes('?') ? '&' : '?'}${qs}`;
     window.setTimeout(() => { window.location.href = url; }, 450);
   };
@@ -179,12 +180,12 @@ export default function RequestForm() {
               <legend className="mb-1 text-sm font-medium">Make bigger</legend>
               <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Make bigger">
                 {FOCUS.map((o) => (
-                  <button key={o.id} type="button" role="radio" aria-checked={o.id === focus} onClick={() => setFocus(o.id)} className={pill(o.id === focus, false)}>
+                  <button key={o.id} type="button" role="radio" aria-checked={o.id === effFocus} disabled={!focusAllowed(o.id, plot?.marla)} onClick={() => setFocus(o.id)} className={pill(o.id === effFocus, !focusAllowed(o.id, plot?.marla))}>
                     {o.label}
                   </button>
                 ))}
               </div>
-              <Hint>{focus === 'balanced' ? 'No preference: rooms are sized in the usual proportions.' : `The ${FOCUS.find((o) => o.id === focus).label.toLowerCase()} gets a larger share of the house; other rooms give up some space.`}</Hint>
+              <Hint>{plot && !focusAllowed('kitchen', plot.marla) ? 'A bigger kitchen needs more than 6 marla.' : effFocus === 'balanced' ? 'No preference: rooms are sized in the usual proportions.' : `The ${FOCUS.find((o) => o.id === effFocus).label.toLowerCase()} gets a larger share of the house; other rooms give up some space.`}</Hint>
             </fieldset>
           </div>
         </div>

@@ -34,4 +34,5 @@ for f in ("runs/eval_sft_$TAG.json", "runs/eval_rl_$TAG.json"):
         print({k: (round(v, 3) if isinstance(v, float) else v) for k, v in r.items() if k not in ("top_failures",)})
 EOF
 zip -r runs_$TAG.zip runs/sft_$TAG runs/rl_$TAG runs/eval_*_$TAG.json runs/*_$TAG.log > /dev/null
+cp runs/rl_$TAG/model.pt rl_${TAG}_model.pt
 echo "ALL DONE in $(( $(date +%s) - T0 )) s  ->  runs_$TAG.zip"
