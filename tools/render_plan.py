@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw
 COL = {"bed": "#e7e0f4", "bath": "#c9e5ee", "kitchen": "#f7dccd", "lounge": "#dfeedb", "drawing": "#f6e7c8", "dining": "#dce8f4",
        "porch": "#d9d6cc", "lawn": "#cfe8b8", "stairs": "#e9e9e9", "store": "#e6e2d6", "lobby": "#ececec", "courtyard": "#d8ecc8",
        "garage": "#d9d6cc", "balcony": "#d8ecc8", "passage": "#f2f2f2", "prayer": "#f1ecd2", "study": "#e8e8f8",
-       "servant": "#ece0d6", "dress": "#efe3f0", "other": "#f0f0f0"}
+       "servant": "#ece0d6", "master": "#d9cdf0", "void": "#f7f7f7", "dress": "#efe3f0", "other": "#f0f0f0"}
 
 
 def render(plan, out, px_h=900):
