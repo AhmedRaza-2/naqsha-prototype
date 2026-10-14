@@ -53,9 +53,19 @@ def fit(lengths, total, minimum):
 
 def assemble(rl):
     """-> (plan, info) or (None, reason)."""
-    W, D = (float(v) for v in rl["plot"])
-    rows = [[r for r in row if float(r.get("w", 0)) > 0] for row in rl.get("rows", [])]
-    rows = [row for row in rows if row]
+    W, D = (snap(float(v)) for v in rl["plot"])
+    if not (15 <= W <= 120 and 25 <= D <= 150): return None, "plot size out of range"
+    # remember where each kept room was in the input, so washrooms stay attached to the right room
+    rows, where = [], {}
+    for ri, row in enumerate(rl.get("rows", []), 1):
+        kept, pos = [], {}
+        for ci, r in enumerate(row, 1):
+            if float(r.get("w", 0)) > 0:
+                pos[(ri, ci)] = len(kept)
+                kept.append(r)
+        if kept:
+            where.update({k: (len(rows), v) for k, v in pos.items()})
+            rows.append(kept)
     if len(rows) < 2: return None, "fewer than 2 rows"
     # a row's depth: its enclosed rooms' median depth (open strips like a lawn use their own)
     depth = []
@@ -74,14 +84,14 @@ def assemble(rl):
         bands_.append({"d": d, "rooms": [{"t": norm_type(r["t"]), "w": w} for r, w in zip(row, ws)]})
     for b in rl.get("baths", []):
         try:
-            band = bands_[int(b["row"]) - 1]
-            room = band["rooms"][int(b["col"]) - 1]
-        except (IndexError, KeyError, ValueError, TypeError):
+            bi, ri = where[(int(b["row"]), int(b["col"]))]
+        except (KeyError, ValueError, TypeError):
             continue
+        band, room = bands_[bi], bands_[bi]["rooms"][ri]
         if room["t"] in bands.OPEN or room.get("bath"): continue
-        bw = max(3.0, min(snap(float(b.get("w", 5))), room["w"] - 1))
-        bd = max(3.0, min(snap(float(b.get("d", 6))), band["d"] - 2))
-        if bw < 3 or bd < 3: continue
+        bw = min(snap(float(b.get("w", 5))), room["w"] - 1)
+        bd = min(snap(float(b.get("d", 6))), band["d"] - 2)
+        if bw < 3 or bd < 3: continue                             # does not fit this room: leave it out rather than squeeze it
         room["bath"] = [bw, bd, "L" if str(b.get("side", "R")).upper().startswith("L") else "R"]
     nb = sum(1 for b in bands_ for r in b["rooms"] if r["t"] in bands.BEDS)
     nbath = sum(1 for b in bands_ for r in b["rooms"] if r.get("bath"))

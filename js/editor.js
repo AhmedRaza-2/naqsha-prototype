@@ -3,7 +3,7 @@
 //   wall between two rooms in a row  -> one room grows, its neighbour shrinks
 //   wall between two rows            -> one row gets deeper, the next one shallower
 //   inner edges of a washroom        -> the washroom gets wider / deeper inside its room
-import { planSVG } from './svg.js';
+import { planFrame, planSVG } from './svg.js';
 import { OPEN } from './bands.js';
 
 const SNAP = 0.5;
@@ -60,12 +60,15 @@ function apply(base, h, dx, dz) {
 /**
  * Mount an editor for one layout.
  *   rebuild(plan) -> layout object (rule check, doors, windows) for an edited plan
- *   onChange(layout) is called after every change
+ *   onChange(layout, live) after every change; live = true while a wall is still being dragged
+ *   state = { original, history } kept by the caller per layout, so switching layouts keeps undo and reset
  */
-export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn }) {
-  const original = clone(layout.plan);
-  const history = [];
-  let L = layout, drag = null, queued = null;
+export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn, state }) {
+  const st = state || {};
+  st.original ||= clone(layout.plan);
+  st.history ||= [];
+  const { original, history } = st;
+  let L = layout, drag = null;
   const OPTS = { maxW: 640, maxH: 760 };
   const off = new AbortController();                            // removes the listeners when another layout is edited
   const sig = { signal: off.signal };
@@ -91,48 +94,54 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     if (push) history.push(L.plan);
     L = rebuild(plan);
     render();
-    onChange(L);
+    onChange(L, false);
   }
 
-  // feet under the pointer: the plan's frame maps feet to SVG units; the SVG is scaled to its box on screen
-  const toFeet = (e) => {
+  // pointer position in SVG units (the SVG is scaled to its box on screen)
+  const svgPoint = (e) => {
     const svg = host.querySelector('svg');
     const box = svg.getBoundingClientRect();
     const vb = svg.viewBox.baseVal;
-    const px = ((e.clientX - box.left) / box.width) * vb.width, py = ((e.clientY - box.top) / box.height) * vb.height;
-    return { px, py, k: vb.width / box.width };
+    return { px: ((e.clientX - box.left) / box.width) * vb.width, py: ((e.clientY - box.top) / box.height) * vb.height };
   };
+
+  // the edit is computed once per animation frame from the latest pointer position, and once more on release
+  function update() {
+    if (!drag || !drag.last) return;
+    const dx = (drag.last.px - drag.start.px) / drag.s, dz = -(drag.last.py - drag.start.py) / drag.s;   // screen y grows toward the road
+    const next = apply(drag.base, drag.h, dx, dz);
+    if (JSON.stringify(next) !== JSON.stringify(L.plan)) { L = rebuild(next); drag.moved = true; render(); onChange(L, true); }
+  }
+  function end(commit) {
+    if (!drag) return;
+    if (drag.raf) cancelAnimationFrame(drag.raf);
+    if (commit) update();                                        // a quick flick may not have reached a frame yet
+    else if (drag.moved) { L = rebuild(drag.base); drag.moved = false; render(); }   // cancelled: put it back
+    if (drag.moved) history.push(drag.base);
+    host.classList.remove('dragging');
+    drag = null;
+    render();
+    onChange(L, false);
+  }
 
   host.addEventListener('pointerdown', (e) => {
     const g = e.target.closest('g.h');
-    if (!g) return;
+    if (!g || e.button > 0) return;
     e.preventDefault();
-    const hs = handles(L.plan);
-    const h = hs[+g.dataset.k];
-    const f = { s: (host.querySelector('svg').viewBox.baseVal.width - 48) / L.plot.w };   // feet -> SVG units (2 x 24 margin)
-    drag = { h, start: toFeet(e), base: L.plan, s: f.s, moved: false };
+    const h = handles(L.plan)[+g.dataset.k];
+    drag = { h, start: svgPoint(e), last: null, base: L.plan, s: planFrame(L, OPTS).s, moved: false, raf: 0 };
     host.classList.add('dragging');
   }, sig);
   window.addEventListener('pointermove', (e) => {
     if (!drag) return;
-    const now = toFeet(e);
-    const dx = (now.px - drag.start.px) / drag.s, dz = -(now.py - drag.start.py) / drag.s;   // screen y grows toward the road
-    queued = apply(drag.base, drag.h, dx, dz);
-    if (!drag.raf) drag.raf = requestAnimationFrame(() => {
-      if (!drag) return;
-      drag.raf = 0;
-      if (JSON.stringify(queued) !== JSON.stringify(L.plan)) { L = rebuild(queued); drag.moved = true; render(); onChange(L); }
-    });
+    drag.last = svgPoint(e);
+    if (!drag.raf) drag.raf = requestAnimationFrame(() => { if (drag) { drag.raf = 0; update(); } });
   }, sig);
-  window.addEventListener('pointerup', () => {
-    if (!drag) return;
-    if (drag.moved) { history.push(drag.base); render(); }
-    host.classList.remove('dragging');
-    drag = null;
-  }, sig);
+  window.addEventListener('pointerup', () => end(true), sig);
+  window.addEventListener('pointercancel', () => end(false), sig);   // system gesture, second finger: undo the drag
 
   undoBtn.onclick = () => { if (history.length) set(history.pop(), false); };
   resetBtn.onclick = () => set(clone(original), true);
   render();
-  return { get layout() { return L; }, destroy: () => off.abort() };
+  return { get layout() { return L; }, destroy: () => { if (drag) end(true); off.abort(); } };
 }

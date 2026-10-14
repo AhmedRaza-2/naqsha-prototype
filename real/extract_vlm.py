@@ -79,7 +79,15 @@ def main():
     cands = [json.loads(l) for l in open(a.candidates, encoding="utf-8")][: a.limit]
     cands = cands[k::n]
     out = Path(a.out); out.parent.mkdir(parents=True, exist_ok=True)
-    done = {json.loads(l)["id"] for l in open(out, encoding="utf-8")} if out.exists() else set()
+    done = set()
+    if out.exists():                                              # resume; a line cut off by a killed process is read again
+        good = []
+        for l in open(out, encoding="utf-8"):
+            try:
+                done.add(json.loads(l)["id"]); good.append(l.rstrip("\n") + "\n")
+            except (json.JSONDecodeError, KeyError):
+                pass
+        out.write_text("".join(good), encoding="utf-8")
     todo = [c for c in cands if c["id"] not in done]
     gold = {g["id"]: g for g in (json.loads(l) for l in open(a.gold, encoding="utf-8"))}
     examples = [gold[i] for i in EXAMPLE_IDS if i in gold]
@@ -101,7 +109,7 @@ def main():
                                               tokenize=False, add_generation_prompt=True) for c in chunk]
             inputs = proc(text=texts, images=imgs, padding=True, return_tensors="pt").to(model.device)
             with torch.no_grad():
-                gen = model.generate(**inputs, max_new_tokens=a.max_new, do_sample=False, repetition_penalty=1.05)
+                gen = model.generate(**inputs, max_new_tokens=a.max_new, do_sample=False)   # no repetition penalty: sizes and brackets repeat in valid JSON
             outs = proc.batch_decode(gen[:, inputs["input_ids"].shape[1]:], skip_special_tokens=True)
             sec = (time.time() - t0) / len(chunk)
             for c, o in zip(chunk, outs):

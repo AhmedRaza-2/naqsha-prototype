@@ -113,7 +113,7 @@ export function elevationSVG(L, st) {
       if (st.id !== 'modern') o += `<rect x="${x0 - 3}" y="${Y(p.sill) }" width="${w + 6}" height="4" fill="${st.trim}" stroke="#00000033"/>`;
     }
   }
-  const door = front.find((p) => p.main);
+  const door = L.openings.find((p) => p.main);                  // may be set back behind the car porch
   const dx = X(door.at - door.w / 2), dw = door.w * s;
   if (st.id === 'modern') o += `<rect x="${dx - 12}" y="${Y(H)}" width="${dw + 24}" height="${H * s}" fill="${st.accent}" opacity=".92"/>`;
   if (st.id === 'spanish') o += `<path d="M${dx} ${Y(0)} V${Y(6)} A${dw / 2} ${dw / 2} 0 0 1 ${dx + dw} ${Y(6)} V${Y(0)} Z" fill="${st.frame}"/>`;

@@ -39,23 +39,27 @@ export function finalize(L) {
   const openings = [], links = [];
   const byId = (id) => rooms.find((r) => r.id === id);
 
-  // main entrance: the lobby, or the lounge / dining room the porch or lawn opens into (real plans often have no lobby)
-  const open = L.open || [];
-  const frontSpan = (r) => {
-    if (Math.abs(r.z - B.z) < 0.01) return [r.x, r.x + r.w];
-    const p = open.find((o) => Math.abs(o.z + o.d - r.z) < 0.01 && Math.min(o.x + o.w, r.x + r.w) - Math.max(o.x, r.x) >= 3);
-    return p ? [Math.max(p.x, r.x), Math.min(p.x + p.w, r.x + r.w)] : null;
+  // doors to outside, as decided by the checker's rule (outsideDoors in bands.js), so the drawing and the check agree:
+  // the main entrance, plus a guest door for a drawing room next to the porch or lawn
+  const dOut = L.doorsOut || {};
+  let main = dOut.main;
+  if (!main) {                                                   // no entrance facing the road: the front wall of the lobby or front-most room
+    const r = mains.find((m) => m.type === 'lobby') || mains.reduce((a, m) => (m.z < a.z ? m : a));
+    main = { room: r.id, wall: ['h', r.z, r.x, r.x + r.w] };
+  }
+  const doorWalls = new Set();
+  const outDoor = (d, isMain) => {
+    const [o, c, lo, hi] = d.wall;
+    openings.push({ o, c, at: (lo + hi) / 2, w: Math.min(isMain ? 3.5 : 3, hi - lo - 0.5), kind: 'door', main: isMain, sill: 0, top: isMain ? 7.2 : 7, room: d.room });
+    links.push(['outside', d.room]);
+    doorWalls.add(`${d.room}|${o}|${c}`);
   };
-  const lobby = mains.find((r) => r.type === 'lobby');
-  const ent = (lobby && frontSpan(lobby) && lobby) || ['lounge', 'dining', 'passage'].map((t) => mains.find((r) => r.type === t && frontSpan(r))).find(Boolean)
-    || lobby || mains.find((r) => r.type === 'drawing');
-  const span = frontSpan(ent) || [ent.x, ent.x + ent.w];
-  openings.push({ o: 'h', c: ent.z, at: (span[0] + span[1]) / 2, w: 3.5, kind: 'door', main: true, sill: 0, top: 7.2, room: ent.id });
-  links.push(['outside', ent.id]);
+  outDoor(main, true);
+  (dOut.guests || []).forEach((g) => outDoor(g, false));
 
   const PREF = {
     lobby: ['lounge', 'dining'],
-    drawing: ['lobby', 'lounge', 'dining', 'passage'],
+    drawing: ['lobby', 'lounge'],
     kitchen: ['dining', 'lounge', 'lobby'],
     dining: ['lounge', 'kitchen'],
   };
@@ -92,6 +96,7 @@ export function finalize(L) {
   const bounds = { z0: B.z, z1: B.z + B.d, x0: B.x, x1: B.x + B.w };
   const subtract = (lo, hi, cut) => (cut ? [[lo, Math.min(hi, cut[0])], [Math.max(lo, cut[1]), hi]].filter(([a, b]) => b - a > 0) : [[lo, hi]]);
   // open spaces inside the outline (car porch, light well) also give the rooms around them an outside wall
+  const open = L.open || [];
   const near = (a, b) => Math.abs(a - b) < 0.01;
   const openSpans = (e) => open.flatMap((p) => {
     const touch = e.o === 'h' ? (e.front ? near(p.z + p.d, e.c) : near(p.z, e.c)) : (e.left ? near(p.x + p.w, e.c) : near(p.x, e.c));
@@ -109,7 +114,7 @@ export function finalize(L) {
       { o: 'v', c: r.x + r.w, lo: r.z, hi: r.z + r.d, on: rule.side > 0 && Math.abs(r.x + r.w - bounds.x1) < 0.01 },
     ];
     for (const e of edges) {
-      if ((r.type === 'lobby' || r.id === ent.id) && e.front) continue;      // the main door is on this wall
+      if ((r.type === 'lobby' && e.front) || doorWalls.has(`${r.id}|${e.o}|${e.c}`)) continue;   // a door to outside is on this wall
       const spans = e.on ? [[e.lo, e.hi]] : openSpans(e);
       if (!spans.length) continue;
       let cut = null;

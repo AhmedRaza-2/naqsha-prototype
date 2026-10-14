@@ -218,19 +218,36 @@ def _links(rects, mains, y0):
     return links
 
 
+ENTRY_OPEN = {"lawn", "porch", "garage"}     # open spaces a door to outside opens onto (not a light well, side strip, balcony)
+
+
 def _front_open(r, rects):
-    """An open space (lawn, porch...) directly in front of the room, sharing at least 3 ft of its front wall."""
-    return any(o["t"] in OPEN and abs(o["y"] + o["d"] - r["y"]) < 0.01
+    """r's front wall (road side) faces the lawn or porch over at least 3 ft."""
+    return any(o["t"] in ENTRY_OPEN and abs(o["y"] + o["d"] - r["y"]) < 0.01
                and min(o["x"] + o["w"], r["x"] + r["w"]) - max(o["x"], r["x"]) >= 3 for o in rects)
 
 
 def _guest_door(r, rects):
-    """A drawing room that touches the porch or front lawn (any wall, 3 ft or more) can have its own guest door."""
+    """A drawing room sharing at least 3 ft of wall with the porch or a lawn can have its own guest door."""
     for o in rects:
-        if o["t"] not in ("porch", "lawn", "garage"): continue
+        if o["t"] not in ENTRY_OPEN: continue
         s = _shared(r, o)
         if s and s[3] - s[2] >= 3: return True
     return False
+
+
+def outside_doors(rects, mains, y0):
+    """(main entrance or None, faces the road side, [drawing rooms with their own guest door]); same as outsideDoors()
+    in js/bands.js. The main entrance is the lobby, or (common in real plans) a lounge / dining room / passage facing
+    the porch or lawn."""
+    lob = next((r for r in mains if r["t"] == "lobby"), None)
+    if lob is not None:
+        main, faces = lob, abs(lob["y"] - y0) < 0.01 and _front_open(lob, rects)
+    else:
+        main = next((r for t in ("lounge", "dining", "passage") for r in mains if r["t"] == t and _front_open(r, rects)), None)
+        faces = main is not None
+    guests = [r for r in mains if r["t"] == "drawing" and r is not main and _guest_door(r, rects)]
+    return main, faces, guests
 
 
 def _has_window(r, rects):
@@ -319,16 +336,11 @@ def check(plan, beds=None):
     nobath = [r["t"] for r in mains if r["t"] in BEDS and not r["bath"]]
     add("warn" if nobath else "ok", "attached baths", f"{len(nobath)} bedroom(s) without")
     # main entrance: a lobby, or (common in real plans) a lounge / dining room entered straight from the porch or lawn
-    lob = next((r for r in mains if r["t"] == "lobby"), None)
-    if lob is not None:
-        ent, faces = lob, abs(lob["y"] - y0) < 0.01 and _front_open(lob, rects)
-    else:
-        ent = next((r for t in ("lounge", "dining", "passage") for r in mains if r["t"] == t and _front_open(r, rects)), None)
-        faces = ent is not None
+    ent, faces, guests = outside_doors(rects, mains, y0)
     add("ok" if faces else "warn", "entrance on road side")
 
     links = _links(rects, mains, y0)
-    doors_out = ([ent["i"]] if ent else []) + [r["i"] for r in mains if r["t"] == "drawing" and r is not ent and _guest_door(r, rects)]
+    doors_out = ([ent["i"]] if ent else []) + [r["i"] for r in guests]
     adj = {}
     for a, b in links + [(-1, i) for i in doors_out]:
         adj.setdefault(a, []).append(b); adj.setdefault(b, []).append(a)

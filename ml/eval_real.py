@@ -87,7 +87,7 @@ def main():
     ap.add_argument("--samples", type=int, default=4)
     ap.add_argument("--out", default="runs/eval_real.json")
     a = ap.parse_args()
-    gold, silver = rows(f"{a.real}/test.jsonl"), rows(f"{a.real}/val.jsonl")
+    gold, silver = rows(f"{a.real}/test.jsonl"), rows(f"{a.real}/test_silver.jsonl")     # never trained on or used to pick a checkpoint
     res = []
     for ck in a.ckpt:
         model = L.load(ck)

@@ -197,11 +197,12 @@ function renderLayouts() {
     host.appendChild(el);
   });
   $('to3').disabled = true;
-  editor?.destroy(); editor = null; $('editor').hidden = true;
+  editor?.destroy(); editor = null; editIdx = -1; editState.clear(); $('editor').hidden = true;
   $('checks').innerHTML = '<li><span></span><span>Select a layout to see its rule check and cost estimate.</span></li>';
   $('cost').innerHTML = ''; $('chkscore').textContent = '';
 }
-let editor = null;
+let editor = null, editIdx = -1;
+const editState = new Map();                                    // per layout: { original, history }, kept while switching layouts
 function showChecks() {
   $('chkscore').textContent = `(${S.sel.score}/${S.sel.checks.length})`;
   $('checks').innerHTML = S.sel.checks.map((c) =>
@@ -215,24 +216,28 @@ function select(id) {
   [...$('layouts').children].forEach((c, i) => c.classList.toggle('sel', i === idx));
   showChecks();
   $('to3').disabled = false;
+  if (editor && editIdx === idx) return;                         // clicking the layout being edited: keep the editor as it is
   // editor: dragging a wall edits the plan; the rule check, cost, card and 3D all use the edited layout
   const fresh = $('editor').hidden;
   editor?.destroy();
   $('editor').hidden = false;
+  editIdx = idx;
   const card = $('layouts').children[idx];
+  if (!editState.has(S.sel.id)) editState.set(S.sel.id, {});
   editor = mountEditor($('edhost'), S.sel, {
-    undoBtn: $('edundo'), resetBtn: $('edreset'),
+    undoBtn: $('edundo'), resetBtn: $('edreset'), state: editState.get(S.sel.id),
     rebuild: (plan) => {
       const checks = check(plan, plan.beds);
       const L = planToLayout({ text: serialize(plan), plan, checks, score: score(checks) }, idx);
-      L.tag = 'Naqsha model, edited';
+      if (JSON.stringify(plan) !== JSON.stringify(editState.get(L.id).original)) L.tag = 'Naqsha model, edited';
       return L;
     },
-    onChange: (L) => {
+    onChange: (L, live) => {
       S.layouts[idx] = S.sel = L;
+      showChecks();
+      if (live) return;                                          // the card thumbnail is redrawn when the drag ends
       const warn = L.checks.length - L.score;
       card.innerHTML = `${planSVG(L)}<h4>${L.label}: ${L.tag}</h4><p>${L.covered.toLocaleString()} sq ft covered</p><span class="badge ${warn ? 'w' : ''}">${L.score}/${L.checks.length} checks passed</span>`;
-      showChecks();
     },
   });
   if (fresh) $('editor').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });

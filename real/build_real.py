@@ -115,6 +115,22 @@ def agreement(rooms, labels):
     return (ok / n if n else None), n
 
 
+def read_jsonl(path):
+    """Rows of a JSON-lines file; a line cut off when a process was killed mid-write is skipped."""
+    out = []
+    for l in open(path, encoding="utf-8"):
+        try:
+            out.append(json.loads(l))
+        except json.JSONDecodeError:
+            pass
+    return out
+
+
+def encodable(text):
+    """Every number must be a token the model knows: 0.5 to 150 on the 0.5 ft grid (no 'BATHS 0', no 30.25 ft plots)."""
+    return all(0.5 <= float(v) <= 150 and float(v) * 2 == int(float(v) * 2) for v in re.findall(r"\d+(?:\.\d+)?", text))
+
+
 def row_of(plan, source, pid):
     txt = bands.serialize(plan)
     head, comp = txt.split("\n", 1)
@@ -146,8 +162,7 @@ def build():
     gold = {g["id"]: g for g in (json.loads(l) for l in open(ROOT / "real/gold.jsonl", encoding="utf-8"))}
     raw = {}
     for f in sorted(glob.glob(str(out / "raw*.jsonl"))):
-        for l in open(f, encoding="utf-8"):
-            r = json.loads(l); raw[r["id"]] = r
+        for r in read_jsonl(f): raw[r["id"]] = r
     why, silver = Counter(), []
     for pid, r in raw.items():
         if pid in gold: continue                                  # gold plans are the test set
@@ -164,6 +179,8 @@ def build():
         errs = [c[1] for c in cs if c[0] == "err"]
         if errs: why["invalid: " + errs[0]] += 1; continue
         if plan["beds"] < 1: why["no bedroom"] += 1; continue
+        if plan["baths"] < 1: why["no washroom"] += 1; continue
+        if not encodable(bands.serialize(plan)): why["numbers the model has no token for"] += 1; continue
         if info["stretch"] > 0.35: why["sizes far from the plot size"] += 1; continue
         ag, n = agreement(rooms, cands.get(pid, {}).get("labels", []))
         if ag is not None and n >= 2 and ag < 0.4: why["disagrees with printed sizes"] += 1; continue
@@ -172,14 +189,20 @@ def build():
     test = []
     for gid, g in gold.items():
         plan, info = assemble(g["rooms"])
-        if plan: test.append(row_of(plan, "gold", gid))
-    val = [r for r in silver if int(hashlib.md5(r["id"].encode()).hexdigest(), 16) % 10 == 0]     # 10% of silver plans held out
-    train = [r for r in silver if r not in val]
-    for name, rows in (("train", train), ("val", val), ("test", test)):
+        if plan and not any(c[0] == "err" for c in bands.check(plan)) and encodable(bands.serialize(plan)):
+            test.append(row_of(plan, "gold", gid))
+        else:
+            print(f"gold plan {gid} left out of the test set: {info if plan is None else 'invalid'}")
+    # silver plans held out: 10% to choose the fine-tuning checkpoint (val), another 10% only to report (test_silver)
+    part = lambda r: int(hashlib.md5(r["id"].encode()).hexdigest(), 16) % 10
+    val = [r for r in silver if part(r) == 0]
+    test_silver = [r for r in silver if part(r) == 1]
+    train = [r for r in silver if part(r) >= 2]
+    for name, rows in (("train", train), ("val", val), ("test", test), ("test_silver", test_silver)):
         with open(out / f"{name}.jsonl", "w", encoding="utf-8", newline="\n") as f:
             for r in rows: f.write(json.dumps(r) + "\n")
     acc = gold_accuracy(raw, gold)
-    rep = {"read": len(raw), "kept_silver": len(silver), "train": len(train), "val": len(val), "test_gold": len(test),
+    rep = {"read": len(raw), "kept_silver": len(silver), "train": len(train), "val": len(val), "test_silver": len(test_silver), "test_gold": len(test),
            "rejected": dict(why.most_common()), "vision_model_vs_gold": acc,
            "silver_mean_score": round(sum(r["score"] for r in silver) / max(1, len(silver)), 3),
            "silver_beds": dict(Counter(r["beds"] for r in silver)), "silver_marla": dict(Counter(round(r["plot"][0] * r["plot"][1] / 225) for r in silver))}
