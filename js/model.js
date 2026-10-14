@@ -115,12 +115,6 @@ function requestText({ w, d, beds, baths, focus }) {
   return t;
 }
 
-/** True when the loaded model understands the washroom and bigger-rooms preferences. */
-export async function supportsPreferences() {
-  await load();
-  return stoi.has('BATHS') && stoi.has('FOCUS');
-}
-
 /** Sample `n` plans for the request. Returns the text of each (may be invalid, the caller checks them). */
 async function sample(request, { n = 12, temperature = 0.8, maxNew = 140 } = {}, onStatus) {
   const { ort } = await load();

@@ -50,6 +50,24 @@ export function parse(text) {
   return plan;
 }
 
+/** Plan -> text (same as serialize() in tools/bands.py): the last width of a row and the last depth are implicit. */
+export function serialize(plan) {
+  const { w, d } = plan.plot;
+  let head = `PLOT ${w}x${d} BEDS ${plan.beds}`;
+  if (plan.baths != null) head += ` BATHS ${plan.baths}`;
+  if (plan.focus) head += ` FOCUS ${plan.focus}`;
+  const lines = [head];
+  plan.bands.forEach((b, bi) => {
+    const toks = b.rooms.map((r, ri) => {
+      let t = ri === b.rooms.length - 1 ? r.t : `${r.t} ${r.w}`;
+      if (r.bath) t += ` +bath ${r.bath[0]}x${r.bath[1]} ${r.bath[2]}`;
+      return t;
+    });
+    lines.push(`${bi === plan.bands.length - 1 ? 'rest' : b.d}: ${toks.join(' | ')}`);
+  });
+  return lines.join('\n');
+}
+
 // ---------------------------------------------------------------- geometry
 /** Band plan -> rectangles in feet (x across, y = depth from the road). Baths get parent = index of their room. */
 export function toRects(plan) {

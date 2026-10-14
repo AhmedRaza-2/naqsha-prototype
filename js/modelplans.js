@@ -73,7 +73,7 @@ export function planToLayout(item, index) {
   const letter = String.fromCharCode(65 + index);
   const L = {
     id: `M${letter}`, label: `Layout ${letter}`, tag: 'Naqsha model', source: 'model', text: item.text,
-    plot: { w: W, d: D }, rule: ruleFor(W, D), B, rooms, open, beds: plan.beds, narrow: B.w < 26,
+    plot: { w: W, d: D }, rule: ruleFor(W, D), B, rooms, open, beds: plan.beds, narrow: B.w < 26, plan,
   };
   finalize(L);                                                  // doors, windows and links for the 2D plan and the 3D walkthrough
   // the planner's own checker does not know light wells; show the checker the model was trained against instead

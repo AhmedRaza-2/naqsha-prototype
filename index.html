@@ -65,6 +65,13 @@
       <p class="lead" id="s2sub"></p>
       <div class="regen-row"><button class="btn" id="regen">Regenerate layouts</button><span class="fine">Not what you had in mind? Draft three new ones.</span></div>
       <div class="grid3" id="layouts"></div>
+      <section class="card editor" id="editor" hidden>
+        <div class="editor-head">
+          <div><h3>Adjust the layout</h3><p class="fine">Drag any wall to resize the rooms on both sides, or a washroom's edge to resize it. Sizes snap to half a foot and the rule check updates as you go.</p></div>
+          <div class="editor-actions"><button class="btn" id="edundo" disabled>Undo</button><button class="btn" id="edreset" disabled>Reset</button></div>
+        </div>
+        <div id="edhost" class="edhost"></div>
+      </section>
       <div class="split">
         <div class="card"><h3>Rule check <span id="chkscore"></span></h3><ul class="checks" id="checks"></ul></div>
         <div class="card"><h3>Indicative cost</h3><div id="cost"></div>

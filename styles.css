@@ -67,3 +67,24 @@ footer { text-align: center; font-size: 12px; color: var(--mut); padding: 20px; 
 .prefs[open] summary { margin-bottom: 10px; }
 .formerr { color: #a23b2c; font-size: 14px; margin: 8px 0 0; }
 .regen-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 16px; }
+
+/* layout editor: drag walls to resize rooms */
+.editor { margin-bottom: 20px; }
+.editor-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+.editor-head h3 { margin: 0 0 4px; }
+.editor-head .fine { margin: 0; max-width: 60ch; }
+.editor-actions { display: flex; gap: 8px; }
+.edhost { display: flex; justify-content: center; touch-action: none; user-select: none; }
+.edhost svg { width: 100%; max-width: 640px; height: auto; }
+.edhost .h { cursor: col-resize; }
+.edhost .h.hz { cursor: row-resize; }
+.edhost .h .hit { stroke: transparent; stroke-width: 14; }
+.edhost .h .show { stroke: var(--brand); stroke-width: 2.5; opacity: 0; transition: opacity .12s; }
+.edhost .h .grip { fill: #fff; stroke: var(--brand); stroke-width: 1.6; }
+.edhost .h.bath .grip { stroke: #3f9ad0; }
+.edhost .h.bath .show { stroke: #3f9ad0; }
+.edhost .h:hover .show, .edhost.dragging .h:active .show { opacity: .9; }
+.edhost .h:hover .grip { fill: var(--brand); }
+.edhost .h.bath:hover .grip { fill: #3f9ad0; }
+.edhost.dragging, .edhost.dragging * { cursor: grabbing !important; }
+@media (prefers-reduced-motion: reduce) { .edhost .h .show { transition: none; } }
