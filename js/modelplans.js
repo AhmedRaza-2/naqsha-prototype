@@ -39,12 +39,13 @@ export function planToLayout(item, index) {
 
   const rooms = [];
   const byRect = new Map();
-  let bedNo = 1;
+  const nBeds = mains.filter((r) => r.t === 'bed' || r.t === 'master').length;
+  let bedNo = mains.some((r) => r.t === 'master') ? 1 : 0;
   for (const r of mains) {
     if (!KNOWN.has(r.t)) continue;
     let type = r.t, name, id;
     if (r.t === 'master') { type = 'bed'; name = 'Master Bedroom'; id = 'bed1'; }
-    else if (r.t === 'bed') { bedNo += 1; name = `Bedroom ${bedNo}`; id = `bed${bedNo}`; }
+    else if (r.t === 'bed') { bedNo += 1; name = nBeds === 1 ? 'Bedroom' : `Bedroom ${bedNo}`; id = `bed${bedNo}`; }
     else {
       name = { drawing: 'Drawing Room', lobby: 'Entrance', lounge: hasDining ? 'TV Lounge' : 'Lounge & Dining', dining: 'Dining', kitchen: 'Kitchen', stairs: 'Stairs' }[r.t];
       id = r.t;
@@ -64,10 +65,15 @@ export function planToLayout(item, index) {
     parent.att = bath;
   }
 
+  // open spaces inside the house outline: the car porch beside the drawing room (small plots) and light wells
+  const inside = (r) => r.x >= B.x - 0.01 && r.x + r.w <= B.x + B.w + 0.01 && r.y >= B.z - 0.01 && r.y + r.d <= B.z + B.d + 0.01;
+  const open = rects.filter((r) => (r.t === 'porch' || r.t === 'courtyard') && inside(r))
+    .map((r) => ({ type: r.t, name: r.t === 'porch' ? 'Car Porch' : 'Light Well', x: r.x, z: r.y, w: r.w, d: r.d }));
+
   const letter = String.fromCharCode(65 + index);
   const L = {
     id: `M${letter}`, label: `Layout ${letter}`, tag: 'Naqsha model', source: 'model', text: item.text,
-    plot: { w: W, d: D }, rule: ruleFor(W, D), B, rooms, beds: plan.beds, narrow: B.w < 26,
+    plot: { w: W, d: D }, rule: ruleFor(W, D), B, rooms, open, beds: plan.beds, narrow: B.w < 26,
   };
   finalize(L);                                                  // doors, windows and links for the 2D plan and the 3D walkthrough
   // the planner's own checker does not know light wells; show the checker the model was trained against instead

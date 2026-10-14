@@ -2,7 +2,7 @@
     python ml/coverage.py --onnx models/layout.onnx
 The planner falls back to the rule-based generator when the model returns no valid plan, so the number that matters for a
 visitor is "requests with at least one valid plan out of N samples". The sweep covers the preset plot sizes, the
-usual plot sizes, every allowed bedroom count, the three washroom choices and every 'make bigger' choice."""
+usual plot sizes (3 marla to 60x110), every allowed bedroom count, every allowed washroom choice and every 'make bigger' choice."""
 import argparse, sys
 from pathlib import Path
 
@@ -14,11 +14,11 @@ import layoutlm as L  # noqa: E402
 from onnx_check import sample  # noqa: E402
 bands = L.bands
 
-PLOTS = [(25, 45), (30, 45), (30, 60), (35, 65), (38, 59), (40, 80), (45, 95), (50, 90), (60, 110)]
+PLOTS = [(20, 34), (20, 45), (25, 36), (25, 40), (25, 45), (30, 45), (30, 60), (35, 65), (38, 59), (40, 80), (45, 95), (50, 90), (60, 110)]
 
 
 def beds_allowed(w, d):
-    return range(2, bands.max_beds(w, d) + 1)
+    return range(bands.min_beds(w, d), bands.max_beds(w, d) + 1)
 
 
 def main():
@@ -33,11 +33,9 @@ def main():
         marla = w * d / 225
         got = tot = perfect = 0
         for beds in beds_allowed(w, d):
-            for extra in (0, 1, 2):
+            for baths in range(beds, bands.max_baths(w, d, beds) + 1):
                 for focus in bands.FOCUS_VALUES:
-                    if focus == "kitchen" and marla <= 6:
-                        continue
-                    prompt = bands.prompt_for(w, d, beds, beds + extra, focus)
+                    prompt = bands.prompt_for(w, d, beds, baths, focus)
                     res = sample(sess, [prompt] * a.n, rng=rng)
                     scores = [L.reward(prompt, ids)[0] for ids in res]
                     tot += 1

@@ -2,7 +2,8 @@ import { PRESETS, MARLA, ruleFor, generateAll, estimateCost } from './layout.js'
 import { planSVG, elevationSVG } from './svg.js';
 import { STYLES, STYLE_IDS } from './styles.js';
 import { createViewer } from './scene.js';
-import { modelLayouts } from './modelplans.js';
+import { modelLayouts, planToLayout } from './modelplans.js';
+import { compactPlans, isCompact } from './compact.js';
 import { onModelState, preloadModel, supportsPreferences } from './model.js';
 
 const $ = (id) => document.getElementById(id);
@@ -26,9 +27,11 @@ function readPlot() {
   const r = ruleFor(w, d);
   $('plotinfo').textContent = `${w} x ${d} ft = ${(w * d).toLocaleString()} sq ft = ${marla.toFixed(1)} marla. Buildable area about ${(w - 2 * r.side)} x ${(d - r.front - r.rear)} ft after setbacks.`;
   document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', +c.dataset.w === w && +c.dataset.d === d));
-  const cap = maxBedsFor(w, d);
-  [...$('pb').options].forEach((o) => { o.disabled = +o.value > cap; });
-  if (+$('pb').value > cap) { $('pb').value = String(cap); if (typeof syncBaths === 'function') syncBaths(); }
+  const cap = maxBedsFor(w, d), lo = minBedsFor(w, d);
+  [...$('pb').options].forEach((o) => { o.disabled = +o.value > cap || +o.value < lo; });
+  const want = Math.min(Math.max(+$('pb').value, lo), Math.max(cap, lo));
+  if (cap > 0 && want !== +$('pb').value) $('pb').value = String(want);
+  if (typeof syncBaths === 'function') syncBaths();
   return { w, d };
 }
 PRESETS.forEach((p) => {
@@ -50,7 +53,7 @@ $('nl').addEventListener('input', () => {
     if (hit) { $('pw').value = hit.w; $('pd').value = hit.d; }
     else { const a = +m[1] * MARLA; const w = Math.round(Math.sqrt(a * 0.55)); $('pw').value = w; $('pd').value = Math.round(a / w); }
   }
-  if ((m = t.match(/(\d)\s*(?:bed|kamr|room|bhk)/))) $('pb').value = Math.min(5, Math.max(2, +m[1]));
+  if ((m = t.match(/(\d)\s*(?:bed|kamr|room|bhk)/))) $('pb').value = Math.min(6, Math.max(1, +m[1]));
   if ((m = t.match(/(\d)\s*(?:bath|washroom|wc|toilet)/))) { syncBaths(+m[1]); $('prefs').open = true; }
   if (/big\w*\s+(?:hall|lounge|tv)/.test(t)) { $('pfocus').value = 'lounge'; $('prefs').open = true; }
   else if (/big\w*\s+(?:bed|room)/.test(t)) { $('pfocus').value = 'bedrooms'; $('prefs').open = true; }
@@ -59,24 +62,35 @@ $('nl').addEventListener('input', () => {
 });
 
 // ---------- preferences: washrooms and bigger rooms ----------
-// most bedrooms that fit on one floor: the usable width after side setbacks decides (same rule as tools/bands.py)
+// most bedrooms that fit on one floor, found by probing the layout generator (same rule as max_beds in tools/bands.py).
+// 0 = too small or narrow for a single-floor house after setbacks. Up to 6 marla the compact layout also offers 1 bedroom.
 const maxBedsFor = (w, d) => {
-  const marla = (w * d) / MARLA;
-  if (marla <= 6) return 2;
-  const usable = w - 2 * (marla <= 14 ? 3 : 5);
+  const marla = (w * d) / MARLA, r = ruleFor(w, d);
+  if (marla <= 6) {
+    if (d - r.front - r.rear < 21.5) return 0;
+    return (w >= 24 && d >= 42) || (w >= 22 && d >= 48) ? 2 : 1;
+  }
+  const usable = w - 2 * r.side;
+  if (usable < 19) return 0;
   return usable < 26 ? 2 : usable < 32 ? 3 : usable < 44 ? 4 : 6;
 };
+const minBedsFor = (w, d) => ((w * d) / MARLA <= 6 ? 1 : 2);
+// washrooms: one per bedroom + a guest washroom, + a common one off the lounge above 6 marla (same as max_baths)
+const extraBathsFor = (w, d) => ((w * d) / MARLA <= 6 ? 1 : 2);
 function syncBaths(want) {
   const beds = +$('pb').value;
   const sel = $('pbaths');
   const keep = want ?? +sel.value;
+  const plot = { w: +$('pw').value, d: +$('pd').value };
+  const opts = [[beds, beds === 1 ? 'Attached to the bedroom' : 'One per bedroom, attached'], [beds + 1, 'Attached + a guest washroom'], [beds + 2, 'Attached + guest + a common washroom']]
+    .slice(0, 1 + extraBathsFor(plot.w, plot.d));
   sel.innerHTML = '';
-  [[beds, 'One per bedroom, attached'], [beds + 1, 'Attached + a guest washroom'], [beds + 2, 'Attached + guest + a common washroom']].forEach(([n, label]) => {
+  opts.forEach(([n, label]) => {
     const o = document.createElement('option');
     o.value = n; o.textContent = `${n}: ${label}`;
     sel.appendChild(o);
   });
-  sel.value = [beds, beds + 1, beds + 2].includes(keep) ? keep : beds + 1;
+  sel.value = opts.some(([n]) => n === keep) ? keep : beds + 1;
 }
 $('pb').addEventListener('change', () => syncBaths());
 syncBaths();
@@ -89,8 +103,12 @@ function validateRequest() {
   if (d < 30 || d > 200) return 'Plot depth should be between 30 and 200 ft.';
   const marla = (w * d) / MARLA;
   if (marla < 3 || marla > 60) return 'Naqsha plans plots from 3 marla to 3 kanal.';
-  if ($('pfocus').value === 'kitchen' && marla <= 6) return 'A bigger kitchen needs more than 6 marla. Choose another option.';
-  if (beds > maxBedsFor(w, d)) return `A single floor on ${w} x ${d} ft fits up to ${maxBedsFor(w, d)} bedrooms. Choose fewer bedrooms${maxBedsFor(w, d) < 4 && marla > 8 ? ' or a wider plot (about 38 ft)' : ''}.`;
+  const cap = maxBedsFor(w, d);
+  if (cap === 0) return marla <= 6
+    ? `${w} x ${d} ft leaves too little depth for a house after the front and back open spaces. A single floor needs a plot at least 31 ft deep.`
+    : `${w} x ${d} ft is too narrow for a single floor with side setbacks. Plots above 6 marla need about 25 ft of width.`;
+  if (beds > cap) return `A single floor on ${w} x ${d} ft fits up to ${cap} bedroom${cap > 1 ? 's' : ''}. Choose fewer bedrooms${cap < 4 && marla > 8 ? ' or a wider plot (about 38 ft)' : cap === 1 ? ' or a deeper plot (about 25 x 45 ft fits 2)' : ''}.`;
+  if (beds < minBedsFor(w, d)) return 'Plots above 6 marla are planned with at least 2 bedrooms.';
   return '';
 }
 
@@ -123,11 +141,24 @@ async function generate(regen) {
     if (rulesOnly) throw new Error('?rules: model skipped on purpose');
     await withTimeout(preloadModel(), LOAD_TIMEOUT_MS);
     waitingBtn = null;
-    layouts = await modelLayouts(S.plot, S.prefs, (msg) => (btn.textContent = msg),
+    const draft = (prefs) => modelLayouts(S.plot, prefs, (msg) => (btn.textContent = msg),
       { exclude: regen ? S.seen : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12 });
+    layouts = await draft(S.prefs);
     usedModel = true;
     if (wantsPrefs && layouts.length && !(await supportsPreferences())) S.note = 'The model loaded here does not know washroom or size preferences yet, so these are its standard layouts.';
-    if (wantsPrefs && !layouts.length && !regen) S.note = 'No layout met every preference on this plot, so these are rule-based layouts.';
+    // nothing valid for the exact request: ask again with fewer preferences, and say which one was dropped
+    const { beds, baths, focus } = S.prefs;
+    const bigger = { bedrooms: 'bedrooms', lounge: 'hall', kitchen: 'kitchen' }[focus];
+    const relax = [
+      focus !== 'balanced' && [{ ...S.prefs, focus: 'balanced' }, `Bigger ${bigger} does not fit on this plot with your other choices, so these layouts use the usual proportions.`],
+      baths > beds && [{ ...S.prefs, baths: beds }, `${baths} washrooms do not fit on this plot, so these layouts have ${beds}, one attached to each bedroom.`],
+      baths > beds && focus !== 'balanced' && [{ ...S.prefs, baths: beds, focus: 'balanced' }, `${baths} washrooms and a bigger ${bigger} do not fit on this plot together, so these layouts have ${beds} washroom${beds > 1 ? 's' : ''} and the usual proportions.`],
+    ].filter(Boolean);
+    for (const [prefs, note] of relax) {
+      if (layouts.length || isCompact(S.plot.w, S.plot.d)) break;   // small plots: the compact generator relaxes instantly below
+      layouts = await draft(prefs);
+      if (layouts.length) S.note = note;
+    }
   } catch (err) {
     if (err && err.message === 'timeout') S.note = `The model is still downloading (${modelState.pct}%) on this connection, so these are rule-based layouts. Press Regenerate once it says ready.`;
     else console.warn('Trained model unavailable, using the rule-based layouts instead.', err);
@@ -135,10 +166,16 @@ async function generate(regen) {
   waitingBtn = null;
   btn.disabled = false;
   btn.textContent = label;
-  if (regen && usedModel && !layouts.length) {                   // nothing new and valid this time: keep what the visitor has
+  const compact = isCompact(S.plot.w, S.plot.d);
+  if (regen && usedModel && !layouts.length && !compact) {       // nothing new and valid this time: keep what the visitor has
     S.note = 'No new valid layout this time. Press Regenerate again.';
     renderLayouts();
     return;
+  }
+  if (!layouts.length && compact) {                              // small plots: the compact generator the model learned from
+    const { items, relaxed } = compactPlans({ w: S.plot.w, d: S.plot.d, ...S.prefs });
+    layouts = items.filter((it) => !regen || !S.seen.has(it.text)).map((it, i) => Object.assign(planToLayout(it, i), { tag: 'Rule-based', source: 'rules' }));
+    if (relaxed && layouts.length) S.note = `${S.note ? `${S.note} ` : ''}Not every preference fits on this plot, so the closest layouts are shown.`;
   }
   if (!layouts.length) {
     layouts = generateAll(S.plot, S.beds);                       // rule-based fallback
@@ -167,7 +204,7 @@ $('regen').onclick = () => generate(true);
 // ---------- step 2 ----------
 function renderLayouts() {
   const L0 = S.layouts[0];
-  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedrooms${L0.beds !== S.beds ? ` (limited from ${S.beds} for this plot width)` : ''}. ${L0.source === 'model' ? 'Drafted by the Naqsha model and rule-checked.' : 'Three rule-generated options.'}${S.note ? ` ${S.note}` : ''}`;
+  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedroom${L0.beds === 1 ? '' : 's'}${L0.beds !== S.beds ? ` (limited from ${S.beds} for this plot width)` : ''}. ${L0.source === 'model' ? 'Drafted by the Naqsha model and rule-checked.' : 'Three rule-generated options.'}${S.note ? ` ${S.note}` : ''}`;
   const host = $('layouts');
   host.innerHTML = '';
   S.layouts.forEach((L) => {

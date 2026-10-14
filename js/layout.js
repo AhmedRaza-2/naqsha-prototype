@@ -12,7 +12,7 @@ export const PRESETS = [
 // Indicative setbacks only. Verify against CDA/LDA/RDA/DHA before building.
 export function ruleFor(w, d) {
   const marla = (w * d) / MARLA;
-  if (marla <= 6) return { front: 8, rear: 4, side: 0, cover: 75, label: 'up to 6 marla' };
+  if (marla <= 6) return { front: 5, rear: 4, side: 0, cover: 75, label: 'up to 6 marla' };   // the car porch beside the drawing room is the rest of the front open space
   if (marla <= 8.5) return { front: 10, rear: 4, side: 3, cover: 70, label: '6-8 marla' };
   if (marla <= 14) return { front: 12, rear: 5, side: 3, cover: 65, label: '8-14 marla' };
   return { front: 20, rear: 7, side: 5, cover: 60, label: 'kanal and above' };
@@ -172,24 +172,35 @@ export function finalize(L) {
   // windows on exterior walls
   const bounds = { z0: B.z, z1: B.z + B.d, x0: B.x, x1: B.x + B.w };
   const subtract = (lo, hi, cut) => (cut ? [[lo, Math.min(hi, cut[0])], [Math.max(lo, cut[1]), hi]].filter(([a, b]) => b - a > 0) : [[lo, hi]]);
+  // open spaces inside the outline (car porch, light well) also give the rooms around them an outside wall
+  const open = L.open || [];
+  const near = (a, b) => Math.abs(a - b) < 0.01;
+  const openSpans = (e) => open.flatMap((p) => {
+    const touch = e.o === 'h' ? (e.front ? near(p.z + p.d, e.c) : near(p.z, e.c)) : (e.left ? near(p.x + p.w, e.c) : near(p.x, e.c));
+    if (!touch) return [];
+    const lo = Math.max(e.lo, e.o === 'h' ? p.x : p.z), hi = Math.min(e.hi, e.o === 'h' ? p.x + p.w : p.z + p.d);
+    return hi - lo > 0 ? [[lo, hi]] : [];
+  });
   for (const r of rooms) {
     const isBath = r.type.endsWith('bath');
     const a = r.att;
     const edges = [
       { o: 'h', c: r.z, lo: r.x, hi: r.x + r.w, on: Math.abs(r.z - bounds.z0) < 0.01, front: true },
       { o: 'h', c: r.z + r.d, lo: r.x, hi: r.x + r.w, on: Math.abs(r.z + r.d - bounds.z1) < 0.01 },
-      { o: 'v', c: r.x, lo: r.z, hi: r.z + r.d, on: rule.side > 0 && Math.abs(r.x - bounds.x0) < 0.01 },
+      { o: 'v', c: r.x, lo: r.z, hi: r.z + r.d, on: rule.side > 0 && Math.abs(r.x - bounds.x0) < 0.01, left: true },
       { o: 'v', c: r.x + r.w, lo: r.z, hi: r.z + r.d, on: rule.side > 0 && Math.abs(r.x + r.w - bounds.x1) < 0.01 },
     ];
     for (const e of edges) {
-      if (!e.on || (r.type === 'lobby' && e.front)) continue;
+      if (r.type === 'lobby' && e.front) continue;
+      const spans = e.on ? [[e.lo, e.hi]] : openSpans(e);
+      if (!spans.length) continue;
       let cut = null;
       if (a) {
         if (e.o === 'h' && (Math.abs(a.z - e.c) < 0.01 || Math.abs(a.z + a.d - e.c) < 0.01)) cut = [a.x - 1, a.x + a.w + 1];
         if (e.o === 'v' && (Math.abs(a.x - e.c) < 0.01 || Math.abs(a.x + a.w - e.c) < 0.01)) cut = [a.z - 1, a.z + a.d + 1];
       }
       const w = isBath ? 2 : r.type === 'kitchen' ? 3.5 : r.type === 'lobby' ? 3 : r.type === 'bed' ? 4.5 : 5;
-      for (const [lo, hi] of subtract(e.lo, e.hi, cut)) {
+      for (const [lo, hi] of spans.flatMap(([s0, s1]) => subtract(s0, s1, cut))) {
         if (hi - lo < w + 1.5) continue;
         const n = Math.max(1, Math.floor((hi - lo) / 10));
         for (let i = 0; i < n; i++) {

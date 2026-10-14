@@ -33,23 +33,38 @@ TYPES = OPEN | BEDS | {"bath", "kitchen", "lounge", "drawing", "dining", "stairs
 FOCUS_VALUES = ("balanced", "bedrooms", "lounge", "kitchen")
 # typical share of the built area taken by bedrooms (by bedroom count) in balanced plans; "bigger bedrooms" = 4 points above
 BED_BASE = {2: 0.42, 3: 0.43, 4: 0.50, 5: 0.55, 6: 0.57}
+BED_BASE_SMALL = {1: 0.24, 2: 0.40}          # plots up to 6 marla (compact layout: the porch and drawing room take the front row)
 
 
 def rule_for(W, D):
     """Indicative setbacks (same numbers as js/layout.js). Verify against CDA/LDA/RDA/DHA before building."""
     m = W * D / MARLA
-    if m <= 6: return dict(front=8, rear=4, side=0, cover=75, label="up to 6 marla")
+    if m <= 6: return dict(front=5, rear=4, side=0, cover=75, label="up to 6 marla")     # car porch beside the drawing room is the rest of the front open space
     if m <= 8.5: return dict(front=10, rear=4, side=3, cover=70, label="6-8 marla")
     if m <= 14: return dict(front=12, rear=5, side=3, cover=65, label="8-14 marla")
     return dict(front=20, rear=7, side=5, cover=60, label="kanal and above")
 
 
 def max_beds(W, D):
-    """Most bedrooms that fit on one floor, found by probing the generator (matches maxBeds in the landing page and planner)."""
-    marla = W * D / MARLA
-    if marla <= 6: return 2
-    Bw = W - 2 * rule_for(W, D)["side"]
+    """Most bedrooms that fit on one floor, found by probing the generator (matches maxBeds in the landing page and
+    planner). 0 = the plot is too small or narrow for a single-floor house after setbacks."""
+    marla, rule = W * D / MARLA, rule_for(W, D)
+    if marla <= 6:                                                   # compact layout: 2 rows need 21.5 ft, 3 rows about 33
+        if D - rule["front"] - rule["rear"] < 21.5: return 0
+        return 2 if (W >= 24 and D >= 42) or (W >= 22 and D >= 48) else 1
+    Bw = W - 2 * rule["side"]
+    if Bw < 19: return 0
     return 2 if Bw < 26 else 3 if Bw < 32 else 4 if Bw < 44 else 6
+
+
+def min_beds(W, D):
+    """One bedroom is offered only on plots up to 6 marla (the compact layout)."""
+    return 1 if W * D / MARLA <= 6 else 2
+
+
+def max_baths(W, D, beds):
+    """Washrooms: one per bedroom plus a guest washroom, plus a common one off the lounge above 6 marla."""
+    return beds + (1 if W * D / MARLA <= 6 else 2)
 
 
 # ---------------------------------------------------------------- text form
@@ -321,7 +336,8 @@ def check(plan, beds=None):
         built = sum(r["w"] * r["d"] for r in mains)
         share = lambda ts: sum(r["w"] * r["d"] for r in mains if r["t"] in ts) / built
         f = plan["focus"]
-        got, need = ((share({"bed", "master"}), BED_BASE.get(nb, 0.57) + 0.04) if f == "bedrooms"
+        base = BED_BASE_SMALL if W * D / MARLA <= 6 else BED_BASE
+        got, need = ((share({"bed", "master"}), base.get(nb, 0.57) + 0.04) if f == "bedrooms"
                      else (share({"lounge"}), 0.20) if f == "lounge" else (share({"kitchen"}), 0.10))
         add("ok" if got >= need else "warn", "bigger " + f, f"{got:.0%} of built area, wanted {need:.0%}")
     return out
@@ -352,11 +368,190 @@ def _split(total, items):
     return out
 
 
+def _overlap(a0, a1, b0, b1):
+    return min(a1, b1) - max(a0, b0)
+
+
+def _grid(rng, lo, hi):
+    """A random length on the 0.5 ft grid in [lo, hi], or None when the range is empty."""
+    a, b = -int(-lo * 2 // 1), int(hi * 2 // 1)
+    return None if b < a else rng.randint(a, b) / 2
+
+
+def generate_small(W, D, beds, rng, baths=None, focus="balanced", tries=40):
+    """Compact layout for plots up to 6 marla, modelled on real 3-6 marla houses (for example Zameen's 25x50 plans: an
+    11x15 garage beside a 12x12 drawing room, a 20x11 lounge with the stairs, 11x14 bedrooms with 5x8 baths, a 7x14
+    kitchen and a 4-5 ft back yard). The car porch sits beside the drawing room in the front row and is the front open
+    space, so only a short lawn strip is left in front of the house. Three rows (front / lounge / bedrooms) when the
+    plot is deep enough, else two rows and one bedroom. The kitchen gets its window from the porch (behind it), the back
+    yard or the front lawn. Widths are drawn from the ranges the plot allows; up to `tries` arrangements are tried."""
+    if beds not in (1, 2): return None
+    if baths is None: baths = beds + 1
+    if not (beds <= baths <= beds + 2): return None
+    for _ in range(tries):
+        plan = _small_once(W, D, beds, rng, baths, focus)
+        if plan: return plan
+    return None
+
+
+def _small_once(W, D, beds, rng, baths, focus):
+    rule = rule_for(W, D)
+    u = rng.uniform
+    pick = lambda lo, hi: _grid(rng, lo, hi)
+    r5 = lambda v: round(v * 2) / 2
+    down = lambda v: int(v * 2 // 1) / 2
+    up = lambda v: -int(-v * 2 // 1) / 2
+    guest, common = baths >= beds + 1, baths >= beds + 2
+    front_d = rule["front"]
+    depth = D - front_d - rule["rear"]                               # the most the rooms can take
+    three = depth >= 31 and (beds == 2 or rng.random() < 0.5)
+    if beds == 2 and not three: return None
+    porch = W >= 27 or (W >= 24 and rng.random() < (0.7 if three else 0.35))
+    if three:
+        opts = (["porch"] if porch and beds == 2 else []) + (["back"] if beds == 1 or W >= 29 else []) + (["front"] if not porch and beds == 2 else [])
+    else:
+        opts = ["back"] + ([] if porch else ["front"])
+    if not opts: return None
+    if focus == "lounge" and len(opts) > 1 and "porch" in opts: opts.remove("porch")    # keep the kitchen out of the lounge row
+    kpos = rng.choice(opts)
+    kx = r5(u(2, 3)) if focus == "kitchen" else 0.0                   # a bigger kitchen is wider
+
+    # front row, entrance side on the left: [porch | kitchen] lobby [stairs] drawing
+    pw = pick(9, 11) if porch else 0.0
+    lw = pick(4.5, 5.5 if W >= 24 else 5)
+    kf = 0.0
+    if kpos == "front":
+        kf = pick(6.5, min(8 + kx, W - pw - lw - 9))
+        if kf is None: return None
+    lob0 = pw + kf
+    dw = W - lob0 - lw
+    sf = pick(3.5, 4) if dw > 15.5 or (dw >= 14 and rng.random() < 0.4) else 0.0     # stair hall beside the entrance
+    dw -= sf
+    if not (9 <= dw <= 16): return None
+    front = ([{"t": "porch", "w": pw}] if porch else []) + ([{"t": "kitchen", "w": kf}] if kf else []) + [{"t": "lobby", "w": lw}] \
+        + ([{"t": "stairs", "w": sf}] if sf else []) + [{"t": "drawing", "w": dw}]
+
+    # row depths: rooms about 11-14 ft deep like the real plans, tighter on tight plots; spare depth becomes back yard.
+    # 'bigger X' gives the row that holds X the depth the other rows can spare; a narrow drawing room needs a deeper row
+    slack = depth - (31 if three else 21.5)
+    if slack < 0: return None
+    g = lambda lo, span: r5(lo + u(0, max(0.0, min(span, slack * 0.45))))
+    f_min = max(10.5, up(112 / dw))
+    f = f_min if focus == "bedrooms" else max(g(10.5, 2.5), f_min)
+    m = (10.0 if focus == "bedrooms" else r5(u(12, 13.5)) if focus == "lounge" else g(10, 2)) if three else 0.0
+    b_want = 17.0 if focus == "bedrooms" else r5(u(11.5, 14) if three else u(12.5, 15))
+    built_max = (rule["cover"] / 100 * W * D + pw * f) / W         # the porch is open, so it buys built depth
+    b = min(b_want, down(D - front_d - rule["rear"] - f - m), down(built_max - f - m))
+    if b < (10.5 if three else 11): return None
+    rear = D - front_d - f - m - b
+
+    def bed_bath(r, d, side):
+        """Attached bath that leaves the room its minimum net area; a lone bedroom too small for 'master' is a 'bed'."""
+        for t in ([r["t"], "bed"] if beds == 1 else [r["t"]]):
+            for bb in ([4.5 if r["w"] < 11.5 else rng.choice([5, 5.5]), min(rng.choice([6.5, 7, 7.5]), d - 3)], [4.5, min(6.5, d - 3)]):
+                if r["w"] * d - bb[0] * bb[1] >= MINSZ[t][0] + 0.5:
+                    r["t"] = t
+                    return bb + [side]
+        return None
+
+    if three:
+        mid, km = [], 0.0
+        if kpos == "porch":                                          # kitchen behind the porch: its window opens onto it
+            km = pick(7, min(pw, (8 if focus == "lounge" else 9.5 + kx), lob0 + lw - 3.5))
+            if km is None: return None
+            mid.append({"t": "kitchen", "w": km})
+        sw = pick(3.5, 4) if W >= 24 and not sf and focus != "lounge" and rng.random() < 0.6 else 0.0   # stairs rising from the lounge
+        lounge_w = W - km - sw
+        mid.append({"t": "lounge", "w": lounge_w})
+        if sw: mid.append({"t": "stairs", "w": sw})
+        l0, l1 = km, W - sw
+        if lounge_w < 9 or _overlap(lob0, lob0 + lw, l0, l1) < 3.5: return None
+        # back row: bedrooms (and the kitchen on wide or one-bedroom plots), each opening onto the lounge
+        kb = 0.0
+        if kpos == "back":
+            kb = pick(max(7, W - 15 if beds == 1 else 7), (10.5 if beds == 1 else 9) + kx)
+            if kb is None: return None
+        rest = W - kb
+        if beds == 2:
+            a = pick(max(10, rest - 16), min(16, rest - 10))
+            if a is None: return None
+            ws = [a, rest - a]
+        else:
+            ws = [rest]
+        if min(ws) < 10 or max(ws) > 16: return None
+        kind = ["master", "bed"] if beds == 2 else ["master"]
+        if beds == 2 and rng.random() < 0.5: kind.reverse(); ws.reverse()
+        back = [{"t": t, "w": w} for t, w in zip(kind, ws)]
+        if kb:
+            back.insert(rng.choice([0, len(back)]), {"t": "kitchen", "w": kb})
+        x = 0.0
+        for r in back:
+            if _overlap(x, x + r["w"], l0, l1) < 3.5: return None
+            x += r["w"]
+        shared = rng.random() < 0.7                                  # baths back to back on the shared wall (one plumbing stack)
+        beds_back = [r for r in back if r["t"] in BEDS]
+        for i, r in enumerate(beds_back):
+            side = ("R" if i == 0 else "L") if shared else ("L" if i == 0 else "R")
+            if len(beds_back) == 1:                                  # next to the kitchen: one wet wall
+                ki = next((j for j, q in enumerate(back) if q["t"] == "kitchen"), None)
+                side = ("L" if ki < back.index(r) else "R") if ki is not None else rng.choice("LR")
+            r["bath"] = bed_bath(r, b, side)
+            if r["bath"] is None: return None
+        rows = [(f, front), (m, mid), (b, back)]
+        lounge, lounge_d = mid[1] if km else mid[0], m
+    else:
+        # two rows, one bedroom: the lounge sits behind the lobby, the bedroom (and the kitchen) beside it
+        kb = 0.0
+        if kpos == "back":
+            kb = pick(6.5, (7 if focus == "lounge" else 8.5) + kx)
+        hi_b = 11 if focus == "lounge" else 14 if focus == "bedrooms" else 13
+        lo_b = 12 if focus == "bedrooms" else 10
+        if kb:
+            order = rng.choice([["kitchen", "lounge", "master"], ["master", "lounge", "kitchen"]])
+            bw_ = pick(lo_b, min(hi_b, W - kb - 8.5))
+        else:                                                        # the lounge must reach 3.5 ft past the lobby's near edge
+            order = rng.choice([["lounge", "master"], ["master", "lounge"]])
+            bw_ = pick(lo_b, min(hi_b, W - max(8.5, lob0 + 3.5) if order[0] == "lounge" else lob0 + lw - 3.5))
+        if bw_ is None: return None
+        width = {"kitchen": kb, "lounge": W - kb - bw_, "master": bw_}
+        back = [{"t": t, "w": width[t]} for t in order]
+        x = 0.0
+        for r in back:
+            if r["t"] == "lounge" and (r["w"] < 8.5 or _overlap(x, x + r["w"], lob0, lob0 + lw) < 3.5): return None
+            x += r["w"]
+        bed = next(r for r in back if r["t"] == "master")
+        bed["bath"] = bed_bath(bed, b, "L" if order.index("master") == 0 else "R")          # on the outer wall, door side free
+        if bed["bath"] is None: return None
+        rows = [(f, front), (b, back)]
+        lounge, lounge_d = next(r for r in back if r["t"] == "lounge"), b
+
+    drawing = front[-1]
+    lounge_bath = lambda: [4.5, min(rng.choice([6, 6.5]), lounge_d - 3), rng.choice("LR")]
+    lounge_fits = lambda bb: lounge["w"] >= 10 and lounge["w"] * lounge_d - bb[0] * bb[1] >= 102
+    if guest:                                                        # guest washroom in the drawing room's back corner
+        gb = [4.5, min(rng.choice([6, 6.5]), f - 3), "R"]
+        if dw * f - gb[0] * gb[1] >= 112: drawing["bath"] = gb
+        elif not common and lounge_fits(lb := lounge_bath()): lounge["bath"] = lb       # small drawing room: off the lounge instead
+        else: return None
+    if common:                                                       # common washroom off the lounge
+        lb = lounge_bath()
+        if lounge.get("bath") or not lounge_fits(lb): return None
+        lounge["bath"] = lb
+
+    plan = {"plot": {"w": W, "d": D}, "beds": beds, "baths": baths, "focus": focus,
+            "bands": [{"d": front_d, "rooms": [{"t": "lawn", "w": W}]}] + [{"d": d_, "rooms": rs} for d_, rs in rows]
+            + [{"d": rear, "rooms": [{"t": "void", "w": W}]}]}
+    return mirror(plan) if rng.random() < 0.5 else plan
+
+
 def generate(W, D, beds, rng, baths=None, focus="balanced"):
     """One randomised Pakistani-style layout: lawn / front band (drawing, lobby, guest beds) / middle band
     (kitchen, dining, lounge) / back band (bedrooms) / rear setback. Mirrors js/layout.js with jitter.
     baths = total washrooms (bedrooms + 0..2: attached to every bedroom, plus a guest bath, plus a common bath off the
-    lounge). focus = which rooms get more of the built area (balanced / bedrooms / lounge / kitchen)."""
+    lounge). focus = which rooms get more of the built area (balanced / bedrooms / lounge / kitchen).
+    Plots up to 6 marla use the compact layout (generate_small)."""
+    if W * D / MARLA <= 6:
+        return generate_small(W, D, beds, rng, baths, focus)
     rule = rule_for(W, D)
     s = rule["side"]
     Bw = W - 2 * s
@@ -507,7 +702,7 @@ WIDTHS = [20, 22, 24, 25, 26, 27, 28, 30, 30, 32, 33, 35, 35, 36, 38, 40, 42, 45
 # the plot sizes people actually type (marla presets and their usual shapes): oversampled, and never held out of training
 STANDARD = [(20, 34), (25, 36), (25, 45), (30, 45), (30, 52), (30, 60), (35, 65), (38, 59), (40, 68), (40, 80), (45, 95), (50, 90), (55, 100)]
 SIZE_BINS = {"small": (3, 6), "mid": (6, 14), "large": (14, 45)}      # marla
-SIZE_MIX = {"small": 0.15, "mid": 0.45, "large": 0.40}                 # share of plots per bin, so small plots are not drowned out
+SIZE_MIX = {"small": 0.22, "mid": 0.43, "large": 0.35}                 # share of plots per bin, so small plots are not drowned out
 
 
 def sample_plot(rng, size_bin=None):
@@ -531,8 +726,11 @@ def build(n, seed=0, min_score=1.0):
         size_bin = rng.choice(open_bins) if open_bins else None
         std = [(w, d) for w, d in STANDARD if size_bin is None or SIZE_BINS[size_bin][0] < w * d / MARLA <= SIZE_BINS[size_bin][1]]
         W, D = rng.choice(std) if std and rng.random() < 0.3 else sample_plot(rng, size_bin)
-        beds = rng.randint(2, max_beds(W, D) if rng.random() < 0.7 else 6)       # mostly counts a single floor can hold
-        baths = beds + rng.choice([0, 1, 1, 2])                                # a guest washroom is the usual case
+        cap, lo = max_beds(W, D), min_beds(W, D)
+        if cap == 0: continue                                                  # too small for a single floor: the form refuses it
+        beds = rng.randint(lo, cap if lo == 1 or rng.random() < 0.7 else 6)       # mostly counts a single floor can hold
+        if lo == 1 and cap == 2 and rng.random() < 0.5: beds = 2               # small plots: 2 bedrooms is the usual request
+        baths = min(beds + rng.choice([0, 1, 1, 2]), max_baths(W, D, beds))   # a guest washroom is the usual case
         focus = rng.choices(FOCUS_VALUES, [0.4, 0.2, 0.2, 0.2])[0]
         for _ in range(12):
             plan = generate(W, D, beds, rng, baths, focus)

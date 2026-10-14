@@ -13,9 +13,15 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true } = {}) {
   const B = L.B;
   let o = `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan ${L.label}">`;
   o += `<rect x="${X(0)}" y="${Y(D)}" width="${W * s}" height="${D * s}" fill="#f4f2ea" stroke="#555" stroke-width="1.5"/>`;
+  const open = L.open || [];
+  const innerPorch = open.some((p) => p.type === 'porch');
   o += `<rect x="${X(0)}" y="${Y(B.z)}" width="${W * s}" height="${B.z * s}" fill="#e3e0d6"/>`;
-  o += `<text x="${X(W / 2)}" y="${Y(B.z / 2) + 3}" font-size="9" fill="#8a8678" text-anchor="middle">porch / lawn</text>`;
+  o += `<text x="${X(W / 2)}" y="${Y(B.z / 2) + 3}" font-size="9" fill="#8a8678" text-anchor="middle">${innerPorch ? 'lawn' : 'porch / lawn'}</text>`;
   o += `<rect x="${X(B.x)}" y="${Y(B.z + B.d)}" width="${B.w * s}" height="${B.d * s}" fill="none" stroke="#999" stroke-dasharray="3 3" stroke-width=".8"/>`;
+  // car porch and light wells inside the house outline: open to the sky or roofed, but not rooms
+  for (const p of open) {
+    o += `<rect x="${X(p.x)}" y="${Y(p.z + p.d)}" width="${p.w * s}" height="${p.d * s}" fill="${p.type === 'porch' ? '#e3e0d6' : '#e9efe2'}" stroke="#8a8678" stroke-dasharray="4 3" stroke-width=".9"/>`;
+  }
   const order = [...L.rooms.filter((r) => !r.parent), ...L.rooms.filter((r) => r.parent)];
   for (const r of order) {
     o += `<rect x="${X(r.x)}" y="${Y(r.z + r.d)}" width="${r.w * s}" height="${r.d * s}" fill="${FILL[r.type]}" stroke="#2b2b2b" stroke-width="${r.parent ? 1.1 : 1.8}"/>`;
@@ -58,6 +64,12 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true } = {}) {
       o += `<text x="${tx}" y="${ty}" font-size="${fit(nm, fs, maxPx)}" text-anchor="middle" fill="#222" font-weight="${r.parent ? 500 : 600}" ${halo}>${nm}</text>`;
       // every room shows its size, washrooms and the kitchen included
       o += `<text x="${tx}" y="${ty + (r.parent ? 8 : 10)}" font-size="${fit(size, r.parent ? 6.4 : 7.5, maxPx)}" text-anchor="middle" fill="#444" ${halo}>${size}</text>`;
+    }
+    for (const p of open) {
+      const cx = X(p.x + p.w / 2), cy = Y(p.z + p.d / 2), maxPx = p.w * s - 4;
+      const nm = p.type === 'porch' ? 'Car porch' : 'Light well', size = `${fmtFt(p.w)}' x ${fmtFt(p.d)}'`;
+      o += `<text x="${cx}" y="${cy}" font-size="${fit(nm, 8.5, maxPx)}" text-anchor="middle" fill="#6f6b5e" font-weight="600" ${halo}>${nm}</text>`;
+      o += `<text x="${cx}" y="${cy + 10}" font-size="${fit(size, 7.2, maxPx)}" text-anchor="middle" fill="#6f6b5e" ${halo}>${size}</text>`;
     }
   }
   o += `<text x="${X(W / 2)}" y="${Y(0) + 13}" font-size="9" text-anchor="middle" fill="#666">${W} ft</text>`;

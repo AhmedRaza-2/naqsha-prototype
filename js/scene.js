@@ -93,16 +93,23 @@ export function createViewer(host, L, styleId, hooks = {}) {
   plane(0, W, 0, D, 0, mat('#86b25f'));
   plane(0, W, 0, B.z, 0.01, mat('#b8b5ac'));
 
-  // compound wall
+  // open spaces inside the house outline: the car porch beside the drawing room (small plots) and light wells
+  const open = L.open || [];
+  const porch = open.find((p) => p.type === 'porch');
+  for (const p of open) plane(p.x, p.x + p.w, p.z, p.z + p.d, 0.02, mat(p.type === 'porch' ? '#cfcac0' : '#9cbf7a'));
+
+  // compound wall; with a car porch the gate spans the porch and the front door
   const mainDoor = L.openings.find((p) => p.main);
-  const gateX = mainDoor.at, gateHalf = 4;
+  const gateX = mainDoor.at;
+  const gateLo = porch ? Math.max(0.6, Math.min(porch.x, gateX - 2)) : gateX - 4;
+  const gateHi = porch ? Math.min(W - 0.6, Math.max(porch.x + porch.w, gateX + 2)) : gateX + 4;
   const cw = 0.5, ch = 4.5;
   const cwall = (x0, x1, z0, z1) => box(world, x0, x1, 0, ch, z0, z1, mExt, true);
-  cwall(0, gateX - gateHalf, -cw / 2, cw / 2);
-  cwall(gateX + gateHalf, W, -cw / 2, cw / 2);
+  cwall(0, gateLo, -cw / 2, cw / 2);
+  cwall(gateHi, W, -cw / 2, cw / 2);
   cwall(0, W, D - cw / 2, D + cw / 2);
   if (rule.side > 0) { cwall(-cw / 2, cw / 2, 0, D); cwall(W - cw / 2, W + cw / 2, 0, D); }
-  [gateX - gateHalf - 0.4, gateX + gateHalf + 0.4].forEach((x) => box(world, x - 0.6, x + 0.6, 0, 6, -0.7, 0.7, mTrim, true));
+  [gateLo - 0.4, gateHi + 0.4].forEach((x) => box(world, x - 0.6, x + 0.6, 0, 6, -0.7, 0.7, mTrim, true));
 
   // ---------- walls ----------
   const hl = new Map(), vl = new Map();
@@ -126,11 +133,31 @@ export function createViewer(host, L, styleId, hooks = {}) {
   };
   const eq = (a, b) => Math.abs(a - b) < 0.02;
 
+  // stretches of a wall line that face an open space are outside walls too (inDir = which side is indoors)
+  const openSpans = (o, c) => open.flatMap((p) => {
+    if (o === 'h') return eq(c, p.z + p.d) ? [{ a: p.x, b: p.x + p.w, inDir: 1 }] : eq(c, p.z) ? [{ a: p.x, b: p.x + p.w, inDir: -1 }] : [];
+    return eq(c, p.x + p.w) ? [{ a: p.z, b: p.z + p.d, inDir: 1 }] : eq(c, p.x) ? [{ a: p.z, b: p.z + p.d, inDir: -1 }] : [];
+  });
+
   const addLine = (o, line) => {
     const c = line.c;
-    let outer = false, inDir = 1;
-    if (o === 'h') { if (eq(c, B.z)) { outer = true; inDir = 1; } else if (eq(c, B.z + B.d)) { outer = true; inDir = -1; } }
-    else { if (eq(c, B.x)) { outer = true; inDir = 1; } else if (eq(c, B.x + B.w)) { outer = true; inDir = -1; } }
+    let bOuter = false, bDir = 1;
+    if (o === 'h') { if (eq(c, B.z)) { bOuter = true; bDir = 1; } else if (eq(c, B.z + B.d)) { bOuter = true; bDir = -1; } }
+    else { if (eq(c, B.x)) { bOuter = true; bDir = 1; } else if (eq(c, B.x + B.w)) { bOuter = true; bDir = -1; } }
+    const spans = openSpans(o, c);
+    for (const [a0, b0] of merge(line.iv)) {
+      // split at the edges of open spaces so each run is either an outside wall or an inside one
+      const cuts = [a0, ...spans.flatMap((s) => [s.a, s.b]).filter((v) => v > a0 + 0.01 && v < b0 - 0.01), b0].sort((x, y) => x - y);
+      for (let i = 0; i < cuts.length - 1; i++) {
+        const a = cuts[i], b = cuts[i + 1];
+        if (b - a < 0.01) continue;
+        const sp = spans.find((s) => (a + b) / 2 > s.a && (a + b) / 2 < s.b);
+        wallRun(o, c, a, b, bOuter || !!sp, bOuter ? bDir : sp ? sp.inDir : 1, a === a0, b === b0);
+      }
+    }
+  };
+
+  const wallRun = (o, c, a, b, outer, inDir, capA, capB) => {
     const t = outer ? 0.75 : 0.4;
     const piece = (s0, s1, y0, y1, collide) => {
       if (s1 - s0 < 0.01) return;
@@ -142,20 +169,18 @@ export function createViewer(host, L, styleId, hooks = {}) {
         if (outer) box(walls, inDir > 0 ? c + t / 2 : c - t / 2 - 0.04, inDir > 0 ? c + t / 2 + 0.04 : c - t / 2, y0, y1, s0, s1, mInt);
       }
     };
-    for (const [a, b] of merge(line.iv)) {
-      const ops = L.openings.filter((p) => p.o === o && eq(p.c, c) && p.at - p.w / 2 >= a - 0.02 && p.at + p.w / 2 <= b + 0.02).sort((p, q) => p.at - q.at);
-      let cur = a;
-      const solid = (s0, s1) => piece(s0 === a ? s0 - t / 2 : s0, s1 === b ? s1 + t / 2 : s1, 0, H, true);
-      for (const p of ops) {
-        const o0 = p.at - p.w / 2, o1 = p.at + p.w / 2;
-        solid(cur, o0);
-        if (p.sill > 0) piece(o0, o1, 0, p.sill, true);
-        piece(o0, o1, p.top, H, false);
-        decorate(o, c, p, outer, inDir);
-        cur = o1;
-      }
-      solid(cur, b);
+    const ops = L.openings.filter((p) => p.o === o && eq(p.c, c) && p.at - p.w / 2 >= a - 0.02 && p.at + p.w / 2 <= b + 0.02).sort((p, q) => p.at - q.at);
+    let cur = a;
+    const solid = (s0, s1) => piece(s0 === a && capA ? s0 - t / 2 : s0, s1 === b && capB ? s1 + t / 2 : s1, 0, H, true);
+    for (const p of ops) {
+      const o0 = p.at - p.w / 2, o1 = p.at + p.w / 2;
+      solid(cur, o0);
+      if (p.sill > 0) piece(o0, o1, 0, p.sill, true);
+      piece(o0, o1, p.top, H, false);
+      decorate(o, c, p, outer, inDir);
+      cur = o1;
     }
+    solid(cur, b);
   };
 
   function decorate(o, c, p, outer, inDir) {
@@ -263,17 +288,22 @@ export function createViewer(host, L, styleId, hooks = {}) {
 
   // ---------- porch ----------
   const pd = Math.min(rule.front - 1, 7);
-  box(world, B.x - 0.4, B.x + B.w + 0.4, 9.3, 9.8, B.z - pd, B.z + 0.4, st.id === 'spanish' ? mat(st.roof) : mTrim);
-  if (st.id === 'spanish') box(world, B.x - 0.4, B.x + B.w + 0.4, 9.8, 10.1, B.z - pd, B.z - pd + 0.5, mat('#8e3f22'));
+  if (!porch) {                                                  // veranda canopy across the front (the car porch is under the main roof)
+    box(world, B.x - 0.4, B.x + B.w + 0.4, 9.3, 9.8, B.z - pd, B.z + 0.4, st.id === 'spanish' ? mat(st.roof) : mTrim);
+    if (st.id === 'spanish') box(world, B.x - 0.4, B.x + B.w + 0.4, 9.8, 10.1, B.z - pd, B.z - pd + 0.5, mat('#8e3f22'));
+  }
   if (st.deco === 'wood') {
     const dx0 = mainDoor.at - mainDoor.w / 2 - 0.2, dx1 = mainDoor.at + mainDoor.w / 2 + 0.2;
     box(world, dx0 - 1.6, dx0, 0, H, B.z - 0.45, B.z - 0.2, mAccent);
     box(world, dx1, dx1 + 1.6, 0, H, B.z - 0.45, B.z - 0.2, mAccent);
     box(world, dx0, dx1, 7.4, H, B.z - 0.45, B.z - 0.2, mAccent);
   }
+  // a front veranda with pillars, or with a car porch, one pillar at the porch's open front corner (the roof covers it)
   const nP = Math.max(2, Math.round(B.w / 12) + 1);
-  for (let i = 0; i < nP; i++) {
-    const px = B.x + 0.9 + (i * (B.w - 1.8)) / (nP - 1), pz = B.z - pd + 0.7;
+  const pillars = porch
+    ? [[porch.x + porch.w / 2 < mainDoor.at ? porch.x + 0.5 : porch.x + porch.w - 0.5, porch.z + 0.5]]
+    : Array.from({ length: nP }, (_, i) => [B.x + 0.9 + (i * (B.w - 1.8)) / (nP - 1), B.z - pd + 0.7]);
+  for (const [px, pz] of pillars) {
     if (st.pillar === 'box') box(world, px - 0.35, px + 0.35, 0, 9.3, pz - 0.35, pz + 0.35, mTrim, true);
     else {
       const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 9.3, 18), st.pillar === 'column' ? mTrim : mExt);
@@ -286,9 +316,9 @@ export function createViewer(host, L, styleId, hooks = {}) {
   // paved walkway to door
   plane(mainDoor.at - 2, mainDoor.at + 2, 0, B.z, 0.02, mat('#d5d1c6'));
 
-  // car & trees
-  if (rule.front >= 10) {
-    const carX = gateX > W / 2 ? Math.max(8, W * 0.25) : Math.min(W - 8, W * 0.75);
+  // car (parked in the car porch when the house has one) & trees
+  if (rule.front >= 10 || (porch && porch.w >= 8)) {
+    const carX = porch ? porch.x + porch.w / 2 : gateX > W / 2 ? Math.max(8, W * 0.25) : Math.min(W - 8, W * 0.75);
     const car = new THREE.Group();
     const cb = (cx, cy, cz, w, h, d, c) => bx(car, cx, cy, cz, w, h, d, mat(c));
     cb(0, 1.5, 0, 14, 1.7, 5.8, '#b23a3a'); cb(-0.5, 2.9, 0, 7.5, 1.3, 5.2, '#a33333');
@@ -297,9 +327,15 @@ export function createViewer(host, L, styleId, hooks = {}) {
       const wh = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.9, 14), mat('#1b1b1b'));
       wh.rotation.x = Math.PI / 2; wh.position.set(x, 1.1, z); car.add(wh);
     });
-    car.position.set(carX, 0, Math.min(rule.front / 2 + 0.5, 6.5));
+    if (porch) {                                                 // nose toward the house, back end toward the gate
+      car.rotation.y = Math.PI / 2;
+      car.position.set(carX, 0, porch.z + porch.d - 7.4);
+      colliders.push({ x0: carX - 3, x1: carX + 3, z0: car.position.z - 7, z1: car.position.z + 7 });
+    } else {
+      car.position.set(carX, 0, Math.min(rule.front / 2 + 0.5, 6.5));
+      colliders.push({ x0: carX - 7, x1: carX + 7, z0: car.position.z - 3, z1: car.position.z + 3 });
+    }
     world.add(car);
-    colliders.push({ x0: carX - 7, x1: carX + 7, z0: car.position.z - 3, z1: car.position.z + 3 });
   }
   const tree = (x, z, s = 1) => {
     const t = new THREE.Mesh(new THREE.CylinderGeometry(0.25 * s, 0.35 * s, 5 * s, 8), mat('#6b4d34'));
@@ -355,7 +391,8 @@ export function createViewer(host, L, styleId, hooks = {}) {
   const blocked = (x, z, r) => colliders.some((c) => x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r);
   function roomAt(x, z) {
     const hit = L.rooms.filter((r) => x >= r.x && x <= r.x + r.w && z >= r.z && z <= r.z + r.d);
-    return (hit.find((r) => r.parent) || hit[0])?.name || (z < B.z ? 'Porch & lawn' : z < 0 ? 'Road' : 'Outside');
+    const space = open.find((p) => x >= p.x && x <= p.x + p.w && z >= p.z && z <= p.z + p.d);
+    return (hit.find((r) => r.parent) || hit[0])?.name || space?.name || (z < 0 ? 'Road' : z < B.z ? (porch ? 'Lawn' : 'Porch & lawn') : 'Outside');
   }
 
   function resize() {

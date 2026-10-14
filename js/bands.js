@@ -1,6 +1,6 @@
 // Band-format plans: parser, geometry and the rule checker. A line-by-line port of tools/bands.py, so the browser
 // scores a plan exactly like the training pipeline did (verified against Python in tools/verify_js_port.py).
-import { ruleFor } from './layout.js';
+import { ruleFor, MARLA } from './layout.js';
 
 export const OPEN = new Set(['lawn', 'void', 'porch', 'courtyard', 'garage', 'balcony']);
 export const BEDS = new Set(['bed', 'master']);
@@ -9,6 +9,7 @@ const r2 = (v) => Math.round(v * 100) / 100;
 export const FOCUS_VALUES = ['balanced', 'bedrooms', 'lounge', 'kitchen'];
 // typical share of built area taken by bedrooms in balanced plans (by bedroom count); "bigger bedrooms" = 4 points above
 const BED_BASE = { 2: 0.42, 3: 0.43, 4: 0.50, 5: 0.55, 6: 0.57 };
+const BED_BASE_SMALL = { 1: 0.24, 2: 0.40 };      // plots up to 6 marla (compact layout)
 
 // ---------------------------------------------------------------- text form
 const ROOM = /^([a-z]+)(?: ([\d.]+))?(?: \+bath ([\d.]+)x([\d.]+) ([LR]))?$/;
@@ -243,7 +244,8 @@ export function check(plan, beds = plan.beds) {
     const built = mains.reduce((s, r) => s + r.w * r.d, 0);
     const share = (ts) => mains.filter((r) => ts.includes(r.t)).reduce((s, r) => s + r.w * r.d, 0) / built;
     const f = plan.focus;
-    const [got, need] = f === 'bedrooms' ? [share(['bed', 'master']), (BED_BASE[nb] ?? 0.57) + 0.04]
+    const base = (W * D) / MARLA <= 6 ? BED_BASE_SMALL : BED_BASE;
+    const [got, need] = f === 'bedrooms' ? [share(['bed', 'master']), (base[nb] ?? 0.57) + 0.04]
       : f === 'lounge' ? [share(['lounge']), 0.20] : [share(['kitchen']), 0.10];
     add(got >= need ? 'ok' : 'warn', `bigger ${f}`, `${Math.round(got * 100)}% of built area, wanted ${Math.round(need * 100)}%`);
   }

@@ -1,9 +1,9 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { ArrowRight, CaretDown, CircleNotch, SlidersHorizontal, WarningCircle } from '@phosphor-icons/react';
-import { FOCUS, LIMITS, bathOptions, feetError, focusAllowed, maxBeds, parsePlot } from '../lib/parse.js';
+import { FOCUS, LIMITS, bathOptions, feetError, focusAllowed, maxBeds, minBeds, parsePlot, plotTooSmall } from '../lib/parse.js';
 
 const APP_URL = import.meta.env.VITE_APP_URL || '../index.html';
-const BEDS = [2, 3, 4, 5, 6];
+const BEDS = [1, 2, 3, 4, 5, 6];
 const CHIPS = ['5 marla', '10 marla', '1 kanal'];
 
 const field = (bad) =>
@@ -56,8 +56,10 @@ export default function RequestForm() {
 
   // ---- bedrooms and washrooms depend on the plot
   const cap = plot ? maxBeds(plot.w, plot.d) : 6;
-  const effBeds = Math.min(beds, cap);
-  const baOpts = bathOptions(effBeds);
+  const lo = plot ? minBeds(plot.w, plot.d) : 2;
+  const tooSmall = plot ? plotTooSmall(plot.w, plot.d) : '';
+  const effBeds = Math.max(lo, Math.min(beds, Math.max(cap, lo)));
+  const baOpts = bathOptions(effBeds, plot?.marla);
   const effBaths = baOpts.some((o) => o.n === baths) ? baths : effBeds + 1;
   const bathHint = baOpts.find((o) => o.n === effBaths).hint;
   const effFocus = focusAllowed(focus, plot?.marla) ? focus : 'balanced';
@@ -74,7 +76,7 @@ export default function RequestForm() {
       (feetMsg.startsWith('Depth') ? dRef : wRef).current?.focus();
       return;
     }
-    if (!plot) { plotRef.current?.focus(); return; }
+    if (!plot || tooSmall) { plotRef.current?.focus(); return; }
     setBusy(true);
     const dims = feetOk ? { w: plot.w, d: plot.d } : { w: parsed.w, d: parsed.d };
     const label = feetOk ? `${dims.w}x${dims.d}` : text.trim();
@@ -100,8 +102,8 @@ export default function RequestForm() {
           aria-describedby={`${uid}plot-help`}
           className={`${field(textError)} h-14 text-lg`}
         />
-        <Hint id={`${uid}plot-help`} error={textError}>
-          {textError ? textMsg : <span className="num">{plotHelp}</span>}
+        <Hint id={`${uid}plot-help`} error={textError || !!tooSmall}>
+          {textError ? textMsg : tooSmall ? tooSmall : <span className="num">{plotHelp}</span>}
         </Hint>
         <div className="flex flex-wrap gap-2 pt-1">
           {CHIPS.map((c) => (
@@ -116,13 +118,13 @@ export default function RequestForm() {
         <legend className="mb-2 text-sm font-medium">Bedrooms</legend>
         <div className="flex gap-2" role="radiogroup" aria-label="Bedrooms">
           {BEDS.map((n) => (
-            <button key={n} type="button" role="radio" aria-checked={n === effBeds} disabled={n > cap} onClick={() => setBeds(n)} className={`${pill(n === effBeds, n > cap)} min-w-12`}>
+            <button key={n} type="button" role="radio" aria-checked={n === effBeds} disabled={n > cap || n < lo} onClick={() => setBeds(n)} className={`${pill(n === effBeds, n > cap || n < lo)} min-w-12`}>
               {n}
             </button>
           ))}
         </div>
         <p className="min-h-5 text-sm text-soft">
-          {plot && cap < 6 ? `A single floor on ${plot.w} x ${plot.d} ft fits up to ${cap} bedrooms.${cap < 4 && plot.marla > 8 ? ' A wider plot (about 38 ft) fits 4.' : ''}` : 'Single floor, ground level.'}
+          {plot && cap > 0 && cap < 6 ? `A single floor on ${plot.w} x ${plot.d} ft fits up to ${cap} bedroom${cap > 1 ? 's' : ''}.${cap === 1 ? ' About 25 x 45 ft fits 2.' : cap < 4 && plot.marla > 8 ? ' A wider plot (about 38 ft) fits 4.' : ''}` : 'Single floor, ground level.'}
         </p>
       </fieldset>
 
@@ -185,7 +187,7 @@ export default function RequestForm() {
                   </button>
                 ))}
               </div>
-              <Hint>{plot && !focusAllowed('kitchen', plot.marla) ? 'A bigger kitchen needs more than 6 marla.' : effFocus === 'balanced' ? 'No preference: rooms are sized in the usual proportions.' : `The ${FOCUS.find((o) => o.id === effFocus).label.toLowerCase()} gets a larger share of the house; other rooms give up some space.`}</Hint>
+              <Hint>{effFocus === 'balanced' ? 'No preference: rooms are sized in the usual proportions.' : `The ${FOCUS.find((o) => o.id === effFocus).label.toLowerCase()} gets a larger share of the house; other rooms give up some space.`}</Hint>
             </fieldset>
           </div>
         </div>

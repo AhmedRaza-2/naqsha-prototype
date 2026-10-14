@@ -51,18 +51,42 @@ export function feetError(w, d) {
   return '';
 }
 
+/** Indicative setbacks (same numbers as the planner and tools/bands.py). */
+function setbacks(marla) {
+  if (marla <= 6) return { front: 5, rear: 4, side: 0 };
+  if (marla <= 8.5) return { front: 10, rear: 4, side: 3 };
+  if (marla <= 14) return { front: 12, rear: 5, side: 3 };
+  return { front: 20, rear: 7, side: 5 };
+}
+
 /** Most bedrooms that fit on one floor for a plot (found by probing the layout generator; same rule as tools/bands.py).
- *  The usable width after the side setbacks decides: 2 bedrooms up to 26 ft, 3 up to 32 ft, 4 up to 44 ft, then up to 6. */
+ *  Up to 6 marla the compact layout fits 2 bedrooms on plots about 24 x 42 ft or larger, else 1. Above that the usable
+ *  width after the side setbacks decides: 2 bedrooms up to 26 ft, 3 up to 32 ft, 4 up to 44 ft, then up to 6.
+ *  0 = too small or narrow for a single floor. */
 export function maxBeds(w, d) {
-  const marla = (w * d) / SQFT_PER_MARLA;
-  if (marla <= 6) return 2;
-  const side = marla <= 14 ? 3 : 5;
-  const usable = w - 2 * side;
+  const marla = (w * d) / SQFT_PER_MARLA, r = setbacks(marla);
+  if (marla <= 6) {
+    if (d - r.front - r.rear < 21.5) return 0;
+    return (w >= 24 && d >= 42) || (w >= 22 && d >= 48) ? 2 : 1;
+  }
+  const usable = w - 2 * r.side;
+  if (usable < 19) return 0;
   return usable < 26 ? 2 : usable < 32 ? 3 : usable < 44 ? 4 : 6;
 }
 
-/** Whether a 'make bigger' choice can work on a plot (a bigger kitchen has almost no valid layouts up to 6 marla). */
-export const focusAllowed = (id, marla) => !(id === 'kitchen' && marla != null && marla <= 6);
+/** One bedroom is offered up to 6 marla. */
+export const minBeds = (w, d) => ((w * d) / SQFT_PER_MARLA <= 6 ? 1 : 2);
+
+/** Why a plot cannot hold a single-floor house ('' when it can). */
+export function plotTooSmall(w, d) {
+  if (maxBeds(w, d) > 0) return '';
+  return (w * d) / SQFT_PER_MARLA <= 6
+    ? `${w} x ${d} ft leaves too little depth after the front and back open spaces. A single floor needs a plot at least 31 ft deep.`
+    : `${w} x ${d} ft is too narrow for a single floor with side setbacks. Above 6 marla a plot needs about 25 ft of width.`;
+}
+
+/** Every 'make bigger' choice is available (kept as a function so the form can restrict it per plot later). */
+export const focusAllowed = () => true;
 
 export const FOCUS = [
   { id: 'balanced', label: 'Balanced' },
@@ -71,11 +95,13 @@ export const FOCUS = [
   { id: 'kitchen', label: 'Kitchen' },
 ];
 
-/** Washroom choices for a bedroom count: every bedroom attached, plus a guest washroom, plus a common one off the hall. */
-export function bathOptions(beds) {
+/** Washroom choices for a bedroom count: every bedroom attached, plus a guest washroom, plus (above 6 marla) a common
+ *  one off the hall. */
+export function bathOptions(beds, marla) {
+  const one = beds === 1;
   return [
-    { n: beds, label: 'Attached only', hint: `${beds} washrooms, one attached to each bedroom` },
-    { n: beds + 1, label: '+ Guest', hint: `${beds + 1} washrooms: attached, plus a guest washroom by the drawing room` },
+    { n: beds, label: 'Attached only', hint: one ? '1 washroom, attached to the bedroom' : `${beds} washrooms, one attached to each bedroom` },
+    { n: beds + 1, label: '+ Guest', hint: `${beds + 1} washrooms: attached, plus a guest washroom by the drawing room or hall` },
     { n: beds + 2, label: '+ Guest + common', hint: `${beds + 2} washrooms: attached, a guest washroom and a common one off the hall` },
-  ];
+  ].slice(0, marla != null && marla <= 6 ? 2 : 3);
 }
