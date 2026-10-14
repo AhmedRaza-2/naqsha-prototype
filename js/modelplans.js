@@ -1,5 +1,5 @@
 // Turns a model-drafted band plan into the layout object the planner (2D plan, rule check, 3D walkthrough) already uses.
-import { OPEN, toRects } from './bands.js';
+import { OPEN, toRects, outsideDoors } from './bands.js';
 import { finalize, ruleFor } from './layout.js';
 import { draftPlans } from './model.js';
 
@@ -70,10 +70,18 @@ export function planToLayout(item, index) {
   const open = rects.filter((r) => (r.t === 'porch' || r.t === 'courtyard') && inside(r))
     .map((r) => ({ type: r.t, name: r.t === 'porch' ? 'Car Porch' : 'Light Well', x: r.x, z: r.y, w: r.w, d: r.d }));
 
+  // doors to outside: the same rule the checker uses
+  const rmains = rects.filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
+  const od = outsideDoors(rects, rmains, y0);
+  const doorsOut = {
+    main: od.main && od.wall && byRect.get(od.main.i) ? { room: byRect.get(od.main.i).id, wall: od.wall } : null,
+    guests: od.guests.filter(([r]) => byRect.get(r.i)).map(([r, wall]) => ({ room: byRect.get(r.i).id, wall })),
+  };
+
   const letter = String.fromCharCode(65 + index);
   const L = {
     id: `M${letter}`, label: `Layout ${letter}`, tag: 'Naqsha model', source: 'model', text: item.text,
-    plot: { w: W, d: D }, rule: ruleFor(W, D), B, rooms, open, beds: plan.beds, narrow: B.w < 26,
+    plot: { w: W, d: D }, rule: ruleFor(W, D), B, rooms, open, doorsOut, beds: plan.beds, narrow: B.w < 26, plan,
   };
   finalize(L);                                                  // doors, windows and links for the 2D plan and the 3D walkthrough
   // the planner's own checker does not know light wells; show the checker the model was trained against instead

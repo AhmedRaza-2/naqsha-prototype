@@ -1,10 +1,11 @@
-import { PRESETS, MARLA, ruleFor, generateAll, estimateCost } from './layout.js';
+import { PRESETS, MARLA, ruleFor, estimateCost } from './layout.js';
 import { planSVG, elevationSVG } from './svg.js';
 import { STYLES, STYLE_IDS } from './styles.js';
 import { createViewer } from './scene.js';
 import { modelLayouts, planToLayout } from './modelplans.js';
-import { compactPlans, isCompact } from './compact.js';
-import { onModelState, preloadModel, supportsPreferences } from './model.js';
+import { check, score, serialize } from './bands.js';
+import { mountEditor } from './editor.js';
+import { onModelState, preloadModel } from './model.js';
 
 const $ = (id) => document.getElementById(id);
 const S = { seen: new Set(), plot: null, beds: 3, layouts: [], sel: null, style: null, viewer: null };
@@ -112,41 +113,30 @@ function validateRequest() {
   return '';
 }
 
-// ---------- the trained model: start downloading at once, show progress, never block the page ----------
-const LOAD_TIMEOUT_MS = (Number(new URLSearchParams(location.search).get('loadtimeout')) || 45) * 1000;   // after this, show rule-based layouts and keep downloading
-const rulesOnly = new URLSearchParams(location.search).has('rules');
-let modelState = { phase: 'idle', pct: 0 };
+// ---------- the trained model: every layout is drafted by it. Download starts at once, with progress ----------
 let waitingBtn = null;                                           // the button that is waiting for the model, if any
 onModelState((st) => {
-  modelState = st;
-  const msg = st.phase === 'loading' ? `Naqsha model: downloading ${st.pct}% (first visit only)`
-    : st.phase === 'ready' ? 'Naqsha model ready' : st.phase === 'error' ? 'Naqsha model could not load, so rule-based layouts will be used' : '';
-  $('modelstat').textContent = rulesOnly ? '' : msg;
+  $('modelstat').textContent = st.phase === 'loading' ? `Naqsha model: downloading ${st.pct}% (first visit only)`
+    : st.phase === 'ready' ? 'Naqsha model ready'
+    : st.phase === 'error' ? 'The Naqsha model could not load. Check the connection; Generate tries again.' : '';
   if (waitingBtn && st.phase === 'loading') waitingBtn.textContent = `Downloading the Naqsha model ${st.pct}%`;
 });
-if (!rulesOnly) preloadModel().catch((err) => console.warn('Trained model unavailable.', err));
+preloadModel().catch((err) => console.warn('Naqsha model could not load.', err));
 
-const withTimeout = (promise, ms) => Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
-
-/** Draft layouts for S.plot / S.prefs. regen = show different layouts than the ones already shown. */
+/** Draft layouts with the model for S.plot / S.prefs. regen = different layouts from the ones already shown. */
 async function generate(regen) {
   const btn = $(regen ? 'regen' : 'gen'), label = btn.textContent;
   btn.disabled = true;
   waitingBtn = btn;
   S.note = '';
-  let layouts = [];
-  const wantsPrefs = S.prefs.baths !== S.beds + 1 || S.prefs.focus !== 'balanced';
-  let usedModel = false;
+  let layouts = [], failure = '';
   try {
-    if (rulesOnly) throw new Error('?rules: model skipped on purpose');
-    await withTimeout(preloadModel(), LOAD_TIMEOUT_MS);
+    await preloadModel();                                        // after a failed download this starts it again
     waitingBtn = null;
     const draft = (prefs) => modelLayouts(S.plot, prefs, (msg) => (btn.textContent = msg),
       { exclude: regen ? S.seen : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12 });
     layouts = await draft(S.prefs);
-    usedModel = true;
-    if (wantsPrefs && layouts.length && !(await supportsPreferences())) S.note = 'The model loaded here does not know washroom or size preferences yet, so these are its standard layouts.';
-    // nothing valid for the exact request: ask again with fewer preferences, and say which one was dropped
+    // nothing valid for the exact request: ask the model again with fewer preferences, and say which one was dropped
     const { beds, baths, focus } = S.prefs;
     const bigger = { bedrooms: 'bedrooms', lounge: 'hall', kitchen: 'kitchen' }[focus];
     const relax = [
@@ -155,33 +145,24 @@ async function generate(regen) {
       baths > beds && focus !== 'balanced' && [{ ...S.prefs, baths: beds, focus: 'balanced' }, `${baths} washrooms and a bigger ${bigger} do not fit on this plot together, so these layouts have ${beds} washroom${beds > 1 ? 's' : ''} and the usual proportions.`],
     ].filter(Boolean);
     for (const [prefs, note] of relax) {
-      if (layouts.length || isCompact(S.plot.w, S.plot.d)) break;   // small plots: the compact generator relaxes instantly below
+      if (layouts.length) break;
       layouts = await draft(prefs);
       if (layouts.length) S.note = note;
     }
   } catch (err) {
-    if (err && err.message === 'timeout') S.note = `The model is still downloading (${modelState.pct}%) on this connection, so these are rule-based layouts. Press Regenerate once it says ready.`;
-    else console.warn('Trained model unavailable, using the rule-based layouts instead.', err);
+    console.warn('Naqsha model could not load.', err);
+    failure = 'The Naqsha model could not load on this connection. Check the connection and try again.';
   }
   waitingBtn = null;
   btn.disabled = false;
   btn.textContent = label;
-  const compact = isCompact(S.plot.w, S.plot.d);
-  if (regen && usedModel && !layouts.length && !compact) {       // nothing new and valid this time: keep what the visitor has
-    S.note = 'No new valid layout this time. Press Regenerate again.';
-    renderLayouts();
+  if (!layouts.length) {
+    const msg = failure || (regen ? 'No new layout passed the checks this time. Press Regenerate again.'
+      : `The model could not draft a layout that passes the checks for ${S.plot.w} x ${S.plot.d} ft with ${S.beds} bedroom${S.beds > 1 ? 's' : ''}. Try fewer bedrooms or washrooms, or another plot size.`);
+    if (regen) { S.note = msg; renderLayouts(); } else { $('formerr').textContent = msg; $('formerr').hidden = false; }
     return;
   }
-  if (!layouts.length && compact) {                              // small plots: the compact generator the model learned from
-    const { items, relaxed } = compactPlans({ w: S.plot.w, d: S.plot.d, ...S.prefs });
-    layouts = items.filter((it) => !regen || !S.seen.has(it.text)).map((it, i) => Object.assign(planToLayout(it, i), { tag: 'Rule-based', source: 'rules' }));
-    if (relaxed && layouts.length) S.note = `${S.note ? `${S.note} ` : ''}Not every preference fits on this plot, so the closest layouts are shown.`;
-  }
-  if (!layouts.length) {
-    layouts = generateAll(S.plot, S.beds);                       // rule-based fallback
-    if (regen && !S.note) S.note = 'Rule-based layouts do not change. The Naqsha model gives new ones each time once it has loaded.';
-  }
-  layouts.forEach((L) => L.text && S.seen.add(L.text));
+  layouts.forEach((L) => S.seen.add(L.text));
   S.layouts = layouts;
   S.sel = null;
   renderLayouts();
@@ -204,7 +185,7 @@ $('regen').onclick = () => generate(true);
 // ---------- step 2 ----------
 function renderLayouts() {
   const L0 = S.layouts[0];
-  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedroom${L0.beds === 1 ? '' : 's'}${L0.beds !== S.beds ? ` (limited from ${S.beds} for this plot width)` : ''}. ${L0.source === 'model' ? 'Drafted by the Naqsha model and rule-checked.' : 'Three rule-generated options.'}${S.note ? ` ${S.note}` : ''}`;
+  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedroom${L0.beds === 1 ? '' : 's'}${L0.beds !== S.beds ? ` (limited from ${S.beds} for this plot size)` : ''}. Drafted by the Naqsha model and rule-checked. Pick one to adjust its walls.${S.note ? ` ${S.note}` : ''}`;
   const host = $('layouts');
   host.innerHTML = '';
   S.layouts.forEach((L) => {
@@ -216,18 +197,50 @@ function renderLayouts() {
     host.appendChild(el);
   });
   $('to3').disabled = true;
+  editor?.destroy(); editor = null; editIdx = -1; editState.clear(); $('editor').hidden = true;
   $('checks').innerHTML = '<li><span></span><span>Select a layout to see its rule check and cost estimate.</span></li>';
   $('cost').innerHTML = ''; $('chkscore').textContent = '';
 }
-function select(id) {
-  S.sel = S.layouts.find((l) => l.id === id);
-  [...$('layouts').children].forEach((c, i) => c.classList.toggle('sel', S.layouts[i].id === id));
+let editor = null, editIdx = -1;
+const editState = new Map();                                    // per layout: { original, history }, kept while switching layouts
+function showChecks() {
   $('chkscore').textContent = `(${S.sel.score}/${S.sel.checks.length})`;
   $('checks').innerHTML = S.sel.checks.map((c) =>
     `<li><span class="ico ${c.level}">${c.level === 'ok' ? '&#10003;' : '&#9888;'}</span><div><b>${c.title}</b><span>${c.detail}</span></div></li>`).join('');
   $('cost').innerHTML = '<table>' + estimateCost(S.sel).map((t) =>
     `<tr><td>${t.tier} <small>(Rs ${t.rate.toLocaleString()}/sq ft)</small></td><td>Rs ${(t.total / 1e6).toFixed(1)} M</td></tr>`).join('') + '</table>';
+}
+function select(id) {
+  const idx = S.layouts.findIndex((l) => l.id === id);
+  S.sel = S.layouts[idx];
+  [...$('layouts').children].forEach((c, i) => c.classList.toggle('sel', i === idx));
+  showChecks();
   $('to3').disabled = false;
+  if (editor && editIdx === idx) return;                         // clicking the layout being edited: keep the editor as it is
+  // editor: dragging a wall edits the plan; the rule check, cost, card and 3D all use the edited layout
+  const fresh = $('editor').hidden;
+  editor?.destroy();
+  $('editor').hidden = false;
+  editIdx = idx;
+  const card = $('layouts').children[idx];
+  if (!editState.has(S.sel.id)) editState.set(S.sel.id, {});
+  editor = mountEditor($('edhost'), S.sel, {
+    undoBtn: $('edundo'), resetBtn: $('edreset'), state: editState.get(S.sel.id),
+    rebuild: (plan) => {
+      const checks = check(plan, plan.beds);
+      const L = planToLayout({ text: serialize(plan), plan, checks, score: score(checks) }, idx);
+      if (JSON.stringify(plan) !== JSON.stringify(editState.get(L.id).original)) L.tag = 'Naqsha model, edited';
+      return L;
+    },
+    onChange: (L, live) => {
+      S.layouts[idx] = S.sel = L;
+      showChecks();
+      if (live) return;                                          // the card thumbnail is redrawn when the drag ends
+      const warn = L.checks.length - L.score;
+      card.innerHTML = `${planSVG(L)}<h4>${L.label}: ${L.tag}</h4><p>${L.covered.toLocaleString()} sq ft covered</p><span class="badge ${warn ? 'w' : ''}">${L.score}/${L.checks.length} checks passed</span>`;
+    },
+  });
+  if (fresh) $('editor').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
 }
 $('to3').onclick = () => { renderStyles(); show(3); };
 

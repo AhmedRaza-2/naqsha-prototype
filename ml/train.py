@@ -6,6 +6,12 @@ Speed features: fp16 mixed precision (--no-amp to disable), the whole tokenised 
 batching), per-batch padding trimming, and PyTorch DistributedDataParallel when launched with torchrun
 (each GPU trains on its own slice of every batch and gradients are averaged = data parallelism).
 Writes <out>/model.pt, history.json (loss + samples/s per epoch) and loss.png.
+
+Fine-tuning on real plans (after the synthetic pre-training):
+    python ml/train.py --init runs/rl_v9/model.pt --extra data/real/train.jsonl --extra-mult 20         --extra-val data/real/val.jsonl --select extra --epochs 4 --lr 3e-4 --out runs/ft_real
+--extra rows are repeated --extra-mult times and mixed with the synthetic training set (so the model keeps what it
+learned there); --extra-val reports the loss on held-out real plans every epoch, and --select extra keeps the
+checkpoint with the lowest real-plan loss.
 """
 import argparse, json, math, os, random, sys, time
 from pathlib import Path
@@ -81,6 +87,11 @@ def main():
     ap.add_argument("--no-amp", action="store_true", help="disable fp16 mixed precision")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--init", default=None, help="start from this checkpoint (fine-tuning) instead of random weights")
+    ap.add_argument("--extra", action="append", default=[], help="extra training rows (real plans), repeatable")
+    ap.add_argument("--extra-mult", type=int, default=1, help="repeat the extra rows this many times")
+    ap.add_argument("--extra-val", default=None, help="held-out real plans: loss reported every epoch")
+    ap.add_argument("--select", choices=["val", "extra"], default="val", help="keep the checkpoint with the best synthetic or real loss")
     a = ap.parse_args()
 
     ddp = "RANK" in os.environ and torch.cuda.is_available()
@@ -97,17 +108,25 @@ def main():
     out = Path(a.out)
     if main_proc: out.mkdir(parents=True, exist_ok=True)
 
-    tr = to_tensors(read(f"{a.data}/train.jsonl", a.limit, a.mirror), dev)
+    ex = read(f"{a.data}/train.jsonl", a.limit, a.mirror)
+    n_extra = 0
+    for f in a.extra:
+        ext = read(f, None, a.mirror) * a.extra_mult
+        ex += ext; n_extra += len(ext)
+    tr = to_tensors(ex, dev)
     va = to_tensors(read(f"{a.data}/val.jsonl", a.limit), dev)
+    xv = to_tensors(read(a.extra_val), dev) if a.extra_val else None
     N = tr[0].shape[0]
-    core = L.LayoutLM(a.d, a.layers, a.heads, 256, a.dropout).to(dev)
+    core = L.load(a.init, dev) if a.init else L.LayoutLM(a.d, a.layers, a.heads, 256, a.dropout).to(dev)
     model = torch.nn.parallel.DistributedDataParallel(core, device_ids=[dev.index]) if ddp else core
     pb = max(1, a.bs // world)                              # per-GPU batch
     steps_per_epoch = N // (pb * world)
     steps = a.epochs * steps_per_epoch
     if main_proc:
         print(f"device={dev} gpus={world} amp={amp} params={sum(p.numel() for p in core.parameters()) / 1e6:.2f}M "
-              f"train={N} val={va[0].shape[0]} global_bs={pb * world} steps/epoch={steps_per_epoch}", flush=True)
+              f"train={N} (real rows incl. repeats: {n_extra}) val={va[0].shape[0]} real_val={xv[0].shape[0] if xv else 0} "
+              f"init={a.init or 'random'} global_bs={pb * world} steps/epoch={steps_per_epoch}", flush=True)
+        if xv: print({"epoch": 0, "val_loss": evaluate(core, va, amp), "real_val_loss": evaluate(core, xv, amp)}, flush=True)
     opt = torch.optim.AdamW(core.parameters(), lr=a.lr, betas=(0.9, 0.95), weight_decay=0.1, fused=dev.type == "cuda")
     warm = max(1, steps // 20)
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1, (s + 1) / warm) * 0.5 * (1 + math.cos(math.pi * min(1, s / steps))))
@@ -135,12 +154,14 @@ def main():
         if ddp: dist.all_reduce(tl); tl /= world
         if main_proc:
             v = evaluate(core, va, amp)
-            hist.append({"epoch": ep, "train_loss": tl.item(), "val_loss": v, "sec": round(sec, 1),
+            rv = evaluate(core, xv, amp) if xv else None
+            hist.append({"epoch": ep, "train_loss": tl.item(), "val_loss": v, **({"real_val_loss": rv} if xv else {}), "sec": round(sec, 1),
                          "samples_per_sec": round(steps_per_epoch * pb * world / sec)})
             print(hist[-1], flush=True)
-            if v < best:
-                best = v
-                L.save(core, out / "model.pt", {"val_loss": v, "args": vars(a)})
+            key = rv if a.select == "extra" and xv else v
+            if key < best:
+                best = key
+                L.save(core, out / "model.pt", {"val_loss": v, "real_val_loss": rv, "args": vars(a)})
             (out / "history.json").write_text(json.dumps(hist, indent=1))
         if ddp: dist.barrier()
     if main_proc:
@@ -148,10 +169,11 @@ def main():
             import matplotlib; matplotlib.use("Agg")
             import matplotlib.pyplot as plt
             plt.plot([h["train_loss"] for h in hist], label="train"); plt.plot([h["val_loss"] for h in hist], label="val (unseen plot sizes)")
+            if xv: plt.plot([h["real_val_loss"] for h in hist], label="real plans (held out)")
             plt.xlabel("epoch"); plt.ylabel("cross-entropy"); plt.legend(); plt.savefig(out / "loss.png", dpi=120)
         except Exception as e:
             print("no plot:", e)
-        print("best val loss", round(best, 4))
+        print(f"best {'real' if a.select == 'extra' and xv else 'val'} loss", round(best, 4))
     if ddp: dist.destroy_process_group()
 
 

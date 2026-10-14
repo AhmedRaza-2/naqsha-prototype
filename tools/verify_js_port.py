@@ -14,6 +14,13 @@ for src in ("data/synth_v1_loose/train.jsonl", "data/synth/train.jsonl", "data/s
     if not (ROOT / src).exists(): continue                 # flawed + perfect plans
     rows = [json.loads(l) for l in open(ROOT / src, encoding="utf-8")]
     texts += [r["prompt"] + "\n" + r["completion"] for r in rng.sample(rows, 250)]
+gold = ROOT / "real/gold.jsonl"                                                             # real plans: entrances without a lobby
+if gold.exists():
+    sys.path.insert(0, str(ROOT / "real"))
+    from assemble import assemble
+    for l in open(gold, encoding="utf-8"):
+        p, _ = assemble(json.loads(l)["rooms"])
+        if p: texts.append(bands.serialize(p))
 for t in rng.sample(texts, 100):                                                           # deliberately broken variants
     lines = t.split("\n")
     k = rng.randrange(1, len(lines))

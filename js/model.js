@@ -22,15 +22,21 @@ export function onModelState(fn) {
   return () => listeners.delete(fn);
 }
 
+const STALL_MS = 30000;   // a download that receives nothing for this long has stalled: fail it, so Generate can retry
+
 async function fetchBytes(url, onChunk) {
-  const res = await fetch(url, { cache: 'force-cache' });
+  const ctl = new AbortController();
+  let timer = setTimeout(() => ctl.abort(), STALL_MS);
+  const res = await fetch(url, { cache: 'force-cache', signal: ctl.signal });
   if (!res.ok || !res.body) throw new Error(`${url}: HTTP ${res.status}`);
   const reader = res.body.getReader();
   const parts = [];
   let got = 0;
   for (;;) {
-    const { done, value } = await reader.read();
+    const { done, value } = await reader.read().catch((e) => { throw ctl.signal.aborted ? new Error('the download stalled') : e; });
+    clearTimeout(timer);
     if (done) break;
+    timer = setTimeout(() => ctl.abort(), STALL_MS);
     parts.push(value);
     got += value.length;
     onChunk(got);
@@ -113,12 +119,6 @@ function requestText({ w, d, beds, baths, focus }) {
   if (stoi.has('BATHS') && baths != null) t += ` BATHS ${baths}`;
   if (stoi.has('FOCUS') && focus) t += ` FOCUS ${focus}`;
   return t;
-}
-
-/** True when the loaded model understands the washroom and bigger-rooms preferences. */
-export async function supportsPreferences() {
-  await load();
-  return stoi.has('BATHS') && stoi.has('FOCUS');
 }
 
 /** Sample `n` plans for the request. Returns the text of each (may be invalid, the caller checks them). */

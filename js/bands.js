@@ -50,6 +50,24 @@ export function parse(text) {
   return plan;
 }
 
+/** Plan -> text (same as serialize() in tools/bands.py): the last width of a row and the last depth are implicit. */
+export function serialize(plan) {
+  const { w, d } = plan.plot;
+  let head = `PLOT ${w}x${d} BEDS ${plan.beds}`;
+  if (plan.baths != null) head += ` BATHS ${plan.baths}`;
+  if (plan.focus) head += ` FOCUS ${plan.focus}`;
+  const lines = [head];
+  plan.bands.forEach((b, bi) => {
+    const toks = b.rooms.map((r, ri) => {
+      let t = ri === b.rooms.length - 1 ? r.t : `${r.t} ${r.w}`;
+      if (r.bath) t += ` +bath ${r.bath[0]}x${r.bath[1]} ${r.bath[2]}`;
+      return t;
+    });
+    lines.push(`${bi === plan.bands.length - 1 ? 'rest' : b.d}: ${toks.join(' | ')}`);
+  });
+  return lines.join('\n');
+}
+
 // ---------------------------------------------------------------- geometry
 /** Band plan -> rectangles in feet (x across, y = depth from the road). Baths get parent = index of their room. */
 export function toRects(plan) {
@@ -116,6 +134,49 @@ function links(rects, mains, y0) {
   return out;
 }
 
+// open spaces a door to outside can open onto: the lawn and the car porch (not a light well, side strip or balcony)
+const ENTRY_OPEN = new Set(['lawn', 'porch', 'garage']);
+
+/** The part of r's front wall (road side) that faces the lawn or porch, as ['h', y, lo, hi], if at least 3 ft long. */
+function frontOpen(r, rects) {
+  for (const o of rects) {
+    if (!ENTRY_OPEN.has(o.t) || Math.abs(o.y + o.d - r.y) >= 0.01) continue;
+    const lo = Math.max(o.x, r.x), hi = Math.min(o.x + o.w, r.x + r.w);
+    if (hi - lo >= 3) return ['h', r.y, lo, hi];
+  }
+  return null;
+}
+
+/** The wall a drawing room shares with the porch or a lawn (at least 3 ft): where its own guest door goes. */
+function guestWall(r, rects) {
+  for (const o of rects) {
+    if (!ENTRY_OPEN.has(o.t)) continue;
+    const s = shared(r, o);
+    if (s && s[3] - s[2] >= 3) return s;
+  }
+  return null;
+}
+
+/**
+ * Doors to outside, used by the checker and by the plan drawing so both agree:
+ *   main  = the lobby, or (common in real plans) a lounge / dining room / passage facing the porch or lawn
+ *   wall  = where its door goes; faces = it opens onto the road side
+ *   guests = [[drawing room, wall]] for drawing rooms next to the porch or lawn (their own guest door)
+ */
+export function outsideDoors(rects, mains, y0) {
+  const lob = mains.find((r) => r.t === 'lobby');
+  let main = null, wall = null, faces = false;
+  if (lob) { main = lob; wall = frontOpen(lob, rects); faces = Math.abs(lob.y - y0) < 0.01 && !!wall; }
+  else {
+    for (const t of ['lounge', 'dining', 'passage']) {
+      const r = mains.find((m) => m.t === t && frontOpen(m, rects));
+      if (r) { main = r; wall = frontOpen(r, rects); faces = true; break; }
+    }
+  }
+  const guests = mains.filter((r) => r.t === 'drawing' && r !== main).map((r) => [r, guestWall(r, rects)]).filter(([, w]) => w);
+  return { main, wall, faces, guests };
+}
+
 function hasWindow(r, rects) {
   const need = (WINDOW_W[r.t] ?? 5) + 1.0;
   const bath = rects.find((b) => b.t === 'bath' && b.parent === r.i);
@@ -178,7 +239,7 @@ export function check(plan, beds = plan.beds) {
   const count = {};
   for (const b of plan.bands) for (const r of b.rooms) count[r.t] = (count[r.t] || 0) + 1;
   const nb = (count.bed || 0) + (count.master || 0);
-  for (const need of ['kitchen', 'drawing', 'lobby']) if (!count[need]) { add('err', `missing ${need}`); errs++; }
+  for (const need of ['kitchen', 'drawing']) if (!count[need]) { add('err', `missing ${need}`); errs++; }   // a lobby is optional
   if (beds != null && nb !== beds) { add('err', 'bed count', `asked for ${beds}, plan has ${nb}`); errs++; }
   const nbath = plan.bands.reduce((s, b) => s + b.rooms.filter((r) => r.bath).length, 0);
   if (plan.baths != null && nbath !== plan.baths) { add('err', 'bath count', `asked for ${plan.baths}, plan has ${nbath}`); errs++; }
@@ -206,14 +267,14 @@ export function check(plan, beds = plan.beds) {
   add(small.length ? 'warn' : 'ok', 'min room sizes', small.join(','));
   const nobath = mains.filter((r) => BEDS.has(r.t) && !r.bath).map((r) => r.t);
   add(nobath.length ? 'warn' : 'ok', 'attached baths', `${nobath.length} bedroom(s) without`);
-  const lob = mains.find((r) => r.t === 'lobby');
-  const faces = Math.abs(lob.y - y0) < 0.01 && rects.some((o) => OPEN.has(o.t) && Math.abs(o.y + o.d - lob.y) < 0.01
-    && Math.min(o.x + o.w, lob.x + lob.w) - Math.max(o.x, lob.x) >= 3);
-  add(faces ? 'ok' : 'warn', 'entrance on road side');
+  // main entrance: a lobby, or (common in real plans) a lounge / dining room entered straight from the porch or lawn
+  const out_ = outsideDoors(rects, mains, y0);
+  add(out_.faces ? 'ok' : 'warn', 'entrance on road side');
 
   const lk = links(rects, mains, y0);
+  const doorsOut = [...(out_.main ? [out_.main.i] : []), ...out_.guests.map(([r]) => r.i)];
   const adj = new Map();
-  for (const [a, b] of [...lk, [-1, lob.i]]) {
+  for (const [a, b] of [...lk, ...doorsOut.map((i) => [-1, i])]) {
     if (!adj.has(a)) adj.set(a, []);
     if (!adj.has(b)) adj.set(b, []);
     adj.get(a).push(b); adj.get(b).push(a);

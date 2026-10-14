@@ -1,25 +1,25 @@
 {
-  "note": "1,200 plans for 300 requests on plot sizes the model never saw (3 to 34 marla), each with a washroom count and a bigger-room choice. Baseline: the rule-based generator, one try. On the usual plot sizes, every one of the 246 requests the form can make gets a valid plan from the model. Synthetic test set; evaluation on real plans is in progress.",
+  "note": "1,200 plans for 300 requests on plot sizes the model never saw (3 to 34 marla), each with a washroom count and a bigger-room choice. Baseline: the rule-based generator, one try. On the usual plot sizes (3 marla to 60x110), every one of the 292 requests the form can make gets a valid plan from the model. Synthetic test set; evaluation on real plans is in progress.",
   "rows": [
     {
       "label": "Plans that pass every structural check",
-      "model": 99.8,
-      "baseline": 98.0
+      "model": 99.5,
+      "baseline": 97.3
     },
     {
       "label": "Bedrooms and washrooms exactly as asked",
-      "model": 99.9,
-      "baseline": 98.0
+      "model": 99.6,
+      "baseline": 97.3
     },
     {
       "label": "Bigger hall, bedrooms or kitchen as asked",
-      "model": 98.8,
-      "baseline": 92.0
+      "model": 98.4,
+      "baseline": 93.0
     },
     {
       "label": "Plans that also pass every design rule",
-      "model": 84.3,
-      "baseline": 41.3
+      "model": 90.5,
+      "baseline": 62.3
     }
   ]
 }

@@ -218,6 +218,38 @@ def _links(rects, mains, y0):
     return links
 
 
+ENTRY_OPEN = {"lawn", "porch", "garage"}     # open spaces a door to outside opens onto (not a light well, side strip, balcony)
+
+
+def _front_open(r, rects):
+    """r's front wall (road side) faces the lawn or porch over at least 3 ft."""
+    return any(o["t"] in ENTRY_OPEN and abs(o["y"] + o["d"] - r["y"]) < 0.01
+               and min(o["x"] + o["w"], r["x"] + r["w"]) - max(o["x"], r["x"]) >= 3 for o in rects)
+
+
+def _guest_door(r, rects):
+    """A drawing room sharing at least 3 ft of wall with the porch or a lawn can have its own guest door."""
+    for o in rects:
+        if o["t"] not in ENTRY_OPEN: continue
+        s = _shared(r, o)
+        if s and s[3] - s[2] >= 3: return True
+    return False
+
+
+def outside_doors(rects, mains, y0):
+    """(main entrance or None, faces the road side, [drawing rooms with their own guest door]); same as outsideDoors()
+    in js/bands.js. The main entrance is the lobby, or (common in real plans) a lounge / dining room / passage facing
+    the porch or lawn."""
+    lob = next((r for r in mains if r["t"] == "lobby"), None)
+    if lob is not None:
+        main, faces = lob, abs(lob["y"] - y0) < 0.01 and _front_open(lob, rects)
+    else:
+        main = next((r for t in ("lounge", "dining", "passage") for r in mains if r["t"] == t and _front_open(r, rects)), None)
+        faces = main is not None
+    guests = [r for r in mains if r["t"] == "drawing" and r is not main and _guest_door(r, rects)]
+    return main, faces, guests
+
+
 def _has_window(r, rects):
     """Does the room have an exterior (open-side) wall long enough for a window, ignoring the bath corner?"""
     need = WINDOW_W.get(r["t"], 5) + 1.0
@@ -275,7 +307,7 @@ def check(plan, beds=None):
     if abs(sd - D) > 0.26: add("err", "plot depth", f"band depths sum to {sd:g}, plot is {D:g}"); errs += 1
     types = Counter(r["t"] for b in plan["bands"] for r in b["rooms"])
     nb = types["bed"] + types["master"]
-    for need in ("kitchen", "drawing", "lobby"):
+    for need in ("kitchen", "drawing"):                                 # a lobby is optional: real houses are often entered from the porch
         if not types[need]: add("err", f"missing {need}"); errs += 1
     if beds is not None and nb != beds: add("err", "bed count", f"asked for {beds}, plan has {nb}"); errs += 1
     nbath = sum(1 for b in plan["bands"] for r in b["rooms"] if r.get("bath"))
@@ -303,14 +335,14 @@ def check(plan, beds=None):
     add("warn" if small else "ok", "min room sizes", ",".join(small))
     nobath = [r["t"] for r in mains if r["t"] in BEDS and not r["bath"]]
     add("warn" if nobath else "ok", "attached baths", f"{len(nobath)} bedroom(s) without")
-    lob = next(r for r in mains if r["t"] == "lobby")
-    faces = abs(lob["y"] - y0) < 0.01 and any(o["t"] in OPEN and abs(o["y"] + o["d"] - lob["y"]) < 0.01
-                                              and min(o["x"] + o["w"], lob["x"] + lob["w"]) - max(o["x"], lob["x"]) >= 3 for o in rects)
+    # main entrance: a lobby, or (common in real plans) a lounge / dining room entered straight from the porch or lawn
+    ent, faces, guests = outside_doors(rects, mains, y0)
     add("ok" if faces else "warn", "entrance on road side")
 
     links = _links(rects, mains, y0)
+    doors_out = ([ent["i"]] if ent else []) + [r["i"] for r in guests]
     adj = {}
-    for a, b in links + [(-1, lob["i"])]:
+    for a, b in links + [(-1, i) for i in doors_out]:
         adj.setdefault(a, []).append(b); adj.setdefault(b, []).append(a)
 
     def bfs(blocked=lambda i: False):

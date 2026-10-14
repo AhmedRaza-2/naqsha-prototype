@@ -3,13 +3,19 @@ const FILL = {
   kitchen: '#f7dccd', bed: '#e7e0f4', bath: '#c9e5ee', gbath: '#c9e5ee', stairs: '#e4e1d8',
 };
 
-export function planSVG(L, { maxW = 320, maxH = 470, labels = true } = {}) {
+/** Drawing scale of a plan: feet -> SVG units (x across, z from the road, which is at the bottom). */
+export function planFrame(L, { maxW = 320, maxH = 470 } = {}) {
   const { w: W, d: D } = L.plot;
   const m = 24, road = 20;
   const s = Math.min((maxW - 2 * m) / W, (maxH - 2 * m - road) / D);
-  const X = (x) => m + x * s;
-  const Y = (z) => m + (D - z) * s;
-  const vw = 2 * m + W * s, vh = 2 * m + D * s + road;
+  return { s, m, vw: 2 * m + W * s, vh: 2 * m + D * s + road, X: (x) => m + x * s, Y: (z) => m + (D - z) * s };
+}
+
+/** overlay(frame) -> extra SVG markup drawn on top (the editor's drag handles). */
+export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = null } = {}) {
+  const { w: W, d: D } = L.plot;
+  const frame = planFrame(L, { maxW, maxH });
+  const { s, X, Y, vw, vh } = frame;
   const B = L.B;
   let o = `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan ${L.label}">`;
   o += `<rect x="${X(0)}" y="${Y(D)}" width="${W * s}" height="${D * s}" fill="#f4f2ea" stroke="#555" stroke-width="1.5"/>`;
@@ -75,6 +81,7 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true } = {}) {
   o += `<text x="${X(W / 2)}" y="${Y(0) + 13}" font-size="9" text-anchor="middle" fill="#666">${W} ft</text>`;
   o += `<text x="${X(0) - 10}" y="${Y(D / 2)}" font-size="9" text-anchor="middle" fill="#666" transform="rotate(-90 ${X(0) - 10} ${Y(D / 2)})">${D} ft</text>`;
   o += `<rect x="${X(-3)}" y="${vh - 9}" width="${W * s + 6 * s}" height="6" fill="#8d8d8d"/><text x="${X(W / 2)}" y="${vh - 3.6}" font-size="5.5" fill="#fff" text-anchor="middle" letter-spacing="2">ROAD</text>`;
+  if (overlay) o += overlay(frame);
   return o + '</svg>';
 }
 
@@ -106,7 +113,7 @@ export function elevationSVG(L, st) {
       if (st.id !== 'modern') o += `<rect x="${x0 - 3}" y="${Y(p.sill) }" width="${w + 6}" height="4" fill="${st.trim}" stroke="#00000033"/>`;
     }
   }
-  const door = front.find((p) => p.main);
+  const door = L.openings.find((p) => p.main);                  // may be set back behind the car porch
   const dx = X(door.at - door.w / 2), dw = door.w * s;
   if (st.id === 'modern') o += `<rect x="${dx - 12}" y="${Y(H)}" width="${dw + 24}" height="${H * s}" fill="${st.accent}" opacity=".92"/>`;
   if (st.id === 'spanish') o += `<path d="M${dx} ${Y(0)} V${Y(6)} A${dw / 2} ${dw / 2} 0 0 1 ${dx + dw} ${Y(6)} V${Y(0)} Z" fill="${st.frame}"/>`;
