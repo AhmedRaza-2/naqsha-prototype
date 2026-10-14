@@ -3,6 +3,8 @@ import { AnimatePresence, motion, useMotionValueEvent, useScroll, useSpring } fr
 import { List, X, ArrowUpRight } from '@phosphor-icons/react';
 import { goTo } from '../lib/lenis.js';
 
+const APP_URL = import.meta.env.VITE_APP_URL || '/app/';      // the planner: the plot is entered there, in one place
+
 /* Morphing scroll navbar: full-width at the top, a blurred floating pill after you scroll, a compact pill while
    you scroll down, expanded again on scroll up, with a reading-progress line. (Behaviour inspired by the
    "Morphing Scroll Navbar" pattern on 21st.dev, written from scratch.) */
@@ -82,13 +84,12 @@ export default function Nav() {
         </AnimatePresence>
 
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => goTo('plan', { duration: 2.6 })}
-            className="h-10 whitespace-nowrap rounded-full bg-accent px-4 text-sm font-medium text-accent-ink md:px-5 transition-transform duration-300 ease-out-expo hover:-translate-y-px active:translate-y-px active:scale-[0.98]"
+          <a
+            href={APP_URL}
+            className="inline-flex h-10 items-center whitespace-nowrap rounded-full bg-accent px-4 text-sm font-medium text-accent-ink md:px-5 transition-transform duration-300 ease-out-expo hover:-translate-y-px active:translate-y-px active:scale-[0.98]"
           >
             Plan my house
-          </button>
+          </a>
           <button
             type="button"
             aria-label={open ? 'Close menu' : 'Open menu'}

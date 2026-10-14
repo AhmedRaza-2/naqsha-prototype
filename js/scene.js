@@ -96,6 +96,7 @@ export function createViewer(host, L, styleId, hooks = {}) {
   // open spaces inside the house outline: the car porch beside the drawing room (small plots) and light wells
   const open = L.open || [];
   const porch = open.find((p) => p.type === 'porch');
+  const innerPorch = porch && porch.z >= B.z - 0.01 ? porch : null;  // beside the drawing room, under the main roof (small plots)
   for (const p of open) plane(p.x, p.x + p.w, p.z, p.z + p.d, 0.02, mat(p.type === 'porch' ? '#cfcac0' : '#9cbf7a'));
 
   // compound wall; with a car porch the gate spans the porch and the front door
@@ -288,7 +289,7 @@ export function createViewer(host, L, styleId, hooks = {}) {
 
   // ---------- porch ----------
   const pd = Math.min(rule.front - 1, 7);
-  if (!porch) {                                                  // veranda canopy across the front (the car porch is under the main roof)
+  if (!innerPorch) {                                             // veranda canopy across the front (the car porch is under the main roof)
     box(world, B.x - 0.4, B.x + B.w + 0.4, 9.3, 9.8, B.z - pd, B.z + 0.4, st.id === 'spanish' ? mat(st.roof) : mTrim);
     if (st.id === 'spanish') box(world, B.x - 0.4, B.x + B.w + 0.4, 9.8, 10.1, B.z - pd, B.z - pd + 0.5, mat('#8e3f22'));
   }
@@ -300,8 +301,8 @@ export function createViewer(host, L, styleId, hooks = {}) {
   }
   // a front veranda with pillars, or with a car porch, one pillar at the porch's open front corner (the roof covers it)
   const nP = Math.max(2, Math.round(B.w / 12) + 1);
-  const pillars = porch
-    ? [[porch.x + porch.w / 2 < mainDoor.at ? porch.x + 0.5 : porch.x + porch.w - 0.5, porch.z + 0.5]]
+  const pillars = innerPorch
+    ? [[innerPorch.x + innerPorch.w / 2 < mainDoor.at ? innerPorch.x + 0.5 : innerPorch.x + innerPorch.w - 0.5, innerPorch.z + 0.5]]
     : Array.from({ length: nP }, (_, i) => [B.x + 0.9 + (i * (B.w - 1.8)) / (nP - 1), B.z - pd + 0.7]);
   for (const [px, pz] of pillars) {
     if (st.pillar === 'box') box(world, px - 0.35, px + 0.35, 0, 9.3, pz - 0.35, pz + 0.35, mTrim, true);

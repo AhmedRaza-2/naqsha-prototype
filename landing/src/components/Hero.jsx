@@ -1,8 +1,9 @@
 import { Component, lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { useMotion } from '../lib/motion.js';
-import { ArrowDown } from '@phosphor-icons/react';
-import { goTo } from '../lib/lenis.js';
+import { ArrowRight } from '@phosphor-icons/react';
+
+const APP_URL = import.meta.env.VITE_APP_URL || '/app/';      // the planner: the plot is entered there, in one place
 
 // Three.js (the heavy part) is its own chunk: the headline paints first, the scene fades in once ready.
 const HouseScene = lazy(() => import('./HouseScene.jsx'));
@@ -68,14 +69,13 @@ export default function Hero() {
             Enter your plot size. Naqsha drafts room layouts for Pakistani homes, then lets you walk through them in 3D.
           </p>
           <div className="mt-7">
-            <button
-              type="button"
-              onClick={() => goTo('plan', { duration: reduce ? 0 : 3.2 })}
+            <a
+              href={APP_URL}
               className="group inline-flex h-12 items-center gap-2 rounded-full bg-[#394845] pl-6 pr-5 text-[0.95rem] font-medium text-[#fbf8f1] transition-transform duration-300 ease-out-expo hover:-translate-y-px active:translate-y-px active:scale-[0.98]"
             >
               Plan my house
-              <ArrowDown size={18} weight="bold" className="transition-transform duration-300 group-hover:translate-y-0.5" />
-            </button>
+              <ArrowRight size={18} weight="bold" className="transition-transform duration-300 group-hover:translate-x-0.5" />
+            </a>
           </div>
         </motion.div>
 

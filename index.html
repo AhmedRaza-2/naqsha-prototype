@@ -33,7 +33,7 @@
           <label class="field">Width (ft)<input id="pw" type="number" min="18" max="120" value="25"></label>
           <label class="field">Depth (ft)<input id="pd" type="number" min="30" max="200" value="45"></label>
           <label class="field">Bedrooms
-            <select id="pb"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select>
+            <select id="pb"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
           </label>
         </div>
         <details class="prefs" id="prefs">
@@ -48,6 +48,13 @@
                 <option value="bedrooms">Bedrooms</option>
                 <option value="lounge">Hall (lounge)</option>
                 <option value="kitchen">Kitchen</option>
+              </select>
+            </label>
+            <label class="field">Car porch
+              <select id="pporch">
+                <option value="yes" selected>Yes, a car porch</option>
+                <option value="any">Either</option>
+                <option value="no">No car porch</option>
               </select>
             </label>
           </div>

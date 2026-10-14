@@ -28,10 +28,17 @@ function readPlot() {
   const r = ruleFor(w, d);
   $('plotinfo').textContent = `${w} x ${d} ft = ${(w * d).toLocaleString()} sq ft = ${marla.toFixed(1)} marla. Buildable area about ${(w - 2 * r.side)} x ${(d - r.front - r.rear)} ft after setbacks.`;
   document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', +c.dataset.w === w && +c.dataset.d === d));
-  const cap = maxBedsFor(w, d), lo = minBedsFor(w, d);
-  [...$('pb').options].forEach((o) => { o.disabled = +o.value > cap || +o.value < lo; });
-  const want = Math.min(Math.max(+$('pb').value, lo), Math.max(cap, lo));
-  if (cap > 0 && want !== +$('pb').value) $('pb').value = String(want);
+  // every choice stays open; each is labelled by how well it suits this plot
+  const cap = maxBedsFor(w, d), lo = minBedsFor(w, d), rec = recBedsFor(w, d);
+  if (!userBeds && cap > 0) $('pb').value = String(rec);
+  [...$('pb').options].forEach((o) => {
+    const n = +o.value;
+    o.textContent = `${n}${n === rec ? ' (recommended)' : n > cap || n < lo ? ' (closest fit will be shown)' : ''}`;
+  });
+  const beds = +$('pb').value;
+  $('plotinfo').textContent += cap === 0 ? '' : beds > cap
+    ? ` One floor here fits ${cap} bedroom${cap > 1 ? 's' : ''} comfortably; with ${beds} the model shows the closest layouts that fit.`
+    : ` Recommended for this plot: ${rec} bedroom${rec > 1 ? 's' : ''}.`;
   if (typeof syncBaths === 'function') syncBaths();
   return { w, d };
 }
@@ -54,7 +61,7 @@ $('nl').addEventListener('input', () => {
     if (hit) { $('pw').value = hit.w; $('pd').value = hit.d; }
     else { const a = +m[1] * MARLA; const w = Math.round(Math.sqrt(a * 0.55)); $('pw').value = w; $('pd').value = Math.round(a / w); }
   }
-  if ((m = t.match(/(\d)\s*(?:bed|kamr|room|bhk)/))) $('pb').value = Math.min(6, Math.max(1, +m[1]));
+  if ((m = t.match(/(\d)\s*(?:bed|kamr|room|bhk)/))) { $('pb').value = Math.min(6, Math.max(1, +m[1])); userBeds = true; }
   if ((m = t.match(/(\d)\s*(?:bath|washroom|wc|toilet)/))) { syncBaths(+m[1]); $('prefs').open = true; }
   if (/big\w*\s+(?:hall|lounge|tv)/.test(t)) { $('pfocus').value = 'lounge'; $('prefs').open = true; }
   else if (/big\w*\s+(?:bed|room)/.test(t)) { $('pfocus').value = 'bedrooms'; $('prefs').open = true; }
@@ -76,6 +83,13 @@ const maxBedsFor = (w, d) => {
   return usable < 26 ? 2 : usable < 32 ? 3 : usable < 44 ? 4 : 6;
 };
 const minBedsFor = (w, d) => ((w * d) / MARLA <= 6 ? 1 : 2);
+// what usually suits a plot this size (typical Pakistani homes), never more than one floor fits comfortably
+const recBedsFor = (w, d) => {
+  const marla = (w * d) / MARLA;
+  const typical = marla <= 7 ? 2 : marla <= 12 ? 3 : marla <= 22 ? 4 : 5;
+  return Math.max(minBedsFor(w, d), Math.min(maxBedsFor(w, d), typical));
+};
+let userBeds = false;                                              // once the visitor picks a bedroom count, keep it
 // washrooms: one per bedroom + a guest washroom, + a common one off the lounge above 6 marla (same as max_baths)
 const extraBathsFor = (w, d) => ((w * d) / MARLA <= 6 ? 1 : 2);
 function syncBaths(want) {
@@ -83,17 +97,17 @@ function syncBaths(want) {
   const sel = $('pbaths');
   const keep = want ?? +sel.value;
   const plot = { w: +$('pw').value, d: +$('pd').value };
-  const opts = [[beds, beds === 1 ? 'Attached to the bedroom' : 'One per bedroom, attached'], [beds + 1, 'Attached + a guest washroom'], [beds + 2, 'Attached + guest + a common washroom']]
-    .slice(0, 1 + extraBathsFor(plot.w, plot.d));
+  const opts = [[beds, beds === 1 ? 'Attached to the bedroom' : 'One per bedroom, attached'], [beds + 1, 'Attached + a guest washroom'], [beds + 2, 'Attached + guest + a common washroom']];
+  const fits = beds + extraBathsFor(plot.w, plot.d);
   sel.innerHTML = '';
   opts.forEach(([n, label]) => {
     const o = document.createElement('option');
-    o.value = n; o.textContent = `${n}: ${label}`;
+    o.value = n; o.textContent = `${n}: ${label}${n === beds + 1 ? ' (recommended)' : n > fits ? ' (closest fit will be shown)' : ''}`;
     sel.appendChild(o);
   });
   sel.value = opts.some(([n]) => n === keep) ? keep : beds + 1;
 }
-$('pb').addEventListener('change', () => syncBaths());
+$('pb').addEventListener('change', () => { userBeds = true; readPlot(); });
 syncBaths();
 
 /** Returns an error message, or '' when the request is fine. Also nudges the bedroom count to what the plot can hold. */
@@ -108,8 +122,6 @@ function validateRequest() {
   if (cap === 0) return marla <= 6
     ? `${w} x ${d} ft leaves too little depth for a house after the front and back open spaces. A single floor needs a plot at least 31 ft deep.`
     : `${w} x ${d} ft is too narrow for a single floor with side setbacks. Plots above 6 marla need about 25 ft of width.`;
-  if (beds > cap) return `A single floor on ${w} x ${d} ft fits up to ${cap} bedroom${cap > 1 ? 's' : ''}. Choose fewer bedrooms${cap < 4 && marla > 8 ? ' or a wider plot (about 38 ft)' : cap === 1 ? ' or a deeper plot (about 25 x 45 ft fits 2)' : ''}.`;
-  if (beds < minBedsFor(w, d)) return 'Plots above 6 marla are planned with at least 2 bedrooms.';
   return '';
 }
 
@@ -137,13 +149,24 @@ async function generate(regen) {
       { exclude: regen ? S.seen : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12 });
     layouts = await draft(S.prefs);
     // nothing valid for the exact request: ask the model again with fewer preferences, and say which one was dropped
-    const { beds, baths, focus } = S.prefs;
+    const { beds, baths, focus, porch } = S.prefs;
     const bigger = { bedrooms: 'bedrooms', lounge: 'hall', kitchen: 'kitchen' }[focus];
     const relax = [
       focus !== 'balanced' && [{ ...S.prefs, focus: 'balanced' }, `Bigger ${bigger} does not fit on this plot with your other choices, so these layouts use the usual proportions.`],
       baths > beds && [{ ...S.prefs, baths: beds }, `${baths} washrooms do not fit on this plot, so these layouts have ${beds}, one attached to each bedroom.`],
       baths > beds && focus !== 'balanced' && [{ ...S.prefs, baths: beds, focus: 'balanced' }, `${baths} washrooms and a bigger ${bigger} do not fit on this plot together, so these layouts have ${beds} washroom${beds > 1 ? 's' : ''} and the usual proportions.`],
     ].filter(Boolean);
+    if (porch !== 'any') relax.push([{ ...S.prefs, porch: 'any' }, porch === 'yes'
+      ? 'No layout with a car porch fits this plot with your other choices, so these may not have one.'
+      : 'Every layout the model drafted for this plot has a car porch, so these keep it.']);
+    // a bedroom count this plot cannot hold on one floor: the closest count that fits, with the usual washrooms
+    const fitBeds = Math.min(Math.max(beds, minBedsFor(S.plot.w, S.plot.d)), maxBedsFor(S.plot.w, S.plot.d));
+    if (fitBeds !== beds) {
+      const fit = [{ beds: fitBeds, baths: fitBeds + 1, focus: 'balanced', porch: 'any' },
+        beds > fitBeds ? `${beds} bedrooms do not fit on one floor of ${S.plot.w} x ${S.plot.d} ft, so these are the closest layouts, with ${fitBeds}. Double-storey plans are coming.`
+          : `Plots this size are planned with at least ${fitBeds} bedrooms, so these layouts have ${fitBeds}.`];
+      relax.splice(0, relax.length, fit);                           // other relaxations cannot help here; go straight to it
+    }
     for (const [prefs, note] of relax) {
       if (layouts.length) break;
       layouts = await draft(prefs);
@@ -176,7 +199,7 @@ $('gen').onclick = async () => {
   $('formerr').textContent = problem;
   if (problem) return;
   S.beds = +$('pb').value;
-  S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value };
+  S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value };
   S.seen = new Set();
   await generate(false);
 };
@@ -185,7 +208,7 @@ $('regen').onclick = () => generate(true);
 // ---------- step 2 ----------
 function renderLayouts() {
   const L0 = S.layouts[0];
-  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedroom${L0.beds === 1 ? '' : 's'}${L0.beds !== S.beds ? ` (limited from ${S.beds} for this plot size)` : ''}. Drafted by the Naqsha model and rule-checked. Pick one to adjust its walls.${S.note ? ` ${S.note}` : ''}`;
+  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedroom${L0.beds === 1 ? '' : 's'}. Drafted by the Naqsha model and rule-checked. Pick one to adjust its walls.${S.note ? ` ${S.note}` : ''}`;
   const host = $('layouts');
   host.innerHTML = '';
   S.layouts.forEach((L) => {

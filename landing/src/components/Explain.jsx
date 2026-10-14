@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { useMotion } from '../lib/motion.js';
-import RequestForm from './RequestForm.jsx';
+import { ArrowRight } from '@phosphor-icons/react';
 import { prefetchModel } from '../lib/prefetch.js';
 import data from '../data/plan.json';
 import PlanSvg from './PlanSvg.jsx';
@@ -32,10 +32,13 @@ export default function Explain() {
         <div className="lg:col-span-5 lg:pt-8">
           <h2 className="display max-w-[14ch] text-4xl md:text-6xl">Tell us your plot. Get layouts that fit it.</h2>
           <p className="mt-6 max-w-[42ch] text-base leading-relaxed text-soft md:text-lg">
-            Type a size like 10 marla or 30x60. Add washrooms or a bigger hall under More options. Every layout is checked before you see it.
+            Type a size like 10 marla or 30x60, pick bedrooms and washrooms, and say which rooms you want bigger. Every layout is checked before you see it, and you can drag its walls to adjust it.
           </p>
 
-          <RequestForm />
+          <a href={import.meta.env.VITE_APP_URL || '/app/'}
+            className="group mt-10 inline-flex h-14 items-center gap-3 rounded-full bg-accent pl-7 pr-6 text-base font-medium text-accent-ink transition-transform duration-300 ease-out-expo hover:-translate-y-px active:translate-y-px active:scale-[0.98]">
+            Plan my house <ArrowRight size={20} weight="bold" className="transition-transform duration-300 group-hover:translate-x-1" />
+          </a>
         </div>
 
         <motion.div style={{ y: drift }} className="lg:col-span-7">

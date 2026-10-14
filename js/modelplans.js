@@ -67,7 +67,7 @@ export function planToLayout(item, index) {
 
   // open spaces inside the house outline: the car porch beside the drawing room (small plots) and light wells
   const inside = (r) => r.x >= B.x - 0.01 && r.x + r.w <= B.x + B.w + 0.01 && r.y >= B.z - 0.01 && r.y + r.d <= B.z + B.d + 0.01;
-  const open = rects.filter((r) => (r.t === 'porch' || r.t === 'courtyard') && inside(r))
+  const open = rects.filter((r) => r.t === 'porch' || (r.t === 'courtyard' && inside(r)))
     .map((r) => ({ type: r.t, name: r.t === 'porch' ? 'Car Porch' : 'Light Well', x: r.x, z: r.y, w: r.w, d: r.d }));
 
   // doors to outside: the same rule the checker uses
@@ -93,8 +93,11 @@ export function planToLayout(item, index) {
 
 /** Layouts for a plot and bedroom count, drafted by the trained model. Empty list if the model gives nothing valid. */
 export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
-  const items = await draftPlans({ w: plot.w, d: plot.d, ...prefs }, {
-    n: opts.n ?? 12, top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus,
+  const { porch = 'any', ...request } = prefs;
+  const wantPorch = porch === 'any' ? null : porch === 'yes';
+  const items = await draftPlans({ w: plot.w, d: plot.d, ...request }, {
+    n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 99, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus,
   });
-  return items.map((it, i) => planToLayout(it, i));
+  const hasPorch = (it) => it.plan.bands.some((b) => b.rooms.some((r) => r.t === 'porch' || r.t === 'garage'));
+  return items.filter((it) => wantPorch === null || hasPorch(it) === wantPorch).slice(0, 3).map((it, i) => planToLayout(it, i));
 }

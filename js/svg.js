@@ -20,7 +20,7 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
   let o = `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan ${L.label}">`;
   o += `<rect x="${X(0)}" y="${Y(D)}" width="${W * s}" height="${D * s}" fill="#f4f2ea" stroke="#555" stroke-width="1.5"/>`;
   const open = L.open || [];
-  const innerPorch = open.some((p) => p.type === 'porch');
+  const innerPorch = open.some((p) => p.type === 'porch');      // any car porch: the front strip is then just lawn
   o += `<rect x="${X(0)}" y="${Y(B.z)}" width="${W * s}" height="${B.z * s}" fill="#e3e0d6"/>`;
   o += `<text x="${X(W / 2)}" y="${Y(B.z / 2) + 3}" font-size="9" fill="#8a8678" text-anchor="middle">${innerPorch ? 'lawn' : 'porch / lawn'}</text>`;
   o += `<rect x="${X(B.x)}" y="${Y(B.z + B.d)}" width="${B.w * s}" height="${B.d * s}" fill="none" stroke="#999" stroke-dasharray="3 3" stroke-width=".8"/>`;
