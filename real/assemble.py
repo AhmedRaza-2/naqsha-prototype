@@ -11,25 +11,32 @@ room, and the result is checked. `quality` says how far the printed sizes had to
 
     python real/assemble.py real/gold.jsonl            # assemble and check the gold set, print a summary
 """
-import json, statistics as st, sys
+import json, re, statistics as st, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import bands  # noqa: E402
 
-ALIASES = {"bedroom": "bed", "master bedroom": "master", "tv lounge": "lounge", "living": "lounge", "family": "lounge",
-           "hall": "lounge", "drawing room": "drawing", "entrance": "lobby", "foyer": "lobby", "garage": "porch",
-           "car porch": "porch", "ots": "courtyard", "open": "courtyard", "light well": "courtyard", "verandah": "lawn",
-           "terrace": "lawn", "back yard": "void", "passage": "passage", "staircase": "stairs", "stair": "stairs",
-           "dressing": "dress", "laundry": "store", "utility": "store", "wash": "store", "servant quarter": "servant"}
+# room names as people (and the vision model) write them -> our types; first match wins, so "master bed" is a master
+KEYWORDS = [("master", "master"), ("dress|wardrobe|closet", "dress"), ("bath|toilet|w\\.?c\\b|washroom|powder|lav", "bath"),
+            ("draw|drg", "drawing"), ("bed|guest", "bed"), ("dining|dinning", "dining"), ("kitch|kichen|cook", "kitchen"),
+            ("lounge|tv|living|family|sitting|hall", "lounge"), ("lobby|entrance|entry|foyer", "lobby"), ("porch|garage|parking|car", "porch"),
+            ("ots|open|court|light|sky|patio", "courtyard"), ("lawn|garden|green|terrace|verand|deck|sit ?out", "lawn"),
+            ("stair", "stairs"), ("store|utility|laundry|wash|pantry|box", "store"), ("servant|s\\.?\\s?q", "servant"),
+            ("prayer|namaz", "prayer"), ("study|office|library", "study"), ("passage|corridor|gallery", "passage"),
+            ("void|setback|yard|space|side|back", "void")]
 KEEP = bands.TYPES - {"bath"}
 
 
-def norm_type(t):
+def norm_type(t, keep_bath=False):
+    """Room name -> our type ('other' if unknown). Washrooms come back as 'bath' only when keep_bath is set."""
     t = str(t).strip().lower()
-    t = ALIASES.get(t, t)
-    return t if t in KEEP else "other"
+    if t in KEEP: return t
+    for rx, ty in KEYWORDS:
+        if re.search(rx, t):
+            return ty if ty != "bath" or keep_bath else "other"
+    return "other"
 
 
 def snap(v):

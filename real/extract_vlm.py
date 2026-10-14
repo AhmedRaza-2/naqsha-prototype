@@ -20,7 +20,7 @@ EXAMPLE_IDS = ["b6593ed82ccc388e", "ab69e709ccf09c26"]          # shown to the m
 
 INSTRUCTIONS = f"""You are reading a Pakistani house floor plan. Transcribe ONLY the ground floor as rows of rooms, from the road side (row 1) to the back of the plot.
 
-Answer with JSON only, in exactly this form:
+Answer with compact JSON only (one line, no code fence, every row is a list of rooms), in exactly this form:
 {{"plot":[W,D],"rows":[[ROOM,ROOM,...],[ROOM,...],...]}}
 - W = plot width along the road, D = plot depth, in feet.
 - Row 1 faces the road (gate, car porch, front lawn). Rooms in a row go left to right as seen from the road.
@@ -68,7 +68,7 @@ def main():
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--batch", type=int, default=2)
     ap.add_argument("--max-pixels", type=int, default=1024 * 28 * 28)
-    ap.add_argument("--max-new", type=int, default=700)
+    ap.add_argument("--max-new", type=int, default=1400)
     a = ap.parse_args()
 
     import torch

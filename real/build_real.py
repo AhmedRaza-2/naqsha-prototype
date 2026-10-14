@@ -70,29 +70,83 @@ def candidates():
           f"{sum(1 for c in out if len(c['labels']) >= 2)} with 2+ printed room sizes); skipped {dict(skipped)}")
 
 
-def from_compact(js):
-    """Compact JSON from the vision model -> room list for assemble()."""
-    rows, baths = [], []
-    for ri, row in enumerate(js.get("rows", []), 1):
-        rr = []
-        for ci, x in enumerate(row, 1):
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def from_compact(js, plot=None):
+    """Compact JSON from the vision model -> room list for assemble(). Also handles what it often writes instead:
+    one flat list of rooms (rows are rebuilt from the widths: a new row starts when the widths reach the plot width) and
+    washrooms listed as rooms of their own (they become the washroom of the bedroom, or else the room, next to them)."""
+    W = (plot or js.get("plot") or [0])[0]
+    raw = js.get("rows", [])
+    if raw and all(isinstance(x, list) and x and isinstance(x[0], str) for x in raw):      # flat list of rooms
+        rows, cur, acc = [], [], 0.0
+        for x in raw:
+            cur.append(x); acc += _num(x[1]) or 0 if len(x) > 1 else 0
+            if W and acc >= 0.85 * float(W): rows.append(cur); cur, acc = [], 0.0
+        if cur: rows.append(cur)
+        raw = rows
+    out_rows, baths = [], []
+    for ri, row in enumerate(raw, 1):
+        items = []
+        for x in row if isinstance(row, list) else []:
             if not isinstance(x, list) or len(x) < 3: continue
-            try:
-                rr.append({"t": str(x[0]), "w": float(x[1]), "d": float(x[2])})
-                if len(x) >= 6: baths.append({"row": ri, "col": len(rr), "w": float(x[3]), "d": float(x[4]), "side": str(x[5])})
-            except (TypeError, ValueError):
-                continue
-        rows.append(rr)
-    return {"plot": js["plot"], "rows": rows, "baths": baths}
+            w, d = _num(x[1]), _num(x[2])
+            if not w or not d or w <= 0 or d <= 0: continue
+            it = {"t": norm_type(x[0], keep_bath=True), "w": w, "d": d}
+            if len(x) >= 6 and _num(x[3]) and _num(x[4]): it["bath"] = (_num(x[3]), _num(x[4]), str(x[5]))
+            items.append(it)
+        for k, it in enumerate(items):                             # standalone washroom -> washroom of its neighbour
+            if it["t"] != "bath": continue
+            nbrs = [j for j in (k - 1, k + 1) if 0 <= j < len(items) and items[j]["t"] not in {"bath"} | bands.OPEN and "bath" not in items[j]]
+            nbrs.sort(key=lambda j: items[j]["t"] not in bands.BEDS)
+            if nbrs:
+                j = nbrs[0]
+                items[j]["w"] += it["w"]
+                items[j]["bath"] = (it["w"], it["d"], "L" if j > k else "R")
+            it["drop"] = True
+        rr = []
+        for it in items:
+            if it.get("drop"): continue
+            rr.append({"t": it["t"], "w": it["w"], "d": it["d"]})
+            if "bath" in it:
+                bw, bd, side = it["bath"]
+                baths.append({"row": ri, "col": len(rr), "w": bw, "d": bd, "side": side})
+        out_rows.append(rr)
+    return {"plot": plot or js["plot"], "rows": out_rows, "baths": baths}
 
 
 def parse_json(text):
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m: return None
+    """The first JSON object in the text; code fences are ignored and an answer cut off by the length limit is closed
+    after its last complete room."""
+    i = text.find("{")
+    if i < 0: return None
+    t = text[i:].replace("```", "")
+    t = t[: t.rfind("}") + 1] if t.rfind("}") > 0 else t
     try:
-        return json.loads(m[0])
+        return json.loads(t)
     except json.JSONDecodeError:
-        return None
+        pass
+    body = text[i:].replace("```", "")
+    for cut in [m.end() for m in re.finditer(r"\]", body)][::-1][:40]:   # try ending after each of the last closing brackets
+        part, stack, instr, esc = body[:cut], [], False, False
+        for ch in part:
+            if instr:
+                esc = (ch == "\\" and not esc); instr = not (ch == '"' and not esc) if not esc or ch != '"' else instr
+                continue
+            if ch == '"': instr = True
+            elif ch in "[{": stack.append("]" if ch == "[" else "}")
+            elif ch in "]}" and stack: stack.pop()
+        try:
+            js = json.loads(part + "".join(reversed(stack)))
+            if isinstance(js, dict) and js.get("rows"): return js
+        except json.JSONDecodeError:
+            continue
+    return None
 
 
 TYPE_OF = {"master": "master", "bed": "bed", "bath": "bath", "toilet": "bath", "kitchen": "kitchen", "lounge": "lounge", "tv": "lounge",
@@ -169,8 +223,13 @@ def build():
         js = parse_json(r["text"])
         if not js: why["not JSON"] += 1; continue
         if "skip" in js or "rows" not in js or "plot" not in js: why["skipped by the model"] += 1; continue
+        plot = js.get("plot")
+        ok = lambda p: isinstance(p, list) and len(p) == 2 and all(_num(v) for v in p) and 15 <= float(p[0]) <= 120 and 25 <= float(p[1]) <= 150
+        if not ok(plot) and isinstance(plot, list) and len(plot) == 2 and ok(plot[::-1]): plot = plot[::-1]
+        if not ok(plot): plot = cands.get(pid, {}).get("plot")                       # fall back to the printed plot size
+        if not ok(plot): why["plot size not readable"] += 1; continue
         try:
-            rooms = from_compact(js)
+            rooms = from_compact(js, [float(plot[0]), float(plot[1])])
             plan, info = assemble(rooms)
         except Exception as e:                                    # malformed numbers etc.
             why[f"assemble error"] += 1; continue
