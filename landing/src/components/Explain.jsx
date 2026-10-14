@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { useMotion } from '../lib/motion.js';
 import RequestForm from './RequestForm.jsx';
+import { prefetchModel } from '../lib/prefetch.js';
 import data from '../data/plan.json';
 import PlanSvg from './PlanSvg.jsx';
 
@@ -9,6 +10,14 @@ export default function Explain() {
   const section = useRef(null);
   const { reduced: reduce } = useMotion();
   const [active, setActive] = useState(0);
+
+  useEffect(() => {                                           // start the model download as the form comes into view
+    const el = section.current;
+    if (!el || !('IntersectionObserver' in window)) return undefined;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { prefetchModel(import.meta.env.VITE_APP_URL || '/app/'); io.disconnect(); } }, { rootMargin: '300px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const { scrollYProgress } = useScroll({ target: section, offset: ['start end', 'end start'] });
   const drift = useTransform(scrollYProgress, [0, 1], reduce ? [0, 0] : [70, -70]);

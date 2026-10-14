@@ -1,0 +1,5 @@
+onnxruntime-web 1.22.0 (ort.wasm.min.mjs, ort-wasm-simd-threaded.mjs, ort-wasm-simd-threaded.wasm)
+MIT License, Copyright (c) Microsoft Corporation
+https://github.com/microsoft/onnxruntime/blob/main/LICENSE
+
+Bundled so the planner does not depend on a third-party CDN.

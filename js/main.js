@@ -3,10 +3,10 @@ import { planSVG, elevationSVG } from './svg.js';
 import { STYLES, STYLE_IDS } from './styles.js';
 import { createViewer } from './scene.js';
 import { modelLayouts } from './modelplans.js';
-import { supportsPreferences } from './model.js';
+import { onModelState, preloadModel, supportsPreferences } from './model.js';
 
 const $ = (id) => document.getElementById(id);
-const S = { plot: null, beds: 3, layouts: [], sel: null, style: null, viewer: null };
+const S = { seen: new Set(), plot: null, beds: 3, layouts: [], sel: null, style: null, viewer: null };
 
 function show(n) {
   for (let i = 1; i <= 3; i++) $('s' + i).hidden = i !== n;
@@ -85,6 +85,63 @@ function validateRequest() {
   return '';
 }
 
+// ---------- the trained model: start downloading at once, show progress, never block the page ----------
+const LOAD_TIMEOUT_MS = (Number(new URLSearchParams(location.search).get('loadtimeout')) || 45) * 1000;   // after this, show rule-based layouts and keep downloading
+const rulesOnly = new URLSearchParams(location.search).has('rules');
+let modelState = { phase: 'idle', pct: 0 };
+let waitingBtn = null;                                           // the button that is waiting for the model, if any
+onModelState((st) => {
+  modelState = st;
+  const msg = st.phase === 'loading' ? `Naqsha model: downloading ${st.pct}% (first visit only)`
+    : st.phase === 'ready' ? 'Naqsha model ready' : st.phase === 'error' ? 'Naqsha model could not load, so rule-based layouts will be used' : '';
+  $('modelstat').textContent = rulesOnly ? '' : msg;
+  if (waitingBtn && st.phase === 'loading') waitingBtn.textContent = `Downloading the Naqsha model ${st.pct}%`;
+});
+if (!rulesOnly) preloadModel().catch((err) => console.warn('Trained model unavailable.', err));
+
+const withTimeout = (promise, ms) => Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+
+/** Draft layouts for S.plot / S.prefs. regen = show different layouts than the ones already shown. */
+async function generate(regen) {
+  const btn = $(regen ? 'regen' : 'gen'), label = btn.textContent;
+  btn.disabled = true;
+  waitingBtn = btn;
+  S.note = '';
+  let layouts = [];
+  const wantsPrefs = S.prefs.baths !== S.beds + 1 || S.prefs.focus !== 'balanced';
+  let usedModel = false;
+  try {
+    if (rulesOnly) throw new Error('?rules: model skipped on purpose');
+    await withTimeout(preloadModel(), LOAD_TIMEOUT_MS);
+    waitingBtn = null;
+    layouts = await modelLayouts(S.plot, S.prefs, (msg) => (btn.textContent = msg),
+      { exclude: regen ? S.seen : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12 });
+    usedModel = true;
+    if (wantsPrefs && layouts.length && !(await supportsPreferences())) S.note = 'The model loaded here does not know washroom or size preferences yet, so these are its standard layouts.';
+    if (wantsPrefs && !layouts.length && !regen) S.note = 'No layout met every preference on this plot, so these are rule-based layouts.';
+  } catch (err) {
+    if (err && err.message === 'timeout') S.note = `The model is still downloading (${modelState.pct}%) on this connection, so these are rule-based layouts. Press Regenerate once it says ready.`;
+    else console.warn('Trained model unavailable, using the rule-based layouts instead.', err);
+  }
+  waitingBtn = null;
+  btn.disabled = false;
+  btn.textContent = label;
+  if (regen && usedModel && !layouts.length) {                   // nothing new and valid this time: keep what the visitor has
+    S.note = 'No new valid layout this time. Press Regenerate again.';
+    renderLayouts();
+    return;
+  }
+  if (!layouts.length) {
+    layouts = generateAll(S.plot, S.beds);                       // rule-based fallback
+    if (regen && !S.note) S.note = 'Rule-based layouts do not change. The Naqsha model gives new ones each time once it has loaded.';
+  }
+  layouts.forEach((L) => L.text && S.seen.add(L.text));
+  S.layouts = layouts;
+  S.sel = null;
+  renderLayouts();
+  show(2);
+}
+
 $('gen').onclick = async () => {
   S.plot = readPlot();
   const problem = validateRequest();
@@ -93,27 +150,10 @@ $('gen').onclick = async () => {
   if (problem) return;
   S.beds = +$('pb').value;
   S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value };
-  const btn = $('gen'), label = btn.textContent;
-  btn.disabled = true;
-  let layouts = [];
-  S.note = '';
-  const wantsPrefs = S.prefs.baths !== S.beds + 1 || S.prefs.focus !== 'balanced';
-  try {
-    if (new URLSearchParams(location.search).has('rules')) throw new Error('?rules: model skipped on purpose');
-    layouts = await modelLayouts(S.plot, S.prefs, (msg) => (btn.textContent = msg));
-    if (wantsPrefs && layouts.length && !(await supportsPreferences())) S.note = 'The model loaded here does not know washroom or size preferences yet, so these are its standard layouts.';
-    if (wantsPrefs && !layouts.length) S.note = 'No layout met every preference on this plot, so these are rule-based layouts.';
-  } catch (err) {
-    console.warn('Trained model unavailable, using the rule-based layouts instead.', err);
-  }
-  if (!layouts.length) layouts = generateAll(S.plot, S.beds);     // rule-based fallback (also used when the model finds no valid plan)
-  btn.disabled = false;
-  btn.textContent = label;
-  S.layouts = layouts;
-  S.sel = null;
-  renderLayouts();
-  show(2);
+  S.seen = new Set();
+  await generate(false);
 };
+$('regen').onclick = () => generate(true);
 
 // ---------- step 2 ----------
 function renderLayouts() {

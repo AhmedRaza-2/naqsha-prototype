@@ -7,7 +7,9 @@
     "dev": "vite --port 5174",
     "build": "vite build",
     "preview": "vite preview --port 5175",
-    "view": "vite build && vite preview --port 5174 --strictPort --open"
+    "view": "vite build && vite preview --port 5174 --strictPort --open",
+    "sync": "node scripts/sync-planner.mjs",
+    "ship": "node scripts/sync-planner.mjs && vite build && vercel deploy --prod --yes"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

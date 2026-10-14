@@ -78,7 +78,9 @@ export function planToLayout(item, index) {
 }
 
 /** Layouts for a plot and bedroom count, drafted by the trained model. Empty list if the model gives nothing valid. */
-export async function modelLayouts(plot, prefs, onStatus) {
-  const items = await draftPlans({ w: plot.w, d: plot.d, ...prefs }, { n: 12, top: 3, onStatus });
+export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
+  const items = await draftPlans({ w: plot.w, d: plot.d, ...prefs }, {
+    n: opts.n ?? 12, top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus,
+  });
   return items.map((it, i) => planToLayout(it, i));
 }

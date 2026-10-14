@@ -78,6 +78,11 @@ def main():
 
     vocab = {"tokens": L.VOCAB, "bos": L.BOS, "eos": L.EOS, "pad": L.PAD, "nl": L.NL, "max_len": model.cfg["max_len"]}
     (out.parent / "vocab.json").write_text(json.dumps(vocab))
+    man = out.parent / "manifest.json"                          # download sizes, so the planner can show real progress
+    sizes = json.loads(man.read_text()) if man.exists() else {}
+    sizes["onnx"] = final.stat().st_size
+    sizes["version"] = __import__("hashlib").sha1(final.read_bytes()).hexdigest()[:10]   # cache-busting stamp for the planner
+    man.write_text(json.dumps(sizes))
     print("wrote", out.parent / "vocab.json")
 
 

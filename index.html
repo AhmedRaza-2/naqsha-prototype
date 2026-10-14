@@ -7,8 +7,8 @@
   <link rel="stylesheet" href="styles.css">
   <script type="importmap">
     { "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      "three": "./vendor/three/three.module.js",
+      "three/addons/": "./vendor/three/addons/"
     } }
   </script>
 </head>
@@ -56,12 +56,14 @@
         <div class="info" id="plotinfo"></div>
         <p class="formerr" id="formerr" role="alert" hidden></p>
         <button class="btn primary" id="gen">Generate layouts</button>
+        <p class="fine" id="modelstat" aria-live="polite"></p>
       </div>
     </section>
 
     <section id="s2" class="step" hidden>
       <h2>Choose a layout</h2>
       <p class="lead" id="s2sub"></p>
+      <div class="regen-row"><button class="btn" id="regen">Regenerate layouts</button><span class="fine">Not what you had in mind? Draft three new ones.</span></div>
       <div class="grid3" id="layouts"></div>
       <div class="split">
         <div class="card"><h3>Rule check <span id="chkscore"></span></h3><ul class="checks" id="checks"></ul></div>
