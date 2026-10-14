@@ -144,7 +144,7 @@ export function finalize(L) {
     if (r.type === 'lounge') continue;
     const prefs = r.type === 'bed'
       ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge'] : ['lounge', 'dining', 'lobby', 'drawing', 'kitchen'])
-      : PREF[r.type];
+      : (PREF[r.type] || ['lobby', 'lounge', 'dining']);
     let pick = null;
     for (const t of prefs) {
       for (const q of mains.filter((m) => m.type === t)) {

@@ -358,7 +358,8 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
     s = rule["side"]
     Bw = W - 2 * s
     rear = max(rule["rear"], -(-(D - rule["front"] - rule["cover"] / 100 * W * D / Bw) * 2 // 1) / 2)   # more yard if over the coverage limit
-    rear = max(rear, D - rule["front"] - 46)         # houses are not >46 ft deep: spare length becomes a back yard
+    max_built = 46 if focus in ("bedrooms", "lounge") else 42        # real plans: rooms 13-15 ft deep, so houses are about 40 ft deep
+    rear = max(rear, D - rule["front"] - max_built)                   # spare length becomes a back yard
     Bd = D - rule["front"] - rear
     narrow = Bw < 26
     k = 2 if narrow else 3 if Bw < 40 else 4
@@ -371,7 +372,7 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
     if focus == "bedrooms": f, m = u(0.19, 0.25), u(0.19, 0.25)          # deep back band = bigger bedrooms
     elif focus == "lounge": f, m = u(0.21, 0.27), u(0.38, 0.44)          # deep middle band = bigger hall
     elif focus == "kitchen": f, m = u(0.22, 0.28), u(0.31, 0.37)
-    else: f, m = u(0.22, 0.32), u(0.25, 0.36)
+    else: f, m = u(0.27, 0.33), u(0.30, 0.37)                          # rooms about 13-15 ft deep, like the real plans
     depths = _split(Bd, [{"wt": f}, {"wt": m}, {"wt": 1 - f - m}])
 
     # front band
@@ -380,12 +381,27 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
     pos = rng.choice(["left", "right"] + (["middle"] if extra else []))
     items = [{"k": k_, "wt": u(1.0, 1.25)} for k_ in kinds]
     lob = {"k": "lobby", "fixed": lobby_w}
+    avail = Bw - lobby_w - extra * 10.5                                   # width left for the drawing room
+    stairs_w = round(min(9.5, avail - u(14.5, 16.5)) * 2) / 2 if (not narrow and avail > 18.5) else 0
+    if stairs_w >= 6:                                                      # stair hall: real drawing rooms are about 12-16 ft wide
+        lob = {"k": "entry", "fixed": lobby_w + stairs_w}                  # lobby and stairs are placed together below
+    else:
+        stairs_w = 0
     if pos == "left": items = [lob] + items
     elif pos == "right": items = items + [lob]
     else: items.insert(rng.randint(1, len(items) - 1), lob)
     wid = _split(Bw, items)
-    lob_i = next(i for i, it in enumerate(items) if it["k"] == "lobby")
-    front = [{"t": it["k"], "w": w} for it, w in zip(items, wid)]
+    lob_i = next(i for i, it in enumerate(items) if it["k"] in ("lobby", "entry"))
+    front = []
+    for it, w in zip(items, wid):
+        if it["k"] == "entry":                                             # lobby next to the stairs, stairs on the side away from the drawing room
+            lw, sw = w - stairs_w, stairs_w
+            pair = [{"t": "lobby", "w": lw}, {"t": "stairs", "w": sw}]
+            front += pair if pos in ("left",) or (pos == "middle" and rng.random() < 0.5) else pair[::-1]
+        else:
+            front.append({"t": it["k"], "w": w})
+    lob_i = next(i for i, r in enumerate(front) if r["t"] == "lobby")
+    wid = [r["w"] for r in front]
 
     # back band
     names = ["master"] + ["bed"] * (back - 1)
@@ -395,15 +411,15 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
 
 
     # middle band
-    court = s == 0 or rng.random() < 0.2     # light well: the only window source for the kitchen on plots with no side yards
+    court = s == 0 or Bw >= 38 or rng.random() < 0.2     # light well: the window source for the kitchen on plots with no side yards; an inner court on wide plots
     for _ in range(60):
         mid = ["kitchen", "dining", "lounge"] + (["courtyard"] if court else [])
         rng.shuffle(mid)
         if narrow or rng.random() < 0.28: mid.remove("dining")
-        kw, lw = (u(0.30, 0.40), u(0.40, 0.50)) if focus == "kitchen" else (u(0.18, 0.24), u(0.52, 0.62)) if focus == "lounge" else (u(0.2, 0.3), u(0.42, 0.56))
-        wts = {"kitchen": kw, "dining": u(0.22, 0.3), "lounge": lw} if "dining" in mid else {"kitchen": min(kw + 0.08, 0.46) if focus != "lounge" else u(0.26, 0.32), "lounge": u(0.62, 0.72) if focus != "kitchen" else u(0.54, 0.62)}
+        kw, lw = (u(0.30, 0.40), u(0.40, 0.50)) if focus == "kitchen" else (u(0.20, 0.26), u(0.52, 0.62)) if focus == "lounge" else (u(0.24, 0.32), u(0.42, 0.54))
+        wts = {"kitchen": kw, "dining": u(0.26, 0.34), "lounge": lw} if "dining" in mid else {"kitchen": min(kw + 0.08, 0.46) if focus != "lounge" else u(0.26, 0.32), "lounge": u(0.62, 0.72) if focus != "kitchen" else u(0.54, 0.62)}
         wts["courtyard"] = 0.0
-        cw = round(u(4, 5.5) * 2) / 2
+        cw = round((u(7, 10) if Bw >= 38 else u(4, 5.5)) * 2) / 2
         mw = _split(Bw, [{"fixed": cw} if t == "courtyard" else {"wt": wts[t]} for t in mid])
         a, b_ = sum(wid[:lob_i]), sum(wid[:lob_i + 1])
         edge, ok_lobby, pos_ = 0.0, False, {}
@@ -432,7 +448,8 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
     flip = {"L": "R", "R": "L"}
     for i, r in enumerate(backb):
         sd = side0 if i % 2 == 0 else flip[side0]
-        r["bath"] = [4.5 if r["w"] < 11 else rng.choice([5, 5.5]), min(rng.choice([7, 7.5, 8]), depths[2] - 3), sd]
+        big = Bw >= 38
+        r["bath"] = [4.5 if r["w"] < 11 else rng.choice([5.5, 6] if big else [5, 5.5]), min(rng.choice([7.5, 8, 8.5] if big else [7, 7.5, 8]), depths[2] - 3), sd]
     for i, r in enumerate(front):
         if r["t"] in ("bed", "drawing"):
             if r["t"] == "drawing" and not guest: continue                   # no guest washroom requested
@@ -446,7 +463,13 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
         lo["bath"] = [rng.choice([4.5, 5]), min(rng.choice([6, 6.5, 7]), depths[1] - 3), rng.choice("LR")]
 
     pad = [{"t": "void", "w": s}] if s else []
-    bands = [{"d": rule["front"], "rooms": [{"t": "lawn", "w": W}]}]
+    front_row = [{"t": "lawn", "w": W}]
+    if W >= 25 and rule["front"] >= 8 and rng.random() < 0.75:             # car porch in front of the entrance side
+        pw = round(min(11, W * 0.4) * u(0.9, 1.05) * 2) / 2
+        cx = s + sum(wid[:lob_i]) + wid[lob_i] / 2                          # centre of the lobby across the plot
+        x0 = min(max(round((cx - pw / 2) * 2) / 2, 0), W - pw)
+        front_row = [r for r in ({"t": "lawn", "w": x0}, {"t": "porch", "w": pw}, {"t": "lawn", "w": W - x0 - pw}) if r["w"] > 0]
+    bands = [{"d": rule["front"], "rooms": front_row}]
     for d_, rooms in zip(depths, (front, middle, backb)):
         bands.append({"d": d_, "rooms": pad + rooms + pad})
     bands.append({"d": rear, "rooms": [{"t": "void", "w": W}]})

@@ -1,6 +1,6 @@
 const FILL = {
   drawing: '#f6e7c8', lobby: '#ececec', lounge: '#dfeedb', dining: '#dce8f4',
-  kitchen: '#f7dccd', bed: '#e7e0f4', bath: '#c9e5ee', gbath: '#c9e5ee',
+  kitchen: '#f7dccd', bed: '#e7e0f4', bath: '#c9e5ee', gbath: '#c9e5ee', stairs: '#e4e1d8',
 };
 
 export function planSVG(L, { maxW = 320, maxH = 470, labels = true } = {}) {

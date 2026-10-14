@@ -3,7 +3,7 @@ import { OPEN, toRects } from './bands.js';
 import { finalize, ruleFor } from './layout.js';
 import { draftPlans } from './model.js';
 
-const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master']);
+const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs']);
 const TITLE = {
   setbacks: 'Setbacks applied', coverage: 'Plot coverage', 'min room sizes': 'Minimum room sizes', 'attached baths': 'Attached baths',
   'entrance on road side': 'Entrance on the road side', 'every room reachable': 'Every room reachable', 'guest privacy': 'Guest privacy',
@@ -46,7 +46,7 @@ export function planToLayout(item, index) {
     if (r.t === 'master') { type = 'bed'; name = 'Master Bedroom'; id = 'bed1'; }
     else if (r.t === 'bed') { bedNo += 1; name = `Bedroom ${bedNo}`; id = `bed${bedNo}`; }
     else {
-      name = { drawing: 'Drawing Room', lobby: 'Entrance', lounge: hasDining ? 'TV Lounge' : 'Lounge & Dining', dining: 'Dining', kitchen: 'Kitchen' }[r.t];
+      name = { drawing: 'Drawing Room', lobby: 'Entrance', lounge: hasDining ? 'TV Lounge' : 'Lounge & Dining', dining: 'Dining', kitchen: 'Kitchen', stairs: 'Stairs' }[r.t];
       id = r.t;
     }
     const room = { id, type, name, x: r.x, z: r.y, w: r.w, d: r.d };
