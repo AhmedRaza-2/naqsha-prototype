@@ -51,11 +51,14 @@ export function feetError(w, d) {
   return '';
 }
 
-/** Most bedrooms that fit on one floor, from the validator-checked training data (small plots fit 2). */
-export function maxBeds(marla) {
+/** Most bedrooms that fit on one floor for a plot (found by probing the layout generator; same rule as tools/bands.py).
+ *  The usable width after the side setbacks decides: 2 bedrooms up to 26 ft, 3 up to 32 ft, 4 up to 44 ft, then up to 6. */
+export function maxBeds(w, d) {
+  const marla = (w * d) / SQFT_PER_MARLA;
   if (marla <= 6) return 2;
-  if (marla <= 14) return 4;
-  return 6;
+  const side = marla <= 14 ? 3 : 5;
+  const usable = w - 2 * side;
+  return usable < 26 ? 2 : usable < 32 ? 3 : usable < 44 ? 4 : 6;
 }
 
 /** Whether a 'make bigger' choice can work on a plot (a bigger kitchen has almost no valid layouts up to 6 marla). */

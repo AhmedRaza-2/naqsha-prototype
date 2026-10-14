@@ -1,20 +1,25 @@
 {
-  "note": "568 plans for 142 plot sizes the model never saw during training, from 3 marla to 3 kanal. Synthetic test set; evaluation on real plans is in progress.",
+  "note": "1,200 plans for 300 requests on plot sizes the model never saw (3 to 34 marla), each with a washroom count and a bigger-room choice. Synthetic test set; evaluation on real plans is in progress.",
   "rows": [
     {
       "label": "Plans that pass every structural check",
-      "model": 99.6,
-      "baseline": 73.2
+      "model": 99.3,
+      "baseline": 71.3
     },
     {
-      "label": "Plans with the bedroom count you asked for",
+      "label": "Bedrooms and washrooms exactly as asked",
       "model": 99.8,
-      "baseline": 73.2
+      "baseline": 71.3
+    },
+    {
+      "label": "Bigger hall, bedrooms or kitchen as asked",
+      "model": 97.5,
+      "baseline": 63.0
     },
     {
       "label": "Plans that also pass every design rule",
-      "model": 84.3,
-      "baseline": 47.2
+      "model": 75.1,
+      "baseline": 25.7
     }
   ]
 }

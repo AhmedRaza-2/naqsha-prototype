@@ -45,8 +45,11 @@ def rule_for(W, D):
 
 
 def max_beds(W, D):
+    """Most bedrooms that fit on one floor, found by probing the generator (matches maxBeds in the landing page and planner)."""
+    marla = W * D / MARLA
+    if marla <= 6: return 2
     Bw = W - 2 * rule_for(W, D)["side"]
-    return 3 if Bw < 26 else (3 if Bw < 40 else 4) + 2
+    return 2 if Bw < 26 else 3 if Bw < 32 else 4 if Bw < 44 else 6
 
 
 # ---------------------------------------------------------------- text form
@@ -362,7 +365,7 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
     rear = max(rear, D - rule["front"] - max_built)                   # spare length becomes a back yard
     Bd = D - rule["front"] - rear
     narrow = Bw < 26
-    k = 2 if narrow else 3 if Bw < 40 else 4
+    k = 2 if Bw < 32 else 3 if Bw < 44 else 4                              # bedrooms in the back row: about 11-15 ft wide each (extra bedrooms go to the front row)
     nbeds = max(2, min(beds, 3 if narrow else k + 2))
     back, extra = min(nbeds, k), nbeds - min(nbeds, k)
     u = rng.uniform
@@ -403,15 +406,32 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
     lob_i = next(i for i, r in enumerate(front) if r["t"] == "lobby")
     wid = [r["w"] for r in front]
 
-    # back band
-    names = ["master"] + ["bed"] * (back - 1)
-    wts_b = [u(1.15, 1.4)] + [u(0.9, 1.1) for _ in range(back - 1)]
-    if rng.random() < 0.5: names.reverse(); wts_b.reverse()
-    backb = [{"t": t, "w": w} for t, w in zip(names, _split(Bw, [{"wt": w} for w in wts_b]))]
-
+    # back band: widths depend on the middle row (see make_back), so it is built inside the arrangement search below
+    def make_back(left_ext, right_ext):
+        """Bedrooms left to right. The widest (master) goes at the end with more kitchen/court below it, and the end bedrooms
+        are made wide enough to overhang that non-living part by 3.5 ft, so every bedroom can open onto the lounge or dining room."""
+        n = back
+        master_left = left_ext > right_ext or (left_ext == right_ext and rng.random() < 0.5)
+        wts_b = [u(1.15, 1.4)] + [u(0.9, 1.1) for _ in range(n - 1)]           # master first
+        widths = _split(Bw, [{"wt": w} for w in wts_b])
+        names = ["master"] + ["bed"] * (n - 1)
+        if not master_left: names.reverse(); widths.reverse()
+        up = lambda v: -(-v * 2 // 1) / 2                                        # round up to the 0.5 ft grid
+        need_l = up(left_ext + 3.5) if left_ext > 0 else 0
+        need_r = up(right_ext + 3.5) if right_ext > 0 else 0
+        w0 = max(widths[0], need_l)
+        if n == 2:
+            w1 = Bw - w0
+            ws = [w0, w1]
+        else:
+            w_last = max(widths[-1], need_r)
+            mids = _split(Bw - w0 - w_last, [{"wt": 1}] * (n - 2))
+            ws = [w0] + mids + [w_last]
+        if abs(sum(ws) - Bw) > 0.01 or min(ws) < 8.5 or ws[-1] < need_r: return None
+        return [{"t": t, "w": w} for t, w in zip(names, ws)]
 
     # middle band
-    court = s == 0 or Bw >= 38 or rng.random() < 0.2     # light well: the window source for the kitchen on plots with no side yards; an inner court on wide plots
+    court = s == 0 or rng.random() < 0.2     # light well: the only window source for the kitchen on plots with no side yards
     for _ in range(60):
         mid = ["kitchen", "dining", "lounge"] + (["courtyard"] if court else [])
         rng.shuffle(mid)
@@ -419,8 +439,13 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
         kw, lw = (u(0.30, 0.40), u(0.40, 0.50)) if focus == "kitchen" else (u(0.20, 0.26), u(0.52, 0.62)) if focus == "lounge" else (u(0.24, 0.32), u(0.42, 0.54))
         wts = {"kitchen": kw, "dining": u(0.26, 0.34), "lounge": lw} if "dining" in mid else {"kitchen": min(kw + 0.08, 0.46) if focus != "lounge" else u(0.26, 0.32), "lounge": u(0.62, 0.72) if focus != "kitchen" else u(0.54, 0.62)}
         wts["courtyard"] = 0.0
-        cw = round((u(7, 10) if Bw >= 38 else u(4, 5.5)) * 2) / 2
+        cw = round(u(4, 5.5) * 2) / 2
         mw = _split(Bw, [{"fixed": cw} if t == "courtyard" else {"wt": wts[t]} for t in mid])
+        pairs = list(zip(mid, mw))
+        ext = lambda seq: next((i for i, (t, _) in enumerate(seq) if t in ("lounge", "dining")), len(seq))
+        li, ri = ext(pairs), ext(pairs[::-1])
+        backb = make_back(sum(w for _, w in pairs[:li]), sum(w for _, w in pairs[::-1][:ri]))
+        if backb is None: continue
         a, b_ = sum(wid[:lob_i]), sum(wid[:lob_i + 1])
         edge, ok_lobby, pos_ = 0.0, False, {}
         for i, (t, w) in enumerate(zip(mid, mw)):

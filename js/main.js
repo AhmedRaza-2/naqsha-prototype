@@ -26,6 +26,9 @@ function readPlot() {
   const r = ruleFor(w, d);
   $('plotinfo').textContent = `${w} x ${d} ft = ${(w * d).toLocaleString()} sq ft = ${marla.toFixed(1)} marla. Buildable area about ${(w - 2 * r.side)} x ${(d - r.front - r.rear)} ft after setbacks.`;
   document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', +c.dataset.w === w && +c.dataset.d === d));
+  const cap = maxBedsFor(w, d);
+  [...$('pb').options].forEach((o) => { o.disabled = +o.value > cap; });
+  if (+$('pb').value > cap) { $('pb').value = String(cap); if (typeof syncBaths === 'function') syncBaths(); }
   return { w, d };
 }
 PRESETS.forEach((p) => {
@@ -56,7 +59,13 @@ $('nl').addEventListener('input', () => {
 });
 
 // ---------- preferences: washrooms and bigger rooms ----------
-const maxBedsFor = (marla) => (marla <= 6 ? 2 : marla <= 14 ? 4 : 6);
+// most bedrooms that fit on one floor: the usable width after side setbacks decides (same rule as tools/bands.py)
+const maxBedsFor = (w, d) => {
+  const marla = (w * d) / MARLA;
+  if (marla <= 6) return 2;
+  const usable = w - 2 * (marla <= 14 ? 3 : 5);
+  return usable < 26 ? 2 : usable < 32 ? 3 : usable < 44 ? 4 : 6;
+};
 function syncBaths(want) {
   const beds = +$('pb').value;
   const sel = $('pbaths');
@@ -81,7 +90,7 @@ function validateRequest() {
   const marla = (w * d) / MARLA;
   if (marla < 3 || marla > 60) return 'Naqsha plans plots from 3 marla to 3 kanal.';
   if ($('pfocus').value === 'kitchen' && marla <= 6) return 'A bigger kitchen needs more than 6 marla. Choose another option.';
-  if (beds > maxBedsFor(marla)) return `A single floor on ${marla.toFixed(1)} marla fits up to ${maxBedsFor(marla)} bedrooms. Choose fewer bedrooms.`;
+  if (beds > maxBedsFor(w, d)) return `A single floor on ${w} x ${d} ft fits up to ${maxBedsFor(w, d)} bedrooms. Choose fewer bedrooms${maxBedsFor(w, d) < 4 && marla > 8 ? ' or a wider plot (about 38 ft)' : ''}.`;
   return '';
 }
 

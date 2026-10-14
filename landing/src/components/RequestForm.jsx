@@ -3,7 +3,7 @@ import { ArrowRight, CaretDown, CircleNotch, SlidersHorizontal, WarningCircle } 
 import { FOCUS, LIMITS, bathOptions, feetError, focusAllowed, maxBeds, parsePlot } from '../lib/parse.js';
 
 const APP_URL = import.meta.env.VITE_APP_URL || '../index.html';
-const BEDS = [2, 3, 4, 5];
+const BEDS = [2, 3, 4, 5, 6];
 const CHIPS = ['5 marla', '10 marla', '1 kanal'];
 
 const field = (bad) =>
@@ -55,7 +55,7 @@ export default function RequestForm() {
   const textMsg = parsed?.error || 'Enter a size like 10 marla or 30x60.';
 
   // ---- bedrooms and washrooms depend on the plot
-  const cap = plot ? maxBeds(plot.marla) : 5;
+  const cap = plot ? maxBeds(plot.w, plot.d) : 6;
   const effBeds = Math.min(beds, cap);
   const baOpts = bathOptions(effBeds);
   const effBaths = baOpts.some((o) => o.n === baths) ? baths : effBeds + 1;
@@ -122,7 +122,7 @@ export default function RequestForm() {
           ))}
         </div>
         <p className="min-h-5 text-sm text-soft">
-          {plot && cap < 5 ? `A single floor on this plot fits up to ${cap} bedrooms.` : 'Single floor, ground level.'}
+          {plot && cap < 6 ? `A single floor on ${plot.w} x ${plot.d} ft fits up to ${cap} bedrooms.${cap < 4 && plot.marla > 8 ? ' A wider plot (about 38 ft) fits 4.' : ''}` : 'Single floor, ground level.'}
         </p>
       </fieldset>
 
