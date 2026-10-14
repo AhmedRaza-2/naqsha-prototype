@@ -10,7 +10,7 @@ import bands  # noqa: E402
 
 rng = random.Random(5)
 texts = []
-for src in ("data/synth_v1_loose/train.jsonl", "data/synth/train.jsonl", "data/synth_v6/train.jsonl", "data/synth_v7/train.jsonl"):
+for src in ("data/synth_v1_loose/train.jsonl", "data/synth/train.jsonl", "data/synth_v6/train.jsonl", "data/synth_v7/train.jsonl", "data/synth_v8/train.jsonl"):
     if not (ROOT / src).exists(): continue                 # flawed + perfect plans
     rows = [json.loads(l) for l in open(ROOT / src, encoding="utf-8")]
     texts += [r["prompt"] + "\n" + r["completion"] for r in rng.sample(rows, 250)]

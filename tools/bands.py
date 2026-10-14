@@ -504,6 +504,8 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
 WIDTHS = [20, 22, 24, 25, 26, 27, 28, 30, 30, 32, 33, 35, 35, 36, 38, 40, 42, 45, 50, 50, 55, 60]
 
 
+# the plot sizes people actually type (marla presets and their usual shapes): oversampled, and never held out of training
+STANDARD = [(20, 34), (25, 36), (25, 45), (30, 45), (30, 52), (30, 60), (35, 65), (38, 59), (40, 68), (40, 80), (45, 95), (50, 90), (55, 100)]
 SIZE_BINS = {"small": (3, 6), "mid": (6, 14), "large": (14, 45)}      # marla
 SIZE_MIX = {"small": 0.15, "mid": 0.45, "large": 0.40}                 # share of plots per bin, so small plots are not drowned out
 
@@ -527,8 +529,9 @@ def build(n, seed=0, min_score=1.0):
         tried += 1
         open_bins = [k for k in quota if got[k] < quota[k]]
         size_bin = rng.choice(open_bins) if open_bins else None
-        W, D = sample_plot(rng, size_bin)
-        beds = rng.randint(2, 6)
+        std = [(w, d) for w, d in STANDARD if size_bin is None or SIZE_BINS[size_bin][0] < w * d / MARLA <= SIZE_BINS[size_bin][1]]
+        W, D = rng.choice(std) if std and rng.random() < 0.3 else sample_plot(rng, size_bin)
+        beds = rng.randint(2, max_beds(W, D) if rng.random() < 0.7 else 6)       # mostly counts a single floor can hold
         baths = beds + rng.choice([0, 1, 1, 2])                                # a guest washroom is the usual case
         focus = rng.choices(FOCUS_VALUES, [0.4, 0.2, 0.2, 0.2])[0]
         for _ in range(12):
@@ -581,6 +584,7 @@ def split_by_plot(rows, seed=0):
         plots = sorted({tuple(r["plot"]) for r in rows if lo < r["plot"][0] * r["plot"][1] / MARLA <= hi})
         rng.shuffle(plots)
         nv, nt = max(3, len(plots) // 20), max(4, len(plots) // 12)
+        plots = [p for p in plots if p not in STANDARD] + [p for p in plots if p in STANDARD]     # standard sizes go last: they stay in training
         val.update(plots[:nv]); test.update(plots[nv:nv + nt])
     parts = {"train": [], "val": [], "test": []}
     for r in rows:
