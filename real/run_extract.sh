@@ -5,6 +5,9 @@
 #        (plans with the most printed sizes go first; about 25-40 s per plan per T4 for the 7B model in 4-bit)
 set -e
 LIMIT=${1:-400}; MODEL=${2:-Qwen/Qwen2.5-VL-7B-Instruct}
+if ! python -c "import urllib.request; urllib.request.urlopen('https://huggingface.co', timeout=15)" 2>/dev/null; then
+  echo "ERROR: no internet in this notebook. Turn on Settings > Internet (needs a phone-verified account), then run again."; exit 1
+fi
 python -c "import bitsandbytes" 2>/dev/null || pip install -q -U bitsandbytes
 python -c "import accelerate" 2>/dev/null || pip install -q -U accelerate
 NG=$(python -c "import torch;print(torch.cuda.device_count())")
@@ -23,3 +26,5 @@ wait
 tail -n 3 runs/extract_*.log
 echo "reading took $(( $(date +%s) - T0 )) s"
 python real/build_real.py build
+N=$(wc -l < data/real/train.jsonl)
+if [ "$N" -lt 20 ]; then echo "ERROR: only $N real plans kept; see data/real/report.json and runs/extract_*.log"; exit 1; fi
