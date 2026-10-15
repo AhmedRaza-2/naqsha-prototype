@@ -11,7 +11,7 @@ const out = join(here, '..', 'public', 'app');
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 for (const f of ['index.html', 'styles.css']) cpSync(join(root, f), join(out, f));
-for (const d of ['js', 'models', 'vendor']) {
+for (const d of ['js', 'models', 'vendor', 'fonts']) {
   if (existsSync(join(root, d))) cpSync(join(root, d), join(out, d), { recursive: true, filter: (p) => !p.endsWith('.fp32.onnx') });
 }
 console.log('planner copied to', out);

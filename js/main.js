@@ -33,7 +33,7 @@ function readPlot() {
   if (!userBeds && cap > 0) $('pb').value = String(rec);
   [...$('pb').options].forEach((o) => {
     const n = +o.value;
-    o.textContent = `${n}${n === rec ? ' (recommended)' : n > cap || n < lo ? ' (closest fit will be shown)' : ''}`;
+    o.textContent = `${n}${n === rec ? ' (recommended)' : n > cap || n < lo ? ' (may not fit)' : ''}`;
   });
   const beds = +$('pb').value;
   $('plotinfo').textContent += cap === 0 ? '' : beds > cap
@@ -97,12 +97,12 @@ function syncBaths(want) {
   const sel = $('pbaths');
   const keep = want ?? +sel.value;
   const plot = { w: +$('pw').value, d: +$('pd').value };
-  const opts = [[beds, beds === 1 ? 'Attached to the bedroom' : 'One per bedroom, attached'], [beds + 1, 'Attached + a guest washroom'], [beds + 2, 'Attached + guest + a common washroom']];
+  const opts = [[beds, 'attached only'], [beds + 1, 'attached + guest'], [beds + 2, 'attached + guest + common']];
   const fits = beds + extraBathsFor(plot.w, plot.d);
   sel.innerHTML = '';
   opts.forEach(([n, label]) => {
     const o = document.createElement('option');
-    o.value = n; o.textContent = `${n}: ${label}${n === beds + 1 ? ' (recommended)' : n > fits ? ' (closest fit will be shown)' : ''}`;
+    o.value = n; o.textContent = `${n}: ${label}${n === beds + 1 ? ' (recommended)' : n > fits ? ' (may not fit)' : ''}`;
     sel.appendChild(o);
   });
   sel.value = opts.some(([n]) => n === keep) ? keep : beds + 1;

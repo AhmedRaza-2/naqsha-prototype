@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Naqsha AI - Plot to 3D Walkthrough</title>
+  <link rel="preload" href="fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
+  <meta name="theme-color" content="#fbf8f1">
   <script type="importmap">
     { "imports": {
       "three": "./vendor/three/three.module.min.js",
@@ -14,7 +16,7 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand"><span class="logo">N</span> Naqsha<span class="ai">AI</span> <small>prototype</small></div>
+    <a class="brand" href="../" aria-label="Naqsha AI home"><span class="logo">N</span> Naqsha <span class="ai">AI</span></a>
     <ol class="steps" id="steps">
       <li data-s="1">Plot</li><li data-s="2">Layout</li><li data-s="3">Design</li><li data-s="4">Walkthrough</li>
     </ol>
@@ -25,7 +27,7 @@
       <h1>Apna ghar, plot size se shuru</h1>
       <p class="lead">Enter your plot size, pick a layout, choose a facade style, then walk through the house in 3D.</p>
       <div class="card form">
-        <label class="field wide">Describe it (English / Roman Urdu)
+        <label class="field wide">Describe your plot (English or Roman Urdu)
           <input id="nl" placeholder="e.g. 10 marla 3 bedroom ghar  or  30x60 4 bed">
         </label>
         <div class="presets" id="presets"></div>

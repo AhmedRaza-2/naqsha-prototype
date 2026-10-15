@@ -1,7 +1,9 @@
+// plan colours: the landing page's plan palette (Earth ink on off-white paper), the same in light and dark mode
 const FILL = {
-  drawing: '#f6e7c8', lobby: '#ececec', lounge: '#dfeedb', dining: '#dce8f4',
-  kitchen: '#f7dccd', bed: '#e7e0f4', bath: '#c9e5ee', gbath: '#c9e5ee', stairs: '#e4e1d8',
+  drawing: '#e6decf', lobby: '#f6f2e9', lounge: '#ebe5d9', dining: '#dce4e0',
+  kitchen: '#cfdad5', bed: '#e3e8e1', bath: '#bfcbc7', gbath: '#bfcbc7', stairs: '#ddd8cd',
 };
+const PAPER = '#fbf8f1', YARD = '#efeae2', INK = '#3a2f2c', WINDOW = '#6f8f96';
 
 /** Drawing scale of a plan: feet -> SVG units (x across, z from the road, which is at the bottom). */
 export function planFrame(L, { maxW = 320, maxH = 470 } = {}) {
@@ -18,24 +20,24 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
   const { s, X, Y, vw, vh } = frame;
   const B = L.B;
   let o = `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan ${L.label}">`;
-  o += `<rect x="${X(0)}" y="${Y(D)}" width="${W * s}" height="${D * s}" fill="#f4f2ea" stroke="#555" stroke-width="1.5"/>`;
+  o += `<rect x="${X(0)}" y="${Y(D)}" width="${W * s}" height="${D * s}" fill="${PAPER}" stroke="${INK}" stroke-width="1.5"/>`;
   const open = L.open || [];
   const innerPorch = open.some((p) => p.type === 'porch');      // any car porch: the front strip is then just lawn
-  o += `<rect x="${X(0)}" y="${Y(B.z)}" width="${W * s}" height="${B.z * s}" fill="#e3e0d6"/>`;
+  o += `<rect x="${X(0)}" y="${Y(B.z)}" width="${W * s}" height="${B.z * s}" fill="${YARD}"/>`;
   o += `<text x="${X(W / 2)}" y="${Y(B.z / 2) + 3}" font-size="9" fill="#8a8678" text-anchor="middle">${innerPorch ? 'lawn' : 'porch / lawn'}</text>`;
   o += `<rect x="${X(B.x)}" y="${Y(B.z + B.d)}" width="${B.w * s}" height="${B.d * s}" fill="none" stroke="#999" stroke-dasharray="3 3" stroke-width=".8"/>`;
   // car porch and light wells inside the house outline: open to the sky or roofed, but not rooms
   for (const p of open) {
-    o += `<rect x="${X(p.x)}" y="${Y(p.z + p.d)}" width="${p.w * s}" height="${p.d * s}" fill="${p.type === 'porch' ? '#e3e0d6' : '#e9efe2'}" stroke="#8a8678" stroke-dasharray="4 3" stroke-width=".9"/>`;
+    o += `<rect x="${X(p.x)}" y="${Y(p.z + p.d)}" width="${p.w * s}" height="${p.d * s}" fill="${p.type === 'porch' ? YARD : '#dbe5d8'}" stroke="#8a7f78" stroke-dasharray="4 3" stroke-width=".9"/>`;
   }
   const order = [...L.rooms.filter((r) => !r.parent), ...L.rooms.filter((r) => r.parent)];
   for (const r of order) {
-    o += `<rect x="${X(r.x)}" y="${Y(r.z + r.d)}" width="${r.w * s}" height="${r.d * s}" fill="${FILL[r.type]}" stroke="#2b2b2b" stroke-width="${r.parent ? 1.1 : 1.8}"/>`;
+    o += `<rect x="${X(r.x)}" y="${Y(r.z + r.d)}" width="${r.w * s}" height="${r.d * s}" fill="${FILL[r.type]}" stroke="${INK}" stroke-width="${r.parent ? 1.1 : 1.8}"/>`;
   }
   for (const op of L.openings) {
     const half = (op.w / 2) * s;
     if (op.kind === 'window') {
-      const col = '#3f9ad0';
+      const col = WINDOW;
       o += op.o === 'h'
         ? `<line x1="${X(op.at) - half}" x2="${X(op.at) + half}" y1="${Y(op.c)}" y2="${Y(op.c)}" stroke="${col}" stroke-width="4"/>`
         : `<line y1="${Y(op.at) - half}" y2="${Y(op.at) + half}" x1="${X(op.c)}" x2="${X(op.c)}" stroke="${col}" stroke-width="4"/>`;
@@ -43,18 +45,18 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
       const wpx = op.w * s;
       if (op.o === 'h') {
         const x0 = X(op.at) - half, y0 = Y(op.c);
-        o += `<line x1="${x0}" x2="${x0 + wpx}" y1="${y0}" y2="${y0}" stroke="#f4f2ea" stroke-width="4"/>`;
+        o += `<line x1="${x0}" x2="${x0 + wpx}" y1="${y0}" y2="${y0}" stroke="${PAPER}" stroke-width="4"/>`;
         if (op.kind === 'door') o += `<path d="M${x0} ${y0} L${x0} ${y0 - wpx} A${wpx} ${wpx} 0 0 1 ${x0 + wpx} ${y0}" fill="none" stroke="#555" stroke-width=".9"/>`;
       } else {
         const x0 = X(op.c), y0 = Y(op.at - op.w / 2);
-        o += `<line x1="${x0}" x2="${x0}" y1="${y0}" y2="${y0 - wpx}" stroke="#f4f2ea" stroke-width="4"/>`;
+        o += `<line x1="${x0}" x2="${x0}" y1="${y0}" y2="${y0 - wpx}" stroke="${PAPER}" stroke-width="4"/>`;
         if (op.kind === 'door') o += `<path d="M${x0} ${y0} L${x0 + wpx} ${y0} A${wpx} ${wpx} 0 0 0 ${x0} ${y0 - wpx}" fill="none" stroke="#555" stroke-width=".9"/>`;
       }
     }
   }
   if (labels) {
     const fmtFt = (v) => { const h = Math.round(v * 2) / 2; return Number.isInteger(h) ? h : h.toFixed(1); };   // full room size to the half foot; an attached bath sits inside its room
-    const halo = 'paint-order="stroke" stroke="#f4f2ea" stroke-width="2.4" stroke-linejoin="round"';
+    const halo = 'paint-order="stroke" stroke="${PAPER}" stroke-width="2.4" stroke-linejoin="round"';
     const fit = (txt, fs, maxPx) => Math.max(5.2, Math.min(fs, maxPx / (txt.length * 0.56)));   // shrink text that would not fit its room
     for (const r of L.rooms) {
       const cx = X(r.x + r.w / 2), cy = Y(r.z + r.d / 2);
