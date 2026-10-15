@@ -1,5 +1,50 @@
 # Naqsha AI: final plan (deep-learning semester project)
 
+> **Revised plan (v2), after review of the live product.** Problems found: every layout follows the same three-row
+> structure with different sizes; elevations are static drawings; furniture is hard-coded; the 3D render is fast but
+> flat. Root causes and the new go-to option are in section 0. Sections 1 to 7 below are the earlier plan; the items
+> there that are still planned (constrained decoding, ablations, human evaluation, report) are folded into section 0.
+
+## 0. Go-to option v2: pretrain on world plans, fine-tune on Pakistani plans, richer plan language, real 3D
+
+### Why every layout looks the same
+1. The model learns from our synthetic generator, and the generator has essentially one Pakistani template
+   (front row: drawing + entrance; middle row: kitchen + lounge; back row: bedrooms). A model trained on one template
+   reproduces that template; it only changes sizes.
+2. The plan language (rows of rooms) cannot express L-shaped lounges, side corridors, central courtyards, rooms that
+   span two rows, or a bedroom wing. Even a perfect model could not draw them.
+3. The real data that would teach other arrangements is tiny (9 gold + 13 silver plans).
+
+### The fix, in deep-learning terms
+| Step | What | DL concept |
+|---|---|---|
+| A. Richer plan language | Replace rows-of-rooms with a **slicing tree**: the plot is cut recursively, horizontally or vertically, into rooms (`H 12 [ ... ] [ ... ]`). Rows are a special case, so all current data converts losslessly; the last size of each cut stays implicit, so sums stay exact. The checker already works on rectangles. | sequence representation design (cf. FMLM, CVPR 2026) |
+| B. Pretraining on real plans from around the world | **ResPlan** (17,000 real residential plans, CC BY 4.0, room polygons + graphs) converted to slicing trees (rectangles fitted to each room; plans kept when the fit covers at least 90% of the area). Optionally MSD (ECCV 2024) and RPLAN (80,000, academic request). | large-scale pretraining, transfer learning |
+| C. Fine-tuning on Pakistani plans | A more varied Pakistani generator (v11: side corridor, central court, L-lounge, bedroom wing, open kitchen, front bedroom, servant quarter) + the real Pakistani plans; then RL with the rule checker. | domain adaptation, RL with verifiable rewards |
+| D. Diversity on purpose | a STYLE/arrangement token, diverse top-3 selection (most different layouts among the valid ones), and a diversity metric in the evaluation | conditional generation, diversity vs quality trade-off |
+| E. Constrained decoding | grammar masks during sampling: only tokens that keep the tree valid | structured / constrained decoding |
+| F. Evaluation | validity, preferences, rule score, **diversity** (pairwise layout distance), real-plan perplexity, ablations (pretraining on/off, language rows vs tree, RL on/off, model size), human study | ablation and scaling study |
+
+### 3D, elevations and furniture
+| Problem | Fix |
+|---|---|
+| Flat 3D render | physically based materials, ACES tone mapping, soft shadows from a sun, environment lighting, ambient occlusion; textures for floors, plaster, brick and stone per style |
+| Static elevation drawings | elevations rendered from the actual 3D model (front orthographic camera), so they change with every layout and style; style parameters for parapets, cladding, window frames, porch canopy, boundary wall and gate |
+| Hard-coded furniture | a furniture **solver**: per room, candidate positions along walls are scored (against a wall, door swing clear, windows not blocked, 3 ft walkways, bed headboard on a solid wall, sofa facing the TV wall) and optimised by simulated annealing; real CC0 furniture models instead of boxes. Learned placement (ATISS on 3D-FRONT) is noted as future work: it needs a large licensed 3D dataset. |
+
+### Order and time (about 12 working days)
+| Days | Claude | You |
+|---|---|---|
+| 1-3 | slicing-tree language (Python, browser, editor), convert all data; ResPlan converter | download ResPlan if my download is too slow |
+| 3-4 | Pakistani generator v11 (more arrangements); package pretrain + fine-tune + RL Kaggle run | run it (about 1.5 h) |
+| 5-7 | 3D: materials, lighting, shadows, textures; elevations from the 3D model; furniture solver and models | review the look |
+| 8 | constrained decoding, diverse top-3, ablation run script | run ablations (about 1.5 h) |
+| 9 | human-evaluation page | send to 10 people |
+| 10-12 | report, slides, demo script | review, record demo |
+
+If time runs short, cut in this order: human study, MSD/RPLAN, furniture models (keep the solver), ablation breadth.
+A to C plus the 3D lighting are the must-haves.
+
 **One line:** a small transformer, trained from scratch, drafts rule-checked Pakistani house layouts from a plot size
 and a few preferences. It learns from synthetic plans, is sharpened with reinforcement learning against a rule
 checker, and is adapted to real plans read by a vision model. It runs in the browser with an editor and a 3D walkthrough.
