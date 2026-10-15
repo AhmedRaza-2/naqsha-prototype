@@ -3,7 +3,7 @@
 // Everything is served from the same place as the page (models/), with real download progress, so a slow connection
 // shows a percentage instead of a frozen button, and the download can start before the visitor presses Generate.
 import { score } from './bands.js';
-import { parseAny } from './tree.js';
+import { parseAny, familyOf } from './tree.js';
 
 const BASE = new URL('../models/', import.meta.url);
 const LAYERS = 6, HEADS = 8, HEAD_DIM = 32;
@@ -132,6 +132,7 @@ export async function knowsStyles() {
 /** Sample plans: one per entry of `styles` (null = no style tag). Rows whose prompts have the same length share one
  *  batch and one key/value cache. Returns [{ text, style }] (may be invalid, the caller checks them). */
 async function sample(request, styles, { temperature = 0.8, maxNew = 170 } = {}, onStatus) {
+  await load();                                                     // the prompt depends on the loaded vocabulary
   const groups = new Map();
   styles.forEach((st) => {
     const prompt = requestText(request, st);
@@ -199,10 +200,12 @@ async function sampleBatch(rows, temperature, maxNew, progress) {
  * Draft layouts with the trained model and keep the best, most different ones.
  * styles: layout families to draft (each gets n / styles.length samples); [null] = no style tag (older models).
  * -> [{ text, plan, rects, checks, score, style }]: first the best plan of each family that produced a valid one,
- *    then the next best overall; empty if the model produced nothing valid.
+ *    then the next best overall; empty if the model produced nothing valid. `style` is the family the plan really has
+ *    (read from its geometry: the model does not always follow the STYLE tag); null for models without styles.
  * `exclude` is a Set of plan texts to skip (used by Regenerate so the visitor sees new layouts).
+ * `keep(item)` drops plans the visitor ruled out (a car porch, a family) before the best of each family is picked.
  */
-export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, exclude = new Set(), onStatus, styles = [null] } = {}) {
+export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, exclude = new Set(), onStatus, styles = [null], keep = () => true } = {}) {
   const per = Math.max(1, Math.round(n / styles.length));
   const want = styles.flatMap((st) => new Array(per).fill(st));
   const drafts = await sample(request, want, { temperature }, onStatus);
@@ -214,7 +217,8 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
     try {
       const { plan, checks, rects } = parseAny(text, request.beds);
       if (checks.some((c) => c.level === 'err')) continue;
-      good.push({ text, plan, rects, checks, score: score(checks), style });
+      const item = { text, plan, rects, checks, score: score(checks), style: style && familyOf(plan, rects) };
+      if (keep(item)) good.push(item);
     } catch { /* malformed output: skip */ }
   }
   good.sort((a, b) => b.score - a.score);

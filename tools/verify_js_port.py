@@ -64,7 +64,8 @@ for t in texts:
         mod = tree if is_tree(t) else bands
         plan = mod.parse(t)
         cs = mod.check(plan, plan["beds"])
-        expected.append({"ok": True, "score": round(bands.score(cs), 6), "failed": sorted(c[1] for c in cs if c[0] != "ok")})
+        expected.append({"ok": True, "score": round(bands.score(cs), 6), "failed": sorted(c[1] for c in cs if c[0] != "ok"),
+                         "family": tree.family_of(plan)})
     except Exception:
         expected.append({"ok": False})
 tmp = Path(tempfile.mkdtemp()) / "vectors.json"

@@ -116,10 +116,10 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
   const wantPorch = porch === 'any' ? null : porch === 'yes';
   // a model trained on layout families drafts each family that fits, so the three layouts differ in arrangement
   const styles = (await knowsStyles()) ? (family !== 'any' ? [family] : familiesFor(plot, request.beds)) : [null];
-  const items = await draftPlans({ w: plot.w, d: plot.d, ...request }, {
-    n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 99, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles,
-  });
   const hasPorch = (it) => it.rects.some((r) => r.t === 'porch' || r.t === 'garage');
-  return items.filter((it) => wantPorch === null || hasPorch(it) === wantPorch).slice(0, 3)
-    .map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
+  const keep = (it) => (wantPorch === null || hasPorch(it) === wantPorch) && (family === 'any' || !it.style || it.style === family);
+  const items = await draftPlans({ w: plot.w, d: plot.d, ...request }, {
+    n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles, keep,
+  });
+  return items.map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
 }

@@ -3,7 +3,7 @@
 // H stacks its parts from the road to the back, V places them left to right; every cut lists the sizes of all parts
 // but the last, which takes what is left. A leaf is a room (optionally `+bath WxD L|R`); a `bath` leaf is a washroom of
 // its own and belongs to the neighbouring room it shares the longest wall with (a bedroom if there is one).
-import { OPEN, BEDS, FOCUS_VALUES, checkRects, shared, score, parse as parseRows, check as checkRows, toRects as rowsToRects } from './bands.js';
+import { OPEN, BEDS, MARLA_SQFT, FOCUS_VALUES, checkRects, shared, score, parse as parseRows, check as checkRows, toRects as rowsToRects } from './bands.js';
 
 const LEAF_TYPES = new Set([...OPEN, ...BEDS, 'bath', 'kitchen', 'lounge', 'drawing', 'dining', 'stairs', 'store', 'lobby', 'passage', 'prayer', 'study', 'servant', 'dress', 'other']);
 const TOK = /\[|\]|\+bath|[A-Za-z_]+|\d+(?:\.\d+)?x\d+(?:\.\d+)?|\d+(?:\.\d+)?/g;
@@ -93,6 +93,19 @@ export function leaves(plan) {
 }
 
 /** Same rectangles as bands.toRects: rooms first, then washrooms (overlay or standalone) with parent = room index. */
+/** Layout family read from the geometry, not from the requested STYLE tag (the model does not always follow it): a
+ *  corridor at least 12 ft long with two or more bedrooms along it is a bedroom wing, any other long corridor a side
+ *  corridor, no corridor rows of rooms (compact on plots up to 6 marla). Same as family_of in tools/tree.py. */
+export function familyOf(plan, rects) {
+  const plain = (plan.plot.w * plan.plot.d) / MARLA_SQFT <= 6 ? 'compact' : 'rows';
+  if (!plan.tree) return plain;
+  const rooms = (rects || toRects(plan)).filter((r) => r.parent == null);
+  const halls = rooms.filter((r) => r.t === 'passage' && Math.max(r.w, r.d) >= 12);
+  if (!halls.length) return plain;
+  const along = rooms.filter((b) => BEDS.has(b.t) && halls.some((h) => { const s = shared(b, h); return s && s[3] - s[2] >= 3; })).length;
+  return along >= 2 ? 'wing' : 'corridor';
+}
+
 export function toRects(plan) {
   const { rooms } = leaves(plan);
   const rects = rooms.filter((r) => r.t !== 'bath').map((r, k) => ({ i: k, t: r.t, x: r.x, y: r.y, w: r.w, d: r.d, band: 0, bath: r.bath }));

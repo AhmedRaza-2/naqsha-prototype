@@ -110,6 +110,24 @@ def leaves(plan):
     return out, errs
 
 
+def family_of(plan, rects=None):
+    """Layout family read from the geometry, not from the requested STYLE tag (the model does not always follow it):
+    a corridor at least 12 ft long with two or more bedrooms opening along it is a bedroom wing, any other long
+    corridor a side corridor, no corridor rows of rooms (compact on plots up to 6 marla). Same as familyOf in js/tree.js."""
+    W, D = plan["plot"]["w"], plan["plot"]["d"]
+    plain = "compact" if W * D / bands.MARLA <= 6 else "rows"
+    if "tree" not in plan: return plain
+    rooms = [r for r in (rects or to_rects(plan)) if "parent" not in r]
+    halls = [r for r in rooms if r["t"] == "passage" and max(r["w"], r["d"]) >= 12]
+    if not halls: return plain
+    along = 0
+    for b in rooms:
+        if b["t"] not in bands.BEDS: continue
+        walls = [bands._shared(b, h) for h in halls]
+        along += any(s and s[3] - s[2] >= 3 for s in walls)
+    return "wing" if along >= 2 else "corridor"
+
+
 def to_rects(plan):
     """Same rectangles as bands.to_rects: rooms first, then washrooms (overlay or standalone) with parent = room index."""
     rooms, _ = leaves(plan)
