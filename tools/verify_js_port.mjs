@@ -1,15 +1,15 @@
 // Scores the plan texts in a vectors file with js/bands.js and compares with the Python results.
 // Run through tools/verify_js_port.py:  node tools/verify_js_port.mjs <vectors.json>
 import fs from 'fs';
-import { parse, check, score } from '../js/bands.js';
+import { score } from '../js/bands.js';
+import { parseAny } from '../js/tree.js';
 
 const { texts, expected } = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 let bad = 0, unparseable = 0;
 texts.forEach((t, i) => {
   let got;
   try {
-    const p = parse(t);
-    const cs = check(p, p.beds);
+    const cs = parseAny(t).checks;
     got = { ok: true, score: Math.round(score(cs) * 1e6) / 1e6, failed: cs.filter((c) => c.level !== 'ok').map((c) => c.name).sort() };
   } catch (e) {
     got = { ok: false };

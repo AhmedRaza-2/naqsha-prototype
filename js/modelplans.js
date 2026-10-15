@@ -1,9 +1,15 @@
-// Turns a model-drafted band plan into the layout object the planner (2D plan, rule check, 3D walkthrough) already uses.
-import { OPEN, toRects, outsideDoors } from './bands.js';
+// Turns a model-drafted plan (rows of rooms or a slicing tree) into the layout object the planner (2D plan, rule check,
+// 3D walkthrough) uses.
+import { OPEN, MARLA_SQFT, toRects, outsideDoors } from './bands.js';
+import { toRects as treeRects } from './tree.js';
 import { finalize, ruleFor } from './layout.js';
-import { draftPlans } from './model.js';
+import { draftPlans, knowsStyles } from './model.js';
 
-const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs']);
+const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
+const NAMES = { drawing: 'Drawing Room', lobby: 'Entrance', dining: 'Dining', kitchen: 'Kitchen', stairs: 'Stairs', passage: 'Corridor',
+  store: 'Store', dress: 'Dressing', servant: 'Servant Room', study: 'Study', prayer: 'Prayer Room', other: 'Room' };
+// layout families the model was trained on (STYLE tag) and how the planner names them
+export const FAMILY = { rows: 'Classic rows', compact: 'Compact', corridor: 'Side corridor', wing: 'Bedroom wing' };
 const TITLE = {
   setbacks: 'Setbacks applied', coverage: 'Plot coverage', 'min room sizes': 'Minimum room sizes', 'attached baths': 'Attached baths',
   'entrance on road side': 'Entrance on the road side', 'every room reachable': 'Every room reachable', 'guest privacy': 'Guest privacy',
@@ -30,7 +36,7 @@ const OK_TEXT = {
 export function planToLayout(item, index) {
   const { plan } = item;
   const { w: W, d: D } = plan.plot;
-  const rects = toRects(plan);
+  const rects = item.rects || (plan.tree ? treeRects(plan) : toRects(plan));
   const mains = rects.filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
   const x0 = Math.min(...mains.map((r) => r.x)), x1 = Math.max(...mains.map((r) => r.x + r.w));
   const y0 = Math.min(...mains.map((r) => r.y)), y1 = Math.max(...mains.map((r) => r.y + r.d));
@@ -41,14 +47,16 @@ export function planToLayout(item, index) {
   const byRect = new Map();
   const nBeds = mains.filter((r) => r.t === 'bed' || r.t === 'master').length;
   let bedNo = mains.some((r) => r.t === 'master') ? 1 : 0;
+  const seenType = {};
   for (const r of mains) {
     if (!KNOWN.has(r.t)) continue;
     let type = r.t, name, id;
+    seenType[r.t] = (seenType[r.t] || 0) + 1;
     if (r.t === 'master') { type = 'bed'; name = 'Master Bedroom'; id = 'bed1'; }
     else if (r.t === 'bed') { bedNo += 1; name = nBeds === 1 ? 'Bedroom' : `Bedroom ${bedNo}`; id = `bed${bedNo}`; }
     else {
-      name = { drawing: 'Drawing Room', lobby: 'Entrance', lounge: hasDining ? 'TV Lounge' : 'Lounge & Dining', dining: 'Dining', kitchen: 'Kitchen', stairs: 'Stairs' }[r.t];
-      id = r.t;
+      name = r.t === 'lounge' ? (hasDining ? 'TV Lounge' : 'Lounge & Dining') : NAMES[r.t];
+      id = seenType[r.t] === 1 ? r.t : `${r.t}${seenType[r.t]}`;                // unique ids: doors and links refer to them
     }
     const room = { id, type, name, x: r.x, z: r.y, w: r.w, d: r.d };
     if (type === 'bed') room.band = Math.abs(r.y - y0) < 0.01 ? 'front' : 'back';
@@ -92,12 +100,26 @@ export function planToLayout(item, index) {
 }
 
 /** Layouts for a plot and bedroom count, drafted by the trained model. Empty list if the model gives nothing valid. */
+/** Layout families worth drafting for this plot (same limits as tools/gen_tree.py). */
+export function familiesFor(plot, beds) {
+  const marla = (plot.w * plot.d) / MARLA_SQFT;
+  if (marla <= 6) return ['compact'];
+  const side = marla <= 14 ? 3 : 5, Bw = plot.w - 2 * side;
+  const fams = ['rows'];
+  if (Bw >= 18 && Bw <= 29 && beds === 2) fams.push('corridor');
+  if (Bw >= 29 && beds >= 2 && beds <= 5) fams.push('wing');
+  return fams;
+}
+
 export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
-  const { porch = 'any', ...request } = prefs;
+  const { porch = 'any', family = 'any', ...request } = prefs;
   const wantPorch = porch === 'any' ? null : porch === 'yes';
+  // a model trained on layout families drafts each family that fits, so the three layouts differ in arrangement
+  const styles = (await knowsStyles()) ? (family !== 'any' ? [family] : familiesFor(plot, request.beds)) : [null];
   const items = await draftPlans({ w: plot.w, d: plot.d, ...request }, {
-    n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 99, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus,
+    n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 99, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles,
   });
-  const hasPorch = (it) => it.plan.bands.some((b) => b.rooms.some((r) => r.t === 'porch' || r.t === 'garage'));
-  return items.filter((it) => wantPorch === null || hasPorch(it) === wantPorch).slice(0, 3).map((it, i) => planToLayout(it, i));
+  const hasPorch = (it) => it.rects.some((r) => r.t === 'porch' || r.t === 'garage');
+  return items.filter((it) => wantPorch === null || hasPorch(it) === wantPorch).slice(0, 3)
+    .map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
 }

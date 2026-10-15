@@ -2,6 +2,7 @@
 const FILL = {
   drawing: '#e6decf', lobby: '#f6f2e9', lounge: '#ebe5d9', dining: '#dce4e0',
   kitchen: '#cfdad5', bed: '#e3e8e1', bath: '#bfcbc7', gbath: '#bfcbc7', stairs: '#ddd8cd',
+  passage: '#f3efe6', store: '#e2ddd2', dress: '#dfe4dd', servant: '#e4ded3', study: '#e6e3d6', prayer: '#ece6d8', other: '#e8e4da',
 };
 const PAPER = '#fbf8f1', YARD = '#efeae2', INK = '#3a2f2c', WINDOW = '#6f8f96';
 

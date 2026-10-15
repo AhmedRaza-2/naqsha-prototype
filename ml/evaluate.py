@@ -19,6 +19,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import layoutlm as L  # noqa: E402
+tree = L.tree
 bands = L.bands
 
 
@@ -38,18 +39,65 @@ def run(model, prompts, samples, temperature, top_k, train_set, bs=256):
             parse = "unparseable" not in failed
             want = int(re.search(r"BEDS (\d+)", p)[1])
             try:
-                plan = bands.parse(p + "\n" + text)
-                nb = sum(r_["t"] in bands.BEDS for b in plan["bands"] for r_ in b["rooms"])
-                cs = bands.check(plan, plan["beds"])
+                plan, cs, rects = parse_any(p + "\n" + text)
+                nb = sum(r_["t"] in bands.BEDS for r_ in rects if "parent" not in r_)
                 valid = not any(c[0] == "err" for c in cs)
                 bath_ok = not any(c[1] == "bath count" for c in cs)
                 focus_ok = not any(c[1].startswith("bigger ") and c[0] != "ok" for c in cs) and not any(c[1] == "focus value" for c in cs)
             except Exception:
                 nb, valid, bath_ok, focus_ok = -1, False, False, False
             group.append(dict(text=text, reward=r, parse=parse, valid=valid, bed_ok=nb == want, bath_ok=bath_ok, focus_ok=focus_ok, perfect=r == 1.0,
-                              copied=(p, text) in train_set, failed=failed))
+                              copied=(p, text) in train_set, failed=failed, grid=grid_of(p + "\n" + text) if valid else None,
+                              shape=skeleton(p + "\n" + text) if valid else None))
         res.append(group)
     return res
+
+
+def parse_any(text):
+    """Rows of rooms or slicing tree -> (plan, checks, rectangles)."""
+    plan, cs, rects, _ = L.parse_plan(text)
+    return plan, cs, rects
+
+
+def grid_of(text):
+    """Room type of every 1 ft cell (rows from the road): used to measure how different two layouts are."""
+    import numpy as np
+    plan, _, rects = parse_any(text)
+    W, D = int(plan["plot"]["w"]), int(plan["plot"]["d"])
+    g = np.zeros((D, W), np.int16)
+    ids = {}
+    for r in sorted(rects, key=lambda r: "parent" in r):                  # washrooms drawn over their rooms
+        y0, y1, x0, x1 = int(r["y"]), int(r["y"] + r["d"]), int(r["x"]), int(r["x"] + r["w"])
+        g[y0:y1, x0:x1] = ids.setdefault(r["t"], len(ids) + 1)
+    return g, ids
+
+
+def layout_distance(a, b):
+    """Share of the plot where two layouts put a different kind of room (0 = same layout, 1 = nothing in common)."""
+    (ga, ia), (gb, ib) = a, b
+    if ga.shape != gb.shape: return None
+    name_a = {v: k for k, v in ia.items()}; name_b = {v: k for k, v in ib.items()}
+    import numpy as np
+    ta = np.vectorize(lambda v: hash(name_a.get(int(v), "")) % 9973)(ga)
+    tb = np.vectorize(lambda v: hash(name_b.get(int(v), "")) % 9973)(gb)
+    return float((ta != tb).mean())
+
+
+def skeleton(text):
+    """Macro arrangement: the first two levels of cuts with sizes and room names dropped (rows of rooms are converted
+    to a tree first). Rows layouts all share one arrangement; a side corridor or a bedroom wing is a different one."""
+    full = text
+    body = full.split("\n", 1)[1].lstrip()
+    if body[:1] in ("H", "V") or ":" not in body:
+        node = tree.parse(full)["tree"]
+    else:
+        node = tree.from_bands(bands.parse(full))["tree"]
+
+    def sig(n, depth):
+        if n["k"] == "room": return "R"
+        if depth == 2: return n["k"]
+        return n["k"] + "(" + ",".join(sig(k, depth + 1) for k in n["kids"]) + ")"
+    return sig(node, 0)
 
 
 def summarize(res, prompts, name):
@@ -60,6 +108,18 @@ def summarize(res, prompts, name):
            "mean_score": sum(g["reward"] for g in flat) / n, "perfect%": pct("perfect"), "copied%": pct("copied"),
            "best@N": sum(max(g["reward"] for g in grp) for grp in res) / len(res),
            "distinct/N": sum(len({g["text"] for g in grp}) / len(grp) for grp in res) / len(res)}
+    # diversity among the valid plans drafted for the same request
+    dists, shapes = [], []
+    for grp in res:
+        ok = [g for g in grp if g.get("grid") is not None]
+        for i in range(len(ok)):
+            for j in range(i + 1, len(ok)):
+                d = layout_distance(ok[i]["grid"], ok[j]["grid"])
+                if d is not None: dists.append(d)
+        if len(ok) >= 2: shapes.append(len({g["shape"] for g in ok}) / len(ok))
+    out["diversity"] = sum(dists) / len(dists) if dists else None
+    out["arrangements/N"] = sum(shapes) / len(shapes) if shapes else None
+    out["arrangements_total"] = len({g["shape"] for g in flat if g.get("shape")})
     fails = Counter(f for g in flat for f in g["failed"])
     out["top_failures"] = fails.most_common(5)
     by = defaultdict(list)

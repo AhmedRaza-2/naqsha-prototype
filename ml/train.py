@@ -24,14 +24,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import layoutlm as L  # noqa: E402
 
 
+MAX_LEN = 256
+
+
 def read(path, limit=None, mirror=False):
     rows = [json.loads(l) for l in open(path, encoding="utf-8")]
     rows = rows[:limit] if limit else rows
     ex = [L.make_example(r["prompt"], r["completion"]) for r in rows]
+    keep = [len(e[0]) <= MAX_LEN for e in ex]                  # plans longer than the model's context are skipped
+    rows = [r for r, k in zip(rows, keep) if k]
+    ex = [e for e, k in zip(ex, keep) if k]
     if mirror:                                              # augmentation: left-right mirrored copy of every plan
         for r in rows:
-            p = L.bands.mirror(L.bands.parse(r["prompt"] + "\n" + r["completion"]))
-            ex.append(L.make_example(r["prompt"], L.bands.serialize(p).split("\n", 1)[1]))
+            ex.append(L.make_example(r["prompt"], L.mirror_text(r["prompt"], r["completion"])))
     return ex
 
 
@@ -88,7 +93,7 @@ def main():
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--init", default=None, help="start from this checkpoint (fine-tuning) instead of random weights")
-    ap.add_argument("--extra", action="append", default=[], help="extra training rows (real plans), repeatable")
+    ap.add_argument("--extra", action="append", default=[], help="extra training rows, repeatable; 'file*k' repeats that file k times")
     ap.add_argument("--extra-mult", type=int, default=1, help="repeat the extra rows this many times")
     ap.add_argument("--extra-val", default=None, help="held-out real plans: loss reported every epoch")
     ap.add_argument("--select", choices=["val", "extra"], default="val", help="keep the checkpoint with the best synthetic or real loss")
@@ -111,7 +116,8 @@ def main():
     ex = read(f"{a.data}/train.jsonl", a.limit, a.mirror)
     n_extra = 0
     for f in a.extra:
-        ext = read(f, None, a.mirror) * a.extra_mult
+        path, _, k = f.partition("*")
+        ext = read(path, None, a.mirror) * (int(k) if k else a.extra_mult)
         ex += ext; n_extra += len(ext)
     tr = to_tensors(ex, dev)
     va = to_tensors(read(f"{a.data}/val.jsonl", a.limit), dev)

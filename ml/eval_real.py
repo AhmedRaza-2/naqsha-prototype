@@ -49,7 +49,7 @@ def nll(model, data, bs=64):
 
 def sizes(plan):
     out = defaultdict(list)
-    for r in bands.to_rects(plan):
+    for r in plan:
         for k, ts in SIZE_TYPES.items():
             if r["t"] in ts: out[k].append(r["w"] * r["d"])
     return out
@@ -58,7 +58,7 @@ def sizes(plan):
 def realism(model, data, samples, temp=0.8):
     real = defaultdict(list)
     for r in data:
-        for k, v in sizes(bands.parse(r["prompt"] + "\n" + r["completion"])).items(): real[k] += v
+        for k, v in sizes(L.parse_plan(r["prompt"] + "\n" + r["completion"])[2]).items(): real[k] += v
     prompts = [r["prompt"] for r in data for _ in range(samples)]
     outs = []
     model.eval()
@@ -67,13 +67,12 @@ def realism(model, data, samples, temp=0.8):
     gen, valid, scores = defaultdict(list), 0, []
     for p, ids in zip(prompts, outs):
         try:
-            plan = bands.parse(p + "\n" + L.decode(ids))
-            cs = bands.check(plan, plan["beds"])
+            plan, cs, rects, _ = L.parse_plan(p + "\n" + L.decode(ids))
         except Exception:
             scores.append(0.0); continue
         sc = bands.score(cs); scores.append(sc); valid += sc > 0
         if sc > 0:
-            for k, v in sizes(plan).items(): gen[k] += v
+            for k, v in sizes(rects).items(): gen[k] += v
     diff = {k: round(abs(st.median(gen[k]) - st.median(real[k])) / st.median(real[k]) * 100, 1) for k in SIZE_TYPES if gen[k] and real[k]}
     return {"plans": len(prompts), "valid%": round(100 * valid / max(1, len(prompts)), 1), "mean_score": round(sum(scores) / max(1, len(scores)), 3),
             "median_area_gap%": diff, "mean_gap%": round(sum(diff.values()) / max(1, len(diff)), 1) if diff else None,

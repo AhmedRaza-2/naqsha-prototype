@@ -2,7 +2,8 @@
 // The exported graph decodes one token per call with a key/value cache (see ml/export_onnx.py).
 // Everything is served from the same place as the page (models/), with real download progress, so a slow connection
 // shows a percentage instead of a frozen button, and the download can start before the visitor presses Generate.
-import { parse, check, score } from './bands.js';
+import { score } from './bands.js';
+import { parseAny } from './tree.js';
 
 const BASE = new URL('../models/', import.meta.url);
 const LAYERS = 6, HEADS = 8, HEAD_DIM = 32;
@@ -90,7 +91,7 @@ async function load() {
 // ---------------------------------------------------------------- tokenizer (same rules as ml/layoutlm.py)
 function encode(text) {
   const spaced = text.replace(/(?<=\d)x(?=\d)/g, ' X ');
-  return (spaced.match(/\d+(?:\.\d+)?|[A-Za-z]+|[:|+\n]/g) || []).map((t) => stoi.get(t === 'X' ? 'x' : t));
+  return (spaced.match(/\d+(?:\.\d+)?|[A-Za-z]+|[:|+\n\[\]]/g) || []).map((t) => stoi.get(t === 'X' ? 'x' : t));
 }
 
 function decode(ids) {
@@ -102,7 +103,7 @@ function decode(ids) {
     const t = vocab.tokens[i];
     let sep;
     if (prev === null || prev === '\n') sep = '';
-    else if (t === ':' || t === 'x' || prev === 'x' || prev === '+') sep = '';
+    else if (t === ':' || t === 'x' || t === ']' || prev === 'x' || prev === '+' || prev === '[') sep = '';
     else sep = ' ';
     if (t === '\n') sep = '';
     out += sep + t;
@@ -114,19 +115,45 @@ function decode(ids) {
 const fmt = (v) => String(v);
 
 /** The request text the model was trained on. Models trained before washroom/focus support only know PLOT and BEDS. */
-function requestText({ w, d, beds, baths, focus }) {
+function requestText({ w, d, beds, baths, focus }, style) {
   let t = `PLOT ${fmt(w)}x${fmt(d)} BEDS ${beds}`;
   if (stoi.has('BATHS') && baths != null) t += ` BATHS ${baths}`;
   if (stoi.has('FOCUS') && focus) t += ` FOCUS ${focus}`;
+  if (style && stoi.has('STYLE') && stoi.has(style)) t += ` STYLE ${style}`;
   return t;
 }
 
-/** Sample `n` plans for the request. Returns the text of each (may be invalid, the caller checks them). */
-async function sample(request, { n = 12, temperature = 0.8, maxNew = 140 } = {}, onStatus) {
+/** True when the loaded model was trained with layout families (STYLE tags, slicing trees). */
+export async function knowsStyles() {
+  await load();
+  return stoi.has('STYLE') && stoi.has('wing');
+}
+
+/** Sample plans: one per entry of `styles` (null = no style tag). Rows whose prompts have the same length share one
+ *  batch and one key/value cache. Returns [{ text, style }] (may be invalid, the caller checks them). */
+async function sample(request, styles, { temperature = 0.8, maxNew = 170 } = {}, onStatus) {
+  const groups = new Map();
+  styles.forEach((st) => {
+    const prompt = requestText(request, st);
+    const ids = [vocab.bos, ...encode(prompt), vocab.nl];
+    const key = ids.length;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ prompt, ids, style: st });
+  });
+  const out = [];
+  let g = 0;
+  for (const rows of groups.values()) {
+    g += 1;
+    const texts = await sampleBatch(rows, temperature, maxNew, (pct) => onStatus?.(`Drafting layouts (${Math.min(99, Math.round(((g - 1 + pct) / groups.size) * 100))}%)`));
+    rows.forEach((r, i) => out.push({ text: texts[i], style: r.style }));
+  }
+  return out;
+}
+
+async function sampleBatch(rows, temperature, maxNew, progress) {
   const { ort } = await load();
-  const prompt = requestText(request);
-  const start = [vocab.bos, ...encode(prompt), vocab.nl];
-  const B = n;
+  const B = rows.length;
+  const L0 = rows[0].ids.length;
   let k = new ort.Tensor('float32', new Float32Array(0), [LAYERS, B, HEADS, 0, HEAD_DIM]);
   let v = new ort.Tensor('float32', new Float32Array(0), [LAYERS, B, HEADS, 0, HEAD_DIM]);
   const step = async (tokens, pos) => {
@@ -139,15 +166,14 @@ async function sample(request, { n = 12, temperature = 0.8, maxNew = 140 } = {},
     k = o.k; v = o.v;
     return o.logits.data;
   };
-
-  for (let t = 0; t < start.length - 1; t++) await step(new Array(B).fill(start[t]), t);   // feed the prompt
-  let cur = new Array(B).fill(start[start.length - 1]);
-  let pos = start.length - 1;
+  for (let t = 0; t < L0 - 1; t++) await step(rows.map((r) => r.ids[t]), t);   // feed the prompts (one per row)
+  let cur = rows.map((r) => r.ids[L0 - 1]);
+  let pos = L0 - 1;
   const V = vocab.tokens.length;
   const out = Array.from({ length: B }, () => []);
   const done = new Array(B).fill(false);
   for (let s = 0; s < maxNew && pos < vocab.max_len - 1; s++) {
-    onStatus?.(`Drafting layouts (${Math.min(99, Math.round((s / 110) * 100))}%)`);
+    progress(Math.min(1, s / 120));
     const logits = await step(cur, pos);
     const next = new Array(B);
     for (let b = 0; b < B; b++) {
@@ -166,28 +192,37 @@ async function sample(request, { n = 12, temperature = 0.8, maxNew = 140 } = {},
     if (done.every(Boolean)) break;
     if (s % 8 === 0) await new Promise((r) => setTimeout(r, 0));                    // let the page repaint
   }
-  return out.map((ids) => `${prompt}\n${decode(ids)}`);
+  return out.map((ids, b) => `${rows[b].prompt}\n${decode(ids)}`);
 }
 
 /**
- * Draft layouts with the trained model and keep the best distinct ones.
- * -> [{ text, plan, checks, score }] sorted by rule score (highest first); empty if the model produced nothing valid.
+ * Draft layouts with the trained model and keep the best, most different ones.
+ * styles: layout families to draft (each gets n / styles.length samples); [null] = no style tag (older models).
+ * -> [{ text, plan, rects, checks, score, style }]: first the best plan of each family that produced a valid one,
+ *    then the next best overall; empty if the model produced nothing valid.
  * `exclude` is a Set of plan texts to skip (used by Regenerate so the visitor sees new layouts).
  */
-export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, exclude = new Set(), onStatus } = {}) {
-  const texts = await sample(request, { n, temperature }, onStatus);
+export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, exclude = new Set(), onStatus, styles = [null] } = {}) {
+  const per = Math.max(1, Math.round(n / styles.length));
+  const want = styles.flatMap((st) => new Array(per).fill(st));
+  const drafts = await sample(request, want, { temperature }, onStatus);
   const seen = new Set(exclude);
   const good = [];
-  for (const text of texts) {
+  for (const { text, style } of drafts) {
     if (seen.has(text)) continue;
     seen.add(text);
     try {
-      const plan = parse(text);
-      const checks = check(plan, request.beds);
+      const { plan, checks, rects } = parseAny(text, request.beds);
       if (checks.some((c) => c.level === 'err')) continue;
-      good.push({ text, plan, checks, score: score(checks) });
+      good.push({ text, plan, rects, checks, score: score(checks), style });
     } catch { /* malformed output: skip */ }
   }
   good.sort((a, b) => b.score - a.score);
-  return good.slice(0, top);
+  const picked = [];
+  for (const st of styles) {                                          // the best plan of each family first: three different layouts
+    const best = good.find((g) => g.style === st && !picked.includes(g));
+    if (best && picked.length < top) picked.push(best);
+  }
+  for (const g of good) if (picked.length < top && !picked.includes(g)) picked.push(g);
+  return picked;
 }

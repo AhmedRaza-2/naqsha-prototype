@@ -184,10 +184,10 @@ def _shared(a, b):
     return None
 
 
-PREF = {"lobby": ["lounge", "dining"], "drawing": ["lobby", "lounge"], "kitchen": ["dining", "lounge", "lobby"],
+PREF = {"lobby": ["lounge", "dining", "passage"], "drawing": ["lobby", "lounge"], "kitchen": ["dining", "lounge", "lobby", "passage"],
         "dining": ["lounge", "kitchen"]}
-BED_FRONT = ["drawing", "lobby", "lounge"]
-BED_BACK = ["lounge", "dining", "lobby", "drawing", "kitchen"]
+BED_FRONT = ["drawing", "lobby", "lounge", "passage"]
+BED_BACK = ["lounge", "dining", "lobby", "passage", "drawing", "kitchen"]
 OTHER = ["lounge", "passage", "lobby", "dining"]
 MINSZ = {"bed": (95, 9), "master": (110, 9), "drawing": (110, 9), "lounge": (100, 8), "kitchen": (55, 6.5),
          "lobby": (20, 4.5), "dining": (70, 7)}
@@ -305,19 +305,28 @@ def check(plan, beds=None):
                 if bw > r["w"] - 1 or bd > b["d"] - 2: add("err", "bath fit", f"bath {bw}x{bd} too big for {r['t']}"); errs += 1
     sd = sum(b["d"] for b in plan["bands"])
     if abs(sd - D) > 0.26: add("err", "plot depth", f"band depths sum to {sd:g}, plot is {D:g}"); errs += 1
-    types = Counter(r["t"] for b in plan["bands"] for r in b["rooms"])
+    return check_rects(plan, to_rects(plan), beds, out, errs)
+
+
+def check_rects(plan, rects, beds=None, out=None, errs=0):
+    """Rule checks on room rectangles, whatever plan language produced them (rows of rooms or a slicing tree).
+    plan supplies plot, baths and focus; rects come from to_rects (washrooms have t='bath' and a parent)."""
+    out = [] if out is None else out
+    add = lambda lvl, n, d="": out.append((lvl, n, d))
+    W, D = plan["plot"]["w"], plan["plot"]["d"]
+    beds = beds if beds is not None else plan.get("beds")
+    types = Counter(r["t"] for r in rects if "parent" not in r)
     nb = types["bed"] + types["master"]
     for need in ("kitchen", "drawing"):                                 # a lobby is optional: real houses are often entered from the porch
         if not types[need]: add("err", f"missing {need}"); errs += 1
     if beds is not None and nb != beds: add("err", "bed count", f"asked for {beds}, plan has {nb}"); errs += 1
-    nbath = sum(1 for b in plan["bands"] for r in b["rooms"] if r.get("bath"))
+    nbath = sum(1 for r in rects if "parent" in r)
     if plan.get("baths") is not None and nbath != plan["baths"]: add("err", "bath count", f"asked for {plan['baths']}, plan has {nbath}"); errs += 1
     if plan.get("focus") not in (None, *FOCUS_VALUES): add("err", "focus value", str(plan.get("focus"))); errs += 1
     if errs:
         return out
 
     rule = rule_for(W, D)
-    rects = to_rects(plan)
     mains = [r for r in rects if r["t"] not in OPEN and r["t"] != "bath"]
     byi = {r["i"]: r for r in rects}
     x0, x1 = min(r["x"] for r in mains), max(r["x"] + r["w"] for r in mains)
@@ -333,7 +342,7 @@ def check(plan, beds=None):
             net = r["w"] * r["d"] - (r["bath"][0] * r["bath"][1] if r["bath"] else 0)
             if net < MINSZ[r["t"]][0] or min(r["w"], r["d"]) < MINSZ[r["t"]][1]: small.append(r["t"])
     add("warn" if small else "ok", "min room sizes", ",".join(small))
-    nobath = [r["t"] for r in mains if r["t"] in BEDS and not r["bath"]]
+    nobath = [r["t"] for r in mains if r["t"] in BEDS and not r["bath"] and not r.get("ensuite")]
     add("warn" if nobath else "ok", "attached baths", f"{len(nobath)} bedroom(s) without")
     # main entrance: a lobby, or (common in real plans) a lounge / dining room entered straight from the porch or lawn
     ent, faces, guests = outside_doors(rects, mains, y0)

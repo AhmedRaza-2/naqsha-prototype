@@ -1,4 +1,6 @@
-"""Tokenizer + small GPT-style transformer for band-format house layouts (written from scratch in PyTorch).
+"""Tokenizer + small GPT-style transformer for house layouts (written from scratch in PyTorch).
+Plans are rows of rooms (tools/bands.py) or slicing trees (tools/tree.py: "H 10 13 [lawn] [V 12 [drawing] [lobby]] ...").
+Optional prompt tags: STYLE <rows|compact|corridor|wing> and SRC world (ResPlan pretraining data).
 
 Sequence = [BOS] PLOT 30 x 55 BEDS 3 \\n 10 : lawn 30 \\n ... [EOS]   (word-level, vocabulary ~330)
 The prompt is everything up to the first newline; the loss is computed on what comes after it.
@@ -12,12 +14,15 @@ import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 import bands  # noqa: E402  (validator / parser used for evaluation and as the RL reward)
+import tree  # noqa: E402  (slicing-tree plan language, same checker)
 
 # ---------------------------------------------------------------- tokenizer
 NUMS = [f"{v / 2:g}" for v in range(1, 301)]                       # 0.5 .. 150 on the 0.5 ft grid
 WORDS = ["PLOT", "BEDS", "BATHS", "FOCUS", "rest", "bath", "L", "R", "balanced", "bedrooms"] + sorted(bands.TYPES - {"bath"})
 PUNCT = ["\n", ":", "|", "+", "x"]
-VOCAB = ["<pad>", "<bos>", "<eos>"] + PUNCT + WORDS + NUMS
+# added for slicing trees and prompt tags; appended at the end so the ids of older models stay the same
+EXTRA = ["[", "]", "H", "V", "STYLE", "SRC", "rows", "compact", "corridor", "wing", "world", "pk"]
+VOCAB = ["<pad>", "<bos>", "<eos>"] + PUNCT + WORDS + NUMS + EXTRA
 STOI = {t: i for i, t in enumerate(VOCAB)}
 PAD, BOS, EOS, NL = STOI["<pad>"], STOI["<bos>"], STOI["<eos>"], STOI["\n"]
 
@@ -28,7 +33,7 @@ def _split_x(text):
 
 
 def encode(text):
-    toks = re.findall(r"\d+(?:\.\d+)?|[A-Za-z]+|[:|+\n]", _split_x(text))
+    toks = re.findall(r"\d+(?:\.\d+)?|[A-Za-z]+|[:|+\n\[\]]", _split_x(text))
     return [STOI["x" if t == "X" else t] for t in toks]
 
 
@@ -42,7 +47,7 @@ def decode(ids):
         t = VOCAB[i]
         if prev is None or prev == "\n":
             sep = ""
-        elif t == ":" or t == "x" or prev == "x" or prev == "+":
+        elif t in (":", "x", "]") or prev in ("x", "+", "["):
             sep = ""
         else:
             sep = " "
@@ -150,11 +155,30 @@ def ids_to_plan_text(prompt, completion_ids):
     return prompt + "\n" + decode(completion_ids)
 
 
+def is_tree(text):
+    """True when the plan after the prompt line is a slicing tree (not rows of rooms)."""
+    body = text.split("\n", 1)[1].lstrip() if "\n" in text else ""
+    return body[:1] in ("H", "V") or (bool(body) and ":" not in body)
+
+
+def parse_plan(text):
+    """Any plan text -> (plan, checks, rectangles, module) using the matching language."""
+    mod = tree if is_tree(text) else bands
+    plan = mod.parse(text)
+    return plan, mod.check(plan, plan["beds"]), mod.to_rects(plan), mod
+
+
+def mirror_text(prompt, completion):
+    """Left-right mirrored completion text, for either plan language."""
+    text = prompt + "\n" + completion
+    mod = tree if is_tree(text) else bands
+    return mod.serialize(mod.mirror(mod.parse(text))).split("\n", 1)[1]
+
+
 def reward(prompt, completion_ids):
     """Rule-checker reward in [0,1]; 0 if the text does not even parse. Returns (reward, failed_check_names)."""
     try:
-        plan = bands.parse(ids_to_plan_text(prompt, completion_ids))
-        cs = bands.check(plan, plan["beds"])
+        plan, cs, _, _ = parse_plan(ids_to_plan_text(prompt, completion_ids))
     except Exception:
         return 0.0, ["unparseable"]
     return bands.score(cs), bands.failed(cs)
@@ -171,5 +195,12 @@ def save(model, path, extra=None):
 def load(path, map_location=None):
     ck = torch.load(path, map_location=map_location or device(), weights_only=False)
     m = LayoutLM(**ck["cfg"])
-    m.load_state_dict(ck["state"])
+    st = ck["state"]
+    n_old = st["tok.weight"].shape[0]
+    if n_old < len(VOCAB):                                 # a model from before the vocabulary grew: keep its rows, add new ones
+        for k in ("tok.weight", "head.weight"):
+            new = getattr(m, k.split(".")[0]).weight.data.clone()
+            new[:n_old] = st[k]
+            st[k] = new
+    m.load_state_dict(st)
     return m.to(map_location or device())

@@ -4,6 +4,7 @@ import { ruleFor, MARLA } from './layout.js';
 
 export const OPEN = new Set(['lawn', 'void', 'porch', 'courtyard', 'garage', 'balcony']);
 export const BEDS = new Set(['bed', 'master']);
+export const MARLA_SQFT = 225;
 const TYPES = new Set([...OPEN, ...BEDS, 'bath', 'kitchen', 'lounge', 'drawing', 'dining', 'stairs', 'store', 'lobby', 'passage', 'prayer', 'study', 'servant', 'dress', 'other']);
 const r2 = (v) => Math.round(v * 100) / 100;
 export const FOCUS_VALUES = ['balanced', 'bedrooms', 'lounge', 'kitchen'];
@@ -91,7 +92,7 @@ export function toRects(plan) {
   return out;
 }
 
-function shared(a, b) {
+export function shared(a, b) {
   const e = 0.01;
   for (const [p, q] of [[a, b], [b, a]]) {
     if (Math.abs(p.x + p.w - q.x) < e) {
@@ -106,9 +107,9 @@ function shared(a, b) {
   return null;
 }
 
-const PREF = { lobby: ['lounge', 'dining'], drawing: ['lobby', 'lounge'], kitchen: ['dining', 'lounge', 'lobby'], dining: ['lounge', 'kitchen'] };
-const BED_FRONT = ['drawing', 'lobby', 'lounge'];
-const BED_BACK = ['lounge', 'dining', 'lobby', 'drawing', 'kitchen'];
+const PREF = { lobby: ['lounge', 'dining', 'passage'], drawing: ['lobby', 'lounge'], kitchen: ['dining', 'lounge', 'lobby', 'passage'], dining: ['lounge', 'kitchen'] };
+const BED_FRONT = ['drawing', 'lobby', 'lounge', 'passage'];
+const BED_BACK = ['lounge', 'dining', 'lobby', 'passage', 'drawing', 'kitchen'];
 const OTHER = ['lounge', 'passage', 'lobby', 'dining'];
 const MINSZ = { bed: [95, 9], master: [110, 9], drawing: [110, 9], lounge: [100, 8], kitchen: [55, 6.5], lobby: [20, 4.5], dining: [70, 7] };
 const WINDOW_W = { kitchen: 3.5, bed: 4, master: 4, lobby: 3 };
@@ -236,18 +237,24 @@ export function check(plan, beds = plan.beds) {
   });
   const sd = plan.bands.reduce((s, b) => s + b.d, 0);
   if (Math.abs(sd - D) > 0.26) { add('err', 'plot depth', `band depths sum to ${sd}, plot is ${D}`); errs++; }
+  return checkRects(plan, toRects(plan), beds, out, errs);
+}
+
+/** Rule checks on room rectangles, whatever plan language produced them (rows of rooms or a slicing tree). */
+export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
+  const add = (level, name, detail = '') => out.push({ level, name, detail });
+  const { w: W, d: D } = plan.plot;
   const count = {};
-  for (const b of plan.bands) for (const r of b.rooms) count[r.t] = (count[r.t] || 0) + 1;
+  for (const r of rects) if (r.parent === undefined) count[r.t] = (count[r.t] || 0) + 1;
   const nb = (count.bed || 0) + (count.master || 0);
   for (const need of ['kitchen', 'drawing']) if (!count[need]) { add('err', `missing ${need}`); errs++; }   // a lobby is optional
   if (beds != null && nb !== beds) { add('err', 'bed count', `asked for ${beds}, plan has ${nb}`); errs++; }
-  const nbath = plan.bands.reduce((s, b) => s + b.rooms.filter((r) => r.bath).length, 0);
+  const nbath = rects.filter((r) => r.parent !== undefined).length;
   if (plan.baths != null && nbath !== plan.baths) { add('err', 'bath count', `asked for ${plan.baths}, plan has ${nbath}`); errs++; }
   if (plan.focus != null && !FOCUS_VALUES.includes(plan.focus)) { add('err', 'focus value', String(plan.focus)); errs++; }
   if (errs) return out;
 
   const rule = ruleFor(W, D);
-  const rects = toRects(plan);
   const mains = rects.filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
   const byi = new Map(rects.map((r) => [r.i, r]));
   const x0 = Math.min(...mains.map((r) => r.x)), x1 = Math.max(...mains.map((r) => r.x + r.w));
@@ -265,7 +272,7 @@ export function check(plan, beds = plan.beds) {
     }
   }
   add(small.length ? 'warn' : 'ok', 'min room sizes', small.join(','));
-  const nobath = mains.filter((r) => BEDS.has(r.t) && !r.bath).map((r) => r.t);
+  const nobath = mains.filter((r) => BEDS.has(r.t) && !r.bath && !r.ensuite).map((r) => r.t);
   add(nobath.length ? 'warn' : 'ok', 'attached baths', `${nobath.length} bedroom(s) without`);
   // main entrance: a lobby, or (common in real plans) a lounge / dining room entered straight from the porch or lawn
   const out_ = outsideDoors(rects, mains, y0);

@@ -58,16 +58,16 @@ export function finalize(L) {
   (dOut.guests || []).forEach((g) => outDoor(g, false));
 
   const PREF = {
-    lobby: ['lounge', 'dining'],
+    lobby: ['lounge', 'dining', 'passage'],
     drawing: ['lobby', 'lounge'],
-    kitchen: ['dining', 'lounge', 'lobby'],
+    kitchen: ['dining', 'lounge', 'lobby', 'passage'],
     dining: ['lounge', 'kitchen'],
   };
   for (const r of mains) {
     if (r.type === 'lounge') continue;
     const prefs = r.type === 'bed'
-      ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge'] : ['lounge', 'dining', 'lobby', 'drawing', 'kitchen'])
-      : (PREF[r.type] || ['lobby', 'lounge', 'dining']);
+      ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge', 'passage'] : ['lounge', 'dining', 'lobby', 'passage', 'drawing', 'kitchen'])
+      : (PREF[r.type] || ['lounge', 'passage', 'lobby', 'dining']);
     let pick = null;
     for (const t of prefs) {
       for (const q of mains.filter((m) => m.type === t)) {

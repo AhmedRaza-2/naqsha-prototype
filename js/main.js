@@ -2,8 +2,9 @@ import { PRESETS, MARLA, ruleFor, estimateCost } from './layout.js';
 import { planSVG, elevationSVG } from './svg.js';
 import { STYLES, STYLE_IDS } from './styles.js';
 import { createViewer } from './scene.js';
-import { modelLayouts, planToLayout } from './modelplans.js';
+import { modelLayouts, planToLayout, FAMILY } from './modelplans.js';
 import { check, score, serialize } from './bands.js';
+import { check as treeCheck, serialize as treeSerialize } from './tree.js';
 import { mountEditor } from './editor.js';
 import { onModelState, preloadModel } from './model.js';
 
@@ -149,13 +150,14 @@ async function generate(regen) {
       { exclude: regen ? S.seen : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12 });
     layouts = await draft(S.prefs);
     // nothing valid for the exact request: ask the model again with fewer preferences, and say which one was dropped
-    const { beds, baths, focus, porch } = S.prefs;
+    const { beds, baths, focus, porch, family = 'any' } = S.prefs;
     const bigger = { bedrooms: 'bedrooms', lounge: 'hall', kitchen: 'kitchen' }[focus];
     const relax = [
       focus !== 'balanced' && [{ ...S.prefs, focus: 'balanced' }, `Bigger ${bigger} does not fit on this plot with your other choices, so these layouts use the usual proportions.`],
       baths > beds && [{ ...S.prefs, baths: beds }, `${baths} washrooms do not fit on this plot, so these layouts have ${beds}, one attached to each bedroom.`],
       baths > beds && focus !== 'balanced' && [{ ...S.prefs, baths: beds, focus: 'balanced' }, `${baths} washrooms and a bigger ${bigger} do not fit on this plot together, so these layouts have ${beds} washroom${beds > 1 ? 's' : ''} and the usual proportions.`],
     ].filter(Boolean);
+    if (family !== 'any') relax.unshift([{ ...S.prefs, family: 'any' }, 'That layout style does not fit this plot, so these are the closest layouts.']);
     if (porch !== 'any') relax.push([{ ...S.prefs, porch: 'any' }, porch === 'yes'
       ? 'No layout with a car porch fits this plot with your other choices, so these may not have one.'
       : 'Every layout the model drafted for this plot has a car porch, so these keep it.']);
@@ -199,7 +201,7 @@ $('gen').onclick = async () => {
   $('formerr').textContent = problem;
   if (problem) return;
   S.beds = +$('pb').value;
-  S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value };
+  S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, family: $('pfamily').value };
   S.seen = new Set();
   await generate(false);
 };
@@ -250,9 +252,11 @@ function select(id) {
   editor = mountEditor($('edhost'), S.sel, {
     undoBtn: $('edundo'), resetBtn: $('edreset'), state: editState.get(S.sel.id),
     rebuild: (plan) => {
-      const checks = check(plan, plan.beds);
-      const L = planToLayout({ text: serialize(plan), plan, checks, score: score(checks) }, idx);
-      if (JSON.stringify(plan) !== JSON.stringify(editState.get(L.id).original)) L.tag = 'Naqsha model, edited';
+      const checks = plan.tree ? treeCheck(plan, plan.beds) : check(plan, plan.beds);
+      const L = planToLayout({ text: plan.tree ? treeSerialize(plan) : serialize(plan), plan, checks, score: score(checks) }, idx);
+      const fam = S.layouts[idx].family;
+      L.family = fam;
+      L.tag = (FAMILY[fam] || 'Naqsha model') + (JSON.stringify(plan) !== JSON.stringify(editState.get(L.id).original) ? ', edited' : '');
       return L;
     },
     onChange: (L, live) => {

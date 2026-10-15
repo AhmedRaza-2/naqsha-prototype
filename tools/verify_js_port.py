@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import bands  # noqa: E402
+import tree  # noqa: E402
 
 rng = random.Random(5)
 texts = []
@@ -35,11 +36,34 @@ for t in rng.sample(texts, 100):                                                
         if len(lines) > 3: lines[1], lines[2] = lines[2], lines[1]
     texts.append("\n".join(lines))
 
+# slicing-tree plans: the new Pakistani families, world (ResPlan) plans, real plans, and broken variants of them
+trees = []
+for src, k in (("data/pk11/test.jsonl", 300), ("data/world11/val.jsonl", 150), ("data/real11/test.jsonl", 20)):
+    if not (ROOT / src).exists(): continue
+    rows = [json.loads(l) for l in open(ROOT / src, encoding="utf-8")]
+    trees += [r["prompt"] + "\n" + r["completion"] for r in rng.sample(rows, min(k, len(rows)))]
+for t in rng.sample(trees, min(80, len(trees))):
+    head, body = t.split("\n", 1)
+    mode = rng.choice(["size", "type", "bracket", "bath"])
+    if mode == "size": body = body.replace(" 1", " 9", 1)
+    elif mode == "type": body = body.replace("kitchen", "garbage", 1).replace("drawing", "bath", 1)
+    elif mode == "bracket": body = body.replace("]", "", 1)
+    else: body = body.replace("+bath 4.5x", "+bath 14.5x", 1)
+    trees.append(head + "\n" + body)
+texts += trees
+
+
+def is_tree(t):
+    body = t.split("\n", 1)[1].lstrip() if "\n" in t else ""
+    return body[:1] in ("H", "V") or (bool(body) and ":" not in body)
+
+
 expected = []
 for t in texts:
     try:
-        plan = bands.parse(t)
-        cs = bands.check(plan, plan["beds"])
+        mod = tree if is_tree(t) else bands
+        plan = mod.parse(t)
+        cs = mod.check(plan, plan["beds"])
         expected.append({"ok": True, "score": round(bands.score(cs), 6), "failed": sorted(c[1] for c in cs if c[0] != "ok")})
     except Exception:
         expected.append({"ok": False})

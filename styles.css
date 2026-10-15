@@ -182,5 +182,5 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 }
 
 /* preferences: the washroom choice has the longest labels */
-.prefs .row { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1fr); }
+.prefs .row { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); }
 @media (max-width: 760px) { .prefs .row { grid-template-columns: 1fr; } }
