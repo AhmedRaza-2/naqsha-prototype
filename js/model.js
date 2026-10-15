@@ -145,13 +145,17 @@ async function sample(request, styles, { temperature = 0.8, maxNew = 170 } = {},
   let g = 0;
   for (const rows of groups.values()) {
     g += 1;
-    const texts = await sampleBatch(rows, temperature, maxNew, (pct) => onStatus?.(`Drafting layouts (${Math.min(99, Math.round(((g - 1 + pct) / groups.size) * 100))}%)`));
+    const texts = await sampleBatch(rows, temperature, maxNew, expectedLength(request), (pct) => onStatus?.(`Drafting layouts (${Math.min(99, Math.round(((g - 1 + pct) / groups.size) * 100))}%)`));
     rows.forEach((r, i) => out.push({ text: texts[i], style: r.style }));
   }
   return out;
 }
 
-async function sampleBatch(rows, temperature, maxNew, progress) {
+/** About how many words the model writes for a plan on this plot (measured on v11: 47 on 3 marla, 68 on 6, 120 from
+ *  14 marla up), so the progress shown while drafting runs to about 100% instead of stopping half way. */
+const expectedLength = ({ w, d }) => Math.min(125, Math.max(42, 22 + 6.8 * ((w * d) / 225)));
+
+async function sampleBatch(rows, temperature, maxNew, expected, progress) {
   const { ort } = await load();
   const B = rows.length;
   const L0 = rows[0].ids.length;
@@ -174,7 +178,7 @@ async function sampleBatch(rows, temperature, maxNew, progress) {
   const out = Array.from({ length: B }, () => []);
   const done = new Array(B).fill(false);
   for (let s = 0; s < maxNew && pos < vocab.max_len - 1; s++) {
-    progress(Math.min(1, s / 120));
+    progress(Math.min(0.99, s / expected));
     const logits = await step(cur, pos);
     const next = new Array(B);
     for (let b = 0; b < B; b++) {
@@ -227,6 +231,43 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
     const best = good.find((g) => g.style === st && !picked.includes(g));
     if (best && picked.length < top) picked.push(best);
   }
-  for (const g of good) if (picked.length < top && !picked.includes(g)) picked.push(g);
+  // then, among the plans that score as well as the best one left, the one least like the cards already picked
+  // (a mirror image counts as the same layout), so the cards do not show one house three times
+  while (picked.length < top) {
+    const rest = good.filter((g) => !picked.includes(g));
+    if (!rest.length) break;
+    const near = rest.filter((g) => g.score >= rest[0].score - 0.05);
+    const apart = (g) => Math.min(...picked.map((p) => layoutDistance(g, p)));
+    picked.push(picked.length ? near.reduce((a, b) => (apart(b) > apart(a) ? b : a)) : near[0]);
+  }
   return picked;
+}
+
+/** Room type of every 1 ft cell (washrooms over their rooms); cached on the item. */
+function gridOf(item) {
+  if (item.grid) return item.grid;
+  const W = Math.round(item.plan.plot.w), D = Math.round(item.plan.plot.d);
+  const g = new Array(W * D).fill('');
+  for (const r of [...item.rects].sort((a, b) => (a.parent != null) - (b.parent != null))) {
+    for (let y = Math.floor(r.y); y < Math.min(D, Math.floor(r.y + r.d)); y++) {
+      for (let x = Math.floor(r.x); x < Math.min(W, Math.floor(r.x + r.w)); x++) g[y * W + x] = r.t;
+    }
+  }
+  item.grid = { g, W, D };
+  return item.grid;
+}
+
+/** Share of the plot where two plans put a different kind of room, the smaller of as drawn and mirrored. */
+function layoutDistance(a, b) {
+  const A = gridOf(a), B = gridOf(b);
+  if (A.W !== B.W || A.D !== B.D) return 1;
+  let same = 0, mirrored = 0;
+  for (let y = 0; y < A.D; y++) {
+    for (let x = 0; x < A.W; x++) {
+      const t = A.g[y * A.W + x];
+      same += t !== B.g[y * A.W + x];
+      mirrored += t !== B.g[y * A.W + (A.W - 1 - x)];
+    }
+  }
+  return Math.min(same, mirrored) / (A.W * A.D);
 }
