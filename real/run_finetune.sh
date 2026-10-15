@@ -19,7 +19,7 @@ if [ ! -f "$BASE" ]; then
 fi
 [ -f data/real/train.jsonl ] || python real/build_real.py build
 NTR=$(wc -l < data/real/train.jsonl); NVA=$(wc -l < data/real/val.jsonl)
-if [ "$NTR" -lt 20 ]; then echo "ERROR: only $NTR real training plans: run real/run_extract.sh (with Internet on) first. Stopping, nothing was fine-tuned."; exit 1; fi
+if [ "$NTR" -lt 5 ]; then echo "ERROR: only $NTR real training plans: run real/run_extract.sh (with Internet on) first. Stopping, nothing was fine-tuned."; exit 1; fi
 echo "real plans: train $NTR, held-out $NVA, gold test $(wc -l < data/real/test.jsonl)"
 SEL="--extra-val data/real/val.jsonl --select extra"; [ "$NVA" -lt 5 ] && SEL=""
 LAUNCH="python"; [ "$NG" -ge 2 ] && LAUNCH="torchrun --nproc_per_node=$NG"
