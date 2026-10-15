@@ -34,6 +34,27 @@ FOCUS_VALUES = ("balanced", "bedrooms", "lounge", "kitchen")
 # typical share of the built area taken by bedrooms (by bedroom count) in balanced plans; "bigger bedrooms" = 4 points above
 BED_BASE = {2: 0.42, 3: 0.43, 4: 0.50, 5: 0.55, 6: 0.57}
 BED_BASE_SMALL = {1: 0.24, 2: 0.40}          # plots up to 6 marla (compact layout: the porch and drawing room take the front row)
+# a corridor takes floor area the rows layout gives to rooms, so corridor and wing plans have their own baselines
+# (medians of the balanced plans of tools/gen_tree.py): bigger bedrooms means bigger than that layout usually has
+BED_BASE_FAMILY = {"corridor": {2: 0.25, 3: 0.30}, "wing": {2: 0.36, 3: 0.40, 4: 0.40, 5: 0.40, 6: 0.42}}
+
+
+def family(plan, rects):
+    """Layout family read from the geometry: a corridor at least 12 ft long with two or more bedrooms opening along it is
+    a bedroom wing, any other long corridor a side corridor, no corridor rows of rooms (compact on plots up to 6 marla).
+    Rows-of-rooms plans are always rows / compact. Same as family in js/bands.js."""
+    W, D = plan["plot"]["w"], plan["plot"]["d"]
+    plain = "compact" if W * D / MARLA <= 6 else "rows"
+    if "tree" not in plan: return plain
+    rooms = [r for r in rects if "parent" not in r]
+    halls = [r for r in rooms if r["t"] == "passage" and max(r["w"], r["d"]) >= 12]
+    if not halls: return plain
+    along = 0
+    for b in rooms:
+        if b["t"] not in BEDS: continue
+        walls = [_shared(b, h) for h in halls]
+        along += any(s and s[3] - s[2] >= 3 for s in walls)
+    return "wing" if along >= 2 else "corridor"
 
 
 def rule_for(W, D):
@@ -377,7 +398,8 @@ def check_rects(plan, rects, beds=None, out=None, errs=0):
         built = sum(r["w"] * r["d"] for r in mains)
         share = lambda ts: sum(r["w"] * r["d"] for r in mains if r["t"] in ts) / built
         f = plan["focus"]
-        base = BED_BASE_SMALL if W * D / MARLA <= 6 else BED_BASE
+        fam = family(plan, rects)
+        base = BED_BASE_FAMILY.get(fam) or (BED_BASE_SMALL if fam == "compact" else BED_BASE)
         got, need = ((share({"bed", "master"}), base.get(nb, 0.57) + 0.04) if f == "bedrooms"
                      else (share({"lounge"}), 0.20) if f == "lounge" else (share({"kitchen"}), 0.10))
         add("ok" if got >= need else "warn", "bigger " + f, f"{got:.0%} of built area, wanted {need:.0%}")
@@ -447,7 +469,7 @@ def _small_once(W, D, beds, rng, baths, focus):
     depth = D - front_d - rule["rear"]                               # the most the rooms can take
     three = depth >= 31 and (beds == 2 or rng.random() < 0.5)
     if beds == 2 and not three: return None
-    porch = W >= 27 or (W >= 24 and rng.random() < (0.7 if three else 0.35))
+    porch = W >= 27 or (W >= 24 and rng.random() < (0.55 if three else 0.35))   # without one the kitchen can take the front
     if three:
         opts = (["porch"] if porch and beds == 2 else []) + (["back"] if beds == 1 or W >= 29 else []) + (["front"] if not porch and beds == 2 else [])
     else:
@@ -597,7 +619,10 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
     s = rule["side"]
     Bw = W - 2 * s
     rear = max(rule["rear"], -(-(D - rule["front"] - rule["cover"] / 100 * W * D / Bw) * 2 // 1) / 2)   # more yard if over the coverage limit
-    max_built = 46 if focus in ("bedrooms", "lounge") else 42        # real plans: rooms 13-15 ft deep, so houses are about 40 ft deep
+    # real plans: rooms 13-15 ft deep, so houses are about 40 ft deep; kanal houses have bigger rooms (drawing rooms and
+    # lounges 18-20 ft deep) and are 50-60 ft deep, instead of leaving a 30-50 ft empty back yard
+    m_ = W * D / MARLA
+    max_built = (42 if m_ <= 14 else 50 if m_ <= 22 else 56) + (4 if focus in ("bedrooms", "lounge") else 0)
     rear = max(rear, D - rule["front"] - max_built)                   # spare length becomes a back yard
     Bd = D - rule["front"] - rear
     narrow = Bw < 26

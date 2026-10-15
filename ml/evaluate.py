@@ -44,11 +44,13 @@ def run(model, prompts, samples, temperature, top_k, train_set, bs=256):
                 valid = not any(c[0] == "err" for c in cs)
                 bath_ok = not any(c[1] == "bath count" for c in cs)
                 focus_ok = not any(c[1].startswith("bigger ") and c[0] != "ok" for c in cs) and not any(c[1] == "focus value" for c in cs)
+                family = tree.family_of(plan, rects)
             except Exception:
-                nb, valid, bath_ok, focus_ok = -1, False, False, False
+                nb, valid, bath_ok, focus_ok, family = -1, False, False, False, None
             group.append(dict(text=text, reward=r, parse=parse, valid=valid, bed_ok=nb == want, bath_ok=bath_ok, focus_ok=focus_ok, perfect=r == 1.0,
                               copied=(p, text) in train_set, failed=failed, grid=grid_of(p + "\n" + text) if valid else None,
-                              shape=skeleton(p + "\n" + text) if valid else None))
+                              shape=skeleton(p + "\n" + text) if valid else None,
+                              asked=L.asked_style(p), family=family if valid else None))
         res.append(group)
     return res
 
@@ -120,6 +122,11 @@ def summarize(res, prompts, name):
     out["diversity"] = sum(dists) / len(dists) if dists else None
     out["arrangements/N"] = sum(shapes) / len(shapes) if shapes else None
     out["arrangements_total"] = len({g["shape"] for g in flat if g.get("shape")})
+    # requests that name a layout family (STYLE): share of their valid plans that have it, overall and per family
+    asked = [g for g in flat if g.get("asked") and g["valid"]]
+    out["style_followed%"] = 100 * sum(g["family"] == g["asked"] for g in asked) / len(asked) if asked else None
+    out["style_followed_by_family"] = {f: round(100 * sum(g["family"] == f for g in asked if g["asked"] == f) / sum(g["asked"] == f for g in asked), 1)
+                                       for f in sorted({g["asked"] for g in asked})}
     fails = Counter(f for g in flat for f in g["failed"])
     out["top_failures"] = fails.most_common(5)
     by = defaultdict(list)

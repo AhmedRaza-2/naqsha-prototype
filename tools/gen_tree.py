@@ -88,7 +88,7 @@ def corridor(W, D, beds, rng, baths, focus):
     rule, s, front, Bw, Bd, rear = f
     if not (18 <= Bw <= 29): return None
     u = rng.uniform
-    c = round(u(4, 5) * 2) / 2                              # corridor width
+    c = round(u(4.5, 5) * 2) / 2                            # corridor width (the lobby in it needs 4.5 ft)
     cw = Bw - c                                             # rooms column
     back = round(u(12, 14) + (1.5 if focus == "bedrooms" else 0), 1)
     upper = Bd - back
@@ -116,17 +116,35 @@ def corridor(W, D, beds, rng, baths, focus):
 def wing(W, D, beds, rng, baths, focus):
     f = frame(W, D, rng, focus)
     if not f or not (2 <= beds <= 5): return None
-    rule, s, front, Bw, Bd, rear = f
+    rule, s, front, Bw, Bd_max, rear = f
     if Bw < 29: return None
     u = rng.uniform
-    c = round(u(4, 5) * 2) / 2
+    r5 = lambda v: round(v * 2) / 2
+    c = r5(u(4.5, 5.5))                                    # corridor width (the lobby in it needs 4.5 ft)
     avail = Bw - c
-    pw_ = avail * u(0.5, 0.58) * ({"bedrooms": 0.9, "lounge": 1.08, "kitchen": 1.04}.get(focus, 1.0))
-    pw_ = round(min(max(pw_, 12.5), avail - 11) * 2) / 2   # public wing width; the bedroom wing keeps at least 11 ft
+    pw_ = avail * u(0.5, 0.58) * {"bedrooms": 0.8, "lounge": 1.08, "kitchen": 1.04}.get(focus, 1.0)
+    pw_ = r5(min(max(pw_, 12.5, avail - 22), avail - 11))  # public wing width; the bedroom wing is 11-22 ft wide
     bw_ = avail - pw_                                      # private wing width
-    if not (12.5 <= pw_ <= 26 and 11 <= bw_ <= 20): return None
-    bd = Bd / beds
-    if not (11 <= bd <= 17): return None
+    if not (12.5 <= pw_ <= 30 and 11 <= bw_ <= 22): return None
+    # private wing, front to back: rooms a big house adds near the entrance (stairs, study, store), then the bedrooms.
+    # Bedrooms 13-16 ft deep (deeper for bigger bedrooms) leave the outer wall a window beside the washroom corner.
+    lo, hi = (14.5, 17) if focus == "bedrooms" else (13, 15.5)
+    bdep = [r5(u(lo, hi)) for _ in range(beds)]
+    if sum(bdep) > Bd_max:                                 # tight plot: share what there is
+        bdep = split(Bd_max, [1.0] * beds)
+        if min(bdep) < 13: return None
+    room = Bd_max - sum(bdep)
+    extras = []
+    for t, a, b in rng.sample([("stairs", 8, 10), ("study", 10, 13), ("store", 6, 8)], 3):
+        if room < a + 4 or focus == "bedrooms" or (room < 20 and rng.random() < 0.25): continue   # else back yard or bedrooms
+        d_ = r5(u(a, min(b, room)))
+        extras.append((t, d_)); room -= d_
+    if room > 4:                                           # spare depth makes the bedrooms bigger, up to 17-18 ft
+        for k in range(beds):
+            add = min(room, (18 if focus == "bedrooms" else 17) - bdep[k]); bdep[k] += add; room -= add
+    Bd = Bd_max - r5(room)                                 # the rest is back yard (more of it on deep plots)
+    rear += Bd_max - Bd
+    if Bd < 30: return None
     guest, common = baths >= beds + 1, baths >= beds + 2
     # public wing, front to back: drawing, lounge, (dining), kitchen
     use_dining = Bd >= 50 and rng.random() < 0.6
@@ -144,16 +162,17 @@ def wing(W, D, beds, rng, baths, focus):
         if n == "lounge" and common: bath = [5, min(6.5, d - 3), "L"]
         pub.append(R(n, bath))
     public = H(depths[:-1], pub)
-    lob = round(u(6, 9) * 2) / 2
+    lob = r5(u(6, 9))
     passage = H([lob], [R("lobby"), R("passage")])
-    bdepths = split(Bd, [1.0] * beds)
     big = rng.randrange(beds)
-    beds_ = []
-    for i, d in enumerate(bdepths):
-        r = R("master" if i == big else "bed")
-        r["bath"] = bed_bath(bw_, d, "R", rng)
-        beds_.append(r)
-    private = H(bdepths[:-1], beds_)
+    priv = [R(t) for t, _ in extras]
+    for k in range(beds):
+        r = R("master" if k == big else "bed")
+        r["bath"] = bed_bath(bw_, bdep[k], "R", rng)
+        r["bath"][1] = min(r["bath"][1], bdep[k] - 5.5)     # the washroom is on the outer wall: leave a window beside it
+        priv.append(r)
+    sizes = [d_ for _, d_ in extras] + bdep
+    private = H(sizes[:-1], priv)
     core = V([pw_, c], [public, passage, private])
     return wrap(W, D, beds, baths, focus, rule, s, front, Bw, Bd, rear, core, pw_ + c / 2, rng)
 

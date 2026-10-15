@@ -1,6 +1,7 @@
 """Stage B - reinforcement learning with the rule checker as the reward (group-relative policy gradient, GRPO-style).
 
-For each training prompt the model samples G plans; each plan is scored by the validator (tools/bands.py).
+For each training prompt the model samples G plans; each plan is scored by the validator (tools/bands.py), and when the
+prompt names a layout family (STYLE) a plan of another family gets only --style-miss of its score (layoutlm.reward_styled).
 Plans better than their group's average get their tokens pushed up, worse ones pushed down; a KL penalty to the
 frozen Stage-A model keeps the output realistic.
 
@@ -52,6 +53,8 @@ def main():
     ap.add_argument("--beta", type=float, default=0.02, help="KL weight")
     ap.add_argument("--temp", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--style-miss", type=float, default=0.5, help="share of the score kept by a plan of another family than the STYLE asked for (1 = ignore STYLE)")
+    ap.add_argument("--styled", type=float, default=0.6, help="share of RL prompts that name a layout family")
     a = ap.parse_args()
     random.seed(a.seed); torch.manual_seed(a.seed)
     import multiprocessing as mp
@@ -65,14 +68,18 @@ def main():
     for p in ref.parameters(): p.requires_grad_(False)
     opt = torch.optim.AdamW(pol.parameters(), lr=a.lr, weight_decay=0.0)
     prompts_all = sorted({json.loads(l)["prompt"] for l in open(f"{a.data}/train.jsonl", encoding="utf-8")})
+    styled = [p for p in prompts_all if L.asked_style(p)]
+    plain = [p for p in prompts_all if not L.asked_style(p)]
     hist = []
     for step in range(1, a.steps + 1):
         t0 = time.time()
-        ps = [p for p in random.sample(prompts_all, a.prompts) for _ in range(a.group)]
+        n_st = round(a.prompts * a.styled) if styled and plain else (a.prompts if styled else 0)
+        ps = [p for p in random.sample(styled, n_st) + random.sample(plain, a.prompts - n_st) for _ in range(a.group)]
         pol.eval()
         comps = pol.sample(ps, temperature=a.temp)
         t_s = time.time()
-        scored = pool.starmap(L.reward, zip(ps, comps), chunksize=8) if pool else [L.reward(p, c) for p, c in zip(ps, comps)]
+        args_ = [(p, c, a.style_miss) for p, c in zip(ps, comps)]
+        scored = pool.starmap(L.reward_styled, args_, chunksize=8) if pool else [L.reward_styled(*x) for x in args_]
         t_score = time.time() - t_s
         rs = torch.tensor([r[0] for r in scored], device=dev).view(a.prompts, a.group)
         adv = ((rs - rs.mean(1, keepdim=True)) / (rs.std(1, keepdim=True) + 1e-4)).view(-1)
@@ -87,7 +94,9 @@ def main():
         loss.backward()
         torch.nn.utils.clip_grad_norm_(pol.parameters(), 1.0)
         opt.step()
+        fol = [r[2] for r in scored if r[2] is not None]
         h = {"step": step, "reward": rs.mean().item(), "perfect": (rs == 1).float().mean().item(), "zero": (rs == 0).float().mean().item(),
+             "style_followed": round(sum(fol) / len(fol), 3) if fol else None,
              "kl": ((kl * m).sum() / m.sum()).item(), "sec": round(time.time() - t0, 1), "score_sec": round(t_score, 2)}
         hist.append(h)
         if step % 10 == 0 or step == 1: print(h, flush=True)
@@ -99,7 +108,10 @@ def main():
         import matplotlib.pyplot as plt
         fig, ax = plt.subplots(1, 2, figsize=(9, 3))
         ax[0].plot([h["reward"] for h in hist]); ax[0].set_title("mean reward (rule score)"); ax[0].set_xlabel("RL step")
-        ax[1].plot([h["perfect"] for h in hist]); ax[1].set_title("share of perfect plans"); ax[1].set_xlabel("RL step")
+        ax[1].plot([h["perfect"] for h in hist], label="perfect plans")
+        if any(h.get("style_followed") is not None for h in hist):
+            ax[1].plot([h.get("style_followed") for h in hist], label="layout family as asked")
+        ax[1].legend(); ax[1].set_title("share of samples"); ax[1].set_xlabel("RL step")
         fig.tight_layout(); fig.savefig(out / "rl.png", dpi=120)
     except Exception as e:
         print("no plot:", e)

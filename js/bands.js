@@ -11,6 +11,21 @@ export const FOCUS_VALUES = ['balanced', 'bedrooms', 'lounge', 'kitchen'];
 // typical share of built area taken by bedrooms in balanced plans (by bedroom count); "bigger bedrooms" = 4 points above
 const BED_BASE = { 2: 0.42, 3: 0.43, 4: 0.50, 5: 0.55, 6: 0.57 };
 const BED_BASE_SMALL = { 1: 0.24, 2: 0.40 };      // plots up to 6 marla (compact layout)
+// corridor and wing plans spend floor area on the corridor, so they have their own baselines (as in tools/bands.py)
+const BED_BASE_FAMILY = { corridor: { 2: 0.25, 3: 0.30 }, wing: { 2: 0.36, 3: 0.40, 4: 0.40, 5: 0.40, 6: 0.42 } };
+
+/** Layout family read from the geometry: a corridor at least 12 ft long with two or more bedrooms opening along it is a
+ *  bedroom wing, any other long corridor a side corridor, no corridor rows of rooms (compact on plots up to 6 marla).
+ *  Rows-of-rooms plans are always rows / compact. Same as family in tools/bands.py. */
+export function family(plan, rects) {
+  const plain = (plan.plot.w * plan.plot.d) / MARLA_SQFT <= 6 ? 'compact' : 'rows';
+  if (!plan.tree) return plain;
+  const rooms = rects.filter((r) => r.parent == null);
+  const halls = rooms.filter((r) => r.t === 'passage' && Math.max(r.w, r.d) >= 12);
+  if (!halls.length) return plain;
+  const along = rooms.filter((b) => BEDS.has(b.t) && halls.some((h) => { const s = shared(b, h); return s && s[3] - s[2] >= 3; })).length;
+  return along >= 2 ? 'wing' : 'corridor';
+}
 
 // ---------------------------------------------------------------- text form
 const ROOM = /^([a-z]+)(?: ([\d.]+))?(?: \+bath ([\d.]+)x([\d.]+) ([LR]))?$/;
@@ -312,7 +327,8 @@ export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
     const built = mains.reduce((s, r) => s + r.w * r.d, 0);
     const share = (ts) => mains.filter((r) => ts.includes(r.t)).reduce((s, r) => s + r.w * r.d, 0) / built;
     const f = plan.focus;
-    const base = (W * D) / MARLA <= 6 ? BED_BASE_SMALL : BED_BASE;
+    const fam = family(plan, rects);
+    const base = BED_BASE_FAMILY[fam] || (fam === 'compact' ? BED_BASE_SMALL : BED_BASE);
     const [got, need] = f === 'bedrooms' ? [share(['bed', 'master']), (base[nb] ?? 0.57) + 0.04]
       : f === 'lounge' ? [share(['lounge']), 0.20] : [share(['kitchen']), 0.10];
     add(got >= need ? 'ok' : 'warn', `bigger ${f}`, `${Math.round(got * 100)}% of built area, wanted ${Math.round(need * 100)}%`);

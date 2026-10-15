@@ -184,6 +184,26 @@ def reward(prompt, completion_ids):
     return bands.score(cs), bands.failed(cs)
 
 
+def asked_style(prompt):
+    m = re.search(r" STYLE ([a-z]+)", prompt)
+    return m[1] if m else None
+
+
+def reward_styled(prompt, completion_ids, miss=0.5):
+    """RL reward: the rule score, scaled by `miss` when the prompt names a layout family (STYLE) and the plan has another
+    one (read from its geometry, tree.family_of). The checker alone rewards falling back to rows, the easiest family to
+    get right, so v11 drew a bedroom wing for only 38% of the wing requests. Returns (reward, failed, followed or None)."""
+    try:
+        plan, cs, rects, _ = parse_plan(ids_to_plan_text(prompt, completion_ids))
+    except Exception:
+        return 0.0, ["unparseable"], None
+    r, failed = bands.score(cs), bands.failed(cs)
+    want = asked_style(prompt)
+    if want is None or r == 0: return r, failed, None
+    followed = tree.family_of(plan, rects) == want
+    return (r if followed else r * miss), failed + ([] if followed else ["style"]), followed
+
+
 def device():
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
