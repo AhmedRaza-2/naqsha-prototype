@@ -1,8 +1,8 @@
-# Kaggle: real-plan fine-tuning (v10)
+# Kaggle: reading the real plans (v10 onwards)
 
-One notebook does everything: a vision-language model reads the real plan images on both GPUs, the readings become a
-real-plan dataset, our transformer (trained on synthetic plans) is fine-tuned on it, RL keeps it within the rules, and
-both synthetic and real held-out plans are evaluated.
+A vision-language model reads the real plan images on both GPUs and the readings become the real-plan dataset
+(data/real). tools/build_v11.py turns it into data/real11, which the training run (ml/run_v12.sh, see ml/KAGGLE.md)
+mixes into fine-tuning and uses for the real-plan evaluation.
 
 1. Upload `kaggle_upload/naqsha-real-v10` as a new dataset named **naqsha-real-v10** (140 MB: code, 721 plan images,
    9 hand-transcribed gold plans, the v9 synthetic set). Optional: put `rl_v9_model.pt` in that folder before
@@ -20,8 +20,7 @@ for d in ("ml", "tools", "real", "data"):
     shutil.copytree(f"{SRC}/{d}", f"/kaggle/working/{d}", dirs_exist_ok=True)
 !sed -i 's/\r$//' ml/*.sh real/*.sh
 !bash real/run_extract.sh 400          # reads 400 plans, ~1.5-2 h on 2 x T4
-!bash real/run_finetune.sh v10 300     # fine-tune + RL + evaluation, ~25 min
-from IPython.display import FileLink; display(FileLink("rl_v10_model.pt"))
+from IPython.display import FileLink; display(FileLink("data/real/report.json"))
 ```
 
 4. Because reading takes a while, run it with **Save Version → Save & Run All (Commit)** so it keeps going when the

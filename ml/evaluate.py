@@ -159,7 +159,7 @@ def baseline(prompts, seed=0):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", nargs="+", required=True)
-    ap.add_argument("--data", default="data/synth")
+    ap.add_argument("--data", default="data/pk12")
     ap.add_argument("--n", type=int, default=300, help="number of test prompts")
     ap.add_argument("--samples", type=int, default=4)
     ap.add_argument("--temp", type=float, default=0.8)

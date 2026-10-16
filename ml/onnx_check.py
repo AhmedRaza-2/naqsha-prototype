@@ -45,7 +45,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--onnx", default="models/layout.onnx")
     ap.add_argument("--n", type=int, default=200)
-    ap.add_argument("--data", default="data/synth")
+    ap.add_argument("--data", default="data/pk12")
     a = ap.parse_args()
     sess = ort.InferenceSession(a.onnx, providers=["CPUExecutionProvider"])
     test = [json.loads(l) for l in open(f"{a.data}/test.jsonl", encoding="utf-8")]

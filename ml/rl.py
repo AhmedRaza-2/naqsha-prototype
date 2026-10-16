@@ -43,7 +43,7 @@ def token_logprobs(model, prompts, comps):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--init", required=True)
-    ap.add_argument("--data", default="data/synth")
+    ap.add_argument("--data", default="data/pk12")
     ap.add_argument("--out", default="runs/rl")
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--prompts", type=int, default=32, help="prompts per step")

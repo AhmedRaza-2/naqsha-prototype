@@ -79,7 +79,7 @@ def evaluate(model, data, amp, bs=512):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default="data/synth")
+    ap.add_argument("--data", default="data/pk12")
     ap.add_argument("--out", default="runs/sft")
     ap.add_argument("--epochs", type=int, default=16)
     ap.add_argument("--bs", type=int, default=256, help="global batch size (split across GPUs)")

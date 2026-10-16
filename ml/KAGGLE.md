@@ -1,39 +1,29 @@
-# Running the training on Kaggle (free GPU)
+# Training on Kaggle (2 x T4, about 35 minutes)
 
-## 1. Upload the code and data as one Kaggle Dataset
-Make a folder `naqsha-ml` containing exactly this structure and upload it (kaggle.com -> Datasets -> New Dataset):
+1. Build the package locally: `python tools/build_v12.py --workers 10` writes `data/pk12`; zip `ml/`, `tools/bands.py`,
+   `tools/tree.py`, `tools/gen_tree.py`, `data/pk12`, `data/world11` and `data/real11` (the last upload was
+   `kaggle_upload/naqsha-v12.zip`, 2.8 MB) and upload it as a Kaggle dataset.
+2. New notebook, add the dataset, **Settings -> Accelerator: GPU T4 x2** (internet not needed). One cell:
 
-```
-naqsha-ml/
-  tools/bands.py
-  ml/layoutlm.py  ml/train.py  ml/rl.py  ml/evaluate.py
-  data/synth/train.jsonl  data/synth/val.jsonl  data/synth/test.jsonl
-```
-
-## 2. New Notebook -> add the dataset -> Settings: Accelerator = GPU T4 x1, Internet off is fine
-
-```python
+```bash
 %cd /kaggle/working
-!cp -r /kaggle/input/naqsha-ml/* .
-
-# Stage A: supervised training (about 10-15 min on a T4)
-!python ml/train.py --epochs 15 --mirror --out runs/sft
-
-# Stage B: reinforcement learning with the rule checker as reward
-!python ml/rl.py --init runs/sft/model.pt --out runs/rl --steps 300
-
-# Evaluation on plot sizes never seen in training: baseline vs Stage A vs Stage A+B
-!python ml/evaluate.py --ckpt runs/sft/model.pt runs/rl/model.pt --n 300 --samples 4 --out runs/eval.json
+!F=$(find /kaggle/input -name run_v12.sh | head -1); SRC=$(dirname $(dirname $F)); echo "files from: $SRC"; cp -r $SRC/ml $SRC/tools $SRC/data .
+!ls data
+!bash ml/run_v12.sh v12 15 10 500
 ```
 
-Download `runs/` (model.pt, history.json, loss.png, rl.png, eval.json) from the notebook Output tab.
-The loss curves and the evaluation table are the figures for the report.
+The script ([run_v12.sh](run_v12.sh)) uses both GPUs at once:
+pretraining on world plans (GPU 0) || the no-pretraining ablation (GPU 1), then fine-tuning on the Pakistani plans with
+world and real plans mixed in, then RL with the rule checker and the layout-family reward (GPU 0) || evaluation of the
+supervised models (GPU 1), then evaluation of the RL model and the real-plan comparison.
 
-## Experiments to run for the report (each is one command)
-| Experiment | Command change |
-|---|---|
-| Model size | `--d 128 --layers 4` vs `--d 256 --layers 6` vs `--d 384 --layers 8` |
-| Mirror augmentation on/off | with and without `--mirror` |
-| Sampling temperature | `evaluate.py --temp 0.5 / 0.8 / 1.0` |
-| Best-of-N vs single sample | compare `best@N` and `mean_score` in the evaluation output |
-| With vs without RL | the two checkpoints in the evaluation command above |
+3. Download `rl_v12_model.pt` and `runs_v12.zip` from the Output panel (or `from IPython.display import FileLink;
+   display(FileLink('rl_v12_model.pt'))`). Locally: `python ml/export_onnx.py --ckpt runs/rl_v12_model.pt --out
+   runs/v12/layout`, then `python ml/coverage_styles.py --onnx runs/v12/layout.onnx` for the planner-style sweep.
+
+## What the printed tables mean
+- Held-out requests (plot sizes never trained on): valid%, perfect% (every rule check passed), focus_ok% (bigger
+  rooms where asked), diversity (share of the plot that differs between two plans for the same request) and
+  style_followed% (plans with the layout family the request named).
+- Real Pakistani plans (gold, never trained on): gold_ppl (lower = the model finds real plans more likely), valid% and
+  size_gap% (room sizes against the real plans).

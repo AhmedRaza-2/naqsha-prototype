@@ -82,7 +82,7 @@ def realism(model, data, samples, temp=0.8):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", nargs="+", required=True)
-    ap.add_argument("--real", default="data/real")
+    ap.add_argument("--real", default="data/real11")
     ap.add_argument("--samples", type=int, default=4)
     ap.add_argument("--out", default="runs/eval_real.json")
     a = ap.parse_args()
