@@ -36,7 +36,7 @@ def read(path, limit=None, mirror=False):
     ex = [e for e, k in zip(ex, keep) if k]
     if mirror:                                              # augmentation: left-right mirrored copy of every plan
         for r in rows:
-            ex.append(L.make_example(r["prompt"], L.mirror_text(r["prompt"], r["completion"])))
+            ex.append(L.make_example(*L.mirror_example(r["prompt"], r["completion"])))
     return ex
 
 

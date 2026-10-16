@@ -37,11 +37,48 @@ def to_text(node):
     return f"{node['k']} {sizes} " + " ".join(f"[{to_text(c)}]" for c in node["kids"])
 
 
+def header(plan):
+    """The request line. A first floor names the ground floor's built box and its stairs (inside the box), which the
+    first floor must keep: PLOT 35x65 FLOOR 1 BOX 3 12 29 43 UP 0 0 8 12.5 BEDS 3 BATHS 3. The ground floor of a
+    two-storey house says STOREYS 2 (it must have stairs)."""
+    W, D = plan["plot"]["w"], plan["plot"]["d"]
+    s = f"PLOT {_fmt(W)}x{_fmt(D)}"
+    if plan.get("floor"):
+        b, u = plan["box"], plan["up"]
+        s += " FLOOR 1 BOX " + " ".join(_fmt(b[k]) for k in "xywd") + " UP " + " ".join(_fmt(u[k]) for k in "xywd")
+    s += f" BEDS {plan['beds']}"
+    if plan.get("baths") is not None: s += f" BATHS {plan['baths']}"
+    if plan.get("focus"): s += f" FOCUS {plan['focus']}"
+    if plan.get("storeys"): s += f" STOREYS {plan['storeys']}"
+    if plan.get("style"): s += f" STYLE {plan['style']}"
+    if plan.get("src"): s += f" SRC {plan['src']}"
+    return s
+
+
 def serialize(plan):
-    head = bands.prompt_for(plan["plot"]["w"], plan["plot"]["d"], plan["beds"], plan.get("baths"), plan.get("focus"))
-    if plan.get("style"): head += f" STYLE {plan['style']}"
-    if plan.get("src"): head += f" SRC {plan['src']}"
-    return head + "\n" + to_text(plan["tree"])
+    return header(plan) + "\n" + to_text(unwrap(plan) if plan.get("floor") else plan["tree"])
+
+
+# ---------------------------------------------------------------- first floors
+def wrap(W, D, box, local):
+    """A first floor is written inside the ground floor's built box; for geometry, checks and the editor it is placed
+    on the plot with open air (void) around the box."""
+    def cut(k, before, size, total, kid):
+        after = round(total - before - size, 2)
+        sizes, kids = [], []
+        if before > 0.01: sizes.append(before); kids.append({"k": "room", "t": "void"})
+        kids.append(kid)
+        if after > 0.01: sizes.append(size); kids.append({"k": "room", "t": "void"})
+        return kid if len(kids) == 1 else {"k": k, "sizes": sizes, "kids": kids}
+    return cut("H", box["y"], box["d"], D, cut("V", box["x"], box["w"], W, local))
+
+
+def unwrap(plan):
+    """The box-local tree of a first floor (inverse of wrap)."""
+    W, D, b, t = plan["plot"]["w"], plan["plot"]["d"], plan["box"], plan["tree"]
+    if b["y"] > 0.01 or D - b["y"] - b["d"] > 0.01: t = t["kids"][1 if b["y"] > 0.01 else 0]
+    if b["x"] > 0.01 or W - b["x"] - b["w"] > 0.01: t = t["kids"][1 if b["x"] > 0.01 else 0]
+    return t
 
 
 def _parse_node(toks, i):
@@ -71,19 +108,31 @@ def _parse_node(toks, i):
     raise ValueError(f"unexpected token {t!r}")
 
 
+_N = r"(\d+(?:\.\d+)?)"
+_HEAD = re.compile(rf"^PLOT {_N}x{_N}(?: FLOOR 1 BOX {_N} {_N} {_N} {_N} UP {_N} {_N} {_N} {_N})? BEDS (\d+)(?: BATHS (\d+))?"
+                   r"(?: FOCUS ([a-z]+))?(?: STOREYS (\d))?(?: STYLE ([a-z]+))?(?: SRC ([a-z]+))?$")
+
+
 def parse(text):
-    """Text -> plan {plot, beds, baths, focus, tree}. Raises ValueError on malformed text."""
+    """Text -> plan {plot, beds, baths, focus, tree} (+ floor, box, up for a first floor; storeys). Raises ValueError."""
     lines = text.strip().split("\n", 1)
-    m = re.match(r"^PLOT ([\d.]+)x([\d.]+) BEDS (\d+)(?: BATHS (\d+))?(?: FOCUS ([a-z]+))?(?: STYLE ([a-z]+))?(?: SRC ([a-z]+))?$", lines[0].strip())
+    m = _HEAD.match(lines[0].strip())
     if not m or len(lines) < 2: raise ValueError("bad header")
     toks = _TOK.findall(lines[1])
     tree, i = _parse_node(toks, 0)
     if i != len(toks): raise ValueError("trailing tokens")
-    plan = {"plot": {"w": float(m[1]), "d": float(m[2])}, "beds": int(m[3]), "tree": tree}
-    if m[4] is not None: plan["baths"] = int(m[4])
-    if m[5] is not None: plan["focus"] = m[5]
-    if m[6] is not None: plan["style"] = m[6]
-    if m[7] is not None: plan["src"] = m[7]
+    W, D = float(m[1]), float(m[2])
+    plan = {"plot": {"w": W, "d": D}, "beds": int(m[11]), "tree": tree}
+    if m[3] is not None:
+        box = dict(zip("xywd", map(float, m.groups()[2:6])))
+        up = dict(zip("xywd", map(float, m.groups()[6:10])))
+        if box["w"] <= 0 or box["d"] <= 0 or box["x"] + box["w"] > W + 0.01 or box["y"] + box["d"] > D + 0.01: raise ValueError("box outside the plot")
+        plan.update(floor=1, box=box, up=up, tree=wrap(W, D, box, tree))
+    if m[12] is not None: plan["baths"] = int(m[12])
+    if m[13] is not None: plan["focus"] = m[13]
+    if m[14] is not None: plan["storeys"] = int(m[14])
+    if m[15] is not None: plan["style"] = m[15]
+    if m[16] is not None: plan["src"] = m[16]
     return plan
 
 
@@ -156,6 +205,7 @@ def check(plan, beds=None):
     if errs: return out
     rects = to_rects(plan)
     if any(r.get("own") and r["parent"] < 0 for r in rects): add("err", "bath fit", "washroom next to no room"); errs += 1
+    if plan.get("floor"): return bands.check_upper(plan, rects, beds, out, errs)
     return bands.check_rects(plan, rects, beds, out, errs)
 
 
@@ -193,6 +243,10 @@ def mirror(plan):
         else:
             for k in node["kids"]: go(k, w)
     go(p["tree"], p["plot"]["w"])
+    if p.get("floor"):                                    # the box and the stairs move with the plan
+        b, u = p["box"], p["up"]
+        b["x"] = round(p["plot"]["w"] - b["x"] - b["w"], 2)
+        u["x"] = round(b["w"] - u["x"] - u["w"], 2)
     return p
 
 

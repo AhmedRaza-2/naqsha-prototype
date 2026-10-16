@@ -3,7 +3,7 @@
 // H stacks its parts from the road to the back, V places them left to right; every cut lists the sizes of all parts
 // but the last, which takes what is left. A leaf is a room (optionally `+bath WxD L|R`); a `bath` leaf is a washroom of
 // its own and belongs to the neighbouring room it shares the longest wall with (a bedroom if there is one).
-import { OPEN, BEDS, MARLA_SQFT, FOCUS_VALUES, checkRects, shared, family, score, parse as parseRows, check as checkRows, toRects as rowsToRects } from './bands.js';
+import { OPEN, BEDS, MARLA_SQFT, FOCUS_VALUES, checkRects, checkUpper, shared, family, score, parse as parseRows, check as checkRows, toRects as rowsToRects } from './bands.js';
 
 const LEAF_TYPES = new Set([...OPEN, ...BEDS, 'bath', 'kitchen', 'lounge', 'drawing', 'dining', 'stairs', 'store', 'lobby', 'passage', 'prayer', 'study', 'servant', 'dress', 'other']);
 const TOK = /\[|\]|\+bath|[A-Za-z_]+|\d+(?:\.\d+)?x\d+(?:\.\d+)?|\d+(?:\.\d+)?/g;
@@ -16,13 +16,50 @@ export function toText(node) {
   return `${node.k} ${node.sizes.map(fmt).join(' ')} ${node.kids.map((c) => `[${toText(c)}]`).join(' ')}`;
 }
 
-export function serialize(plan) {
-  let head = `PLOT ${fmt(plan.plot.w)}x${fmt(plan.plot.d)} BEDS ${plan.beds}`;
+/** The request line. A first floor names the ground floor's built box and its stairs (inside the box), which it must
+ *  keep: PLOT 35x65 FLOOR 1 BOX 3 12 29 43 UP 0 0 8 12.5 BEDS 3 BATHS 3. The ground floor of a two-storey house says
+ *  STOREYS 2 (it must have stairs). Same as header in tools/tree.py. */
+export function header(plan) {
+  let head = `PLOT ${fmt(plan.plot.w)}x${fmt(plan.plot.d)}`;
+  if (plan.floor) {
+    const b = plan.box, u = plan.up;
+    head += ` FLOOR 1 BOX ${[b.x, b.y, b.w, b.d].map(fmt).join(' ')} UP ${[u.x, u.y, u.w, u.d].map(fmt).join(' ')}`;
+  }
+  head += ` BEDS ${plan.beds}`;
   if (plan.baths != null) head += ` BATHS ${plan.baths}`;
   if (plan.focus) head += ` FOCUS ${plan.focus}`;
+  if (plan.storeys) head += ` STOREYS ${plan.storeys}`;
   if (plan.style) head += ` STYLE ${plan.style}`;
   if (plan.src) head += ` SRC ${plan.src}`;
-  return `${head}\n${toText(plan.tree)}`;
+  return head;
+}
+
+export function serialize(plan) {
+  return `${header(plan)}\n${toText(plan.floor ? unwrap(plan) : plan.tree)}`;
+}
+
+// ---------------------------------------------------------------- first floors
+/** A first floor is written inside the ground floor's built box; for geometry, checks and the editor it is placed on the
+ *  plot with open air (void) around the box. Same as wrap in tools/tree.py. */
+export function wrap(W, D, box, local) {
+  const cut = (k, before, size, total, kid) => {
+    const after = Math.round((total - before - size) * 100) / 100;
+    const sizes = [], kids = [];
+    if (before > 0.01) { sizes.push(before); kids.push({ k: 'room', t: 'void' }); }
+    kids.push(kid);
+    if (after > 0.01) { sizes.push(size); kids.push({ k: 'room', t: 'void' }); }
+    return kids.length === 1 ? kid : { k, sizes, kids };
+  };
+  return cut('H', box.y, box.d, D, cut('V', box.x, box.w, W, local));
+}
+
+/** The box-local tree of a first floor (inverse of wrap). */
+export function unwrap(plan) {
+  const { w: W, d: D } = plan.plot, b = plan.box;
+  let t = plan.tree;
+  if (b.y > 0.01 || D - b.y - b.d > 0.01) t = t.kids[b.y > 0.01 ? 1 : 0];
+  if (b.x > 0.01 || W - b.x - b.w > 0.01) t = t.kids[b.x > 0.01 ? 1 : 0];
+  return t;
 }
 
 function parseNode(toks, i) {
@@ -55,20 +92,35 @@ function parseNode(toks, i) {
   throw new Error(`unexpected token ${t}`);
 }
 
-/** Text -> plan { plot, beds, baths, focus, style, src, tree }. Throws on malformed text. */
+const N = String.raw`(\d+(?:\.\d+)?)`;
+const HEAD = new RegExp(String.raw`^PLOT ${N}x${N}(?: FLOOR 1 BOX ${N} ${N} ${N} ${N} UP ${N} ${N} ${N} ${N})? BEDS (\d+)(?: BATHS (\d+))?`
+  + String.raw`(?: FOCUS ([a-z]+))?(?: STOREYS (\d))?(?: STYLE ([a-z]+))?(?: SRC ([a-z]+))?$`);
+
+/** Text -> plan { plot, beds, baths, focus, storeys, style, src, tree } (+ floor, box, up for a first floor). Throws on
+ *  malformed text. */
 export function parse(text) {
   const nl = text.indexOf('\n');
   const head = (nl < 0 ? text : text.slice(0, nl)).trim();
-  const m = head.match(/^PLOT ([\d.]+)x([\d.]+) BEDS (\d+)(?: BATHS (\d+))?(?: FOCUS ([a-z]+))?(?: STYLE ([a-z]+))?(?: SRC ([a-z]+))?$/);
+  const m = head.match(HEAD);
   if (!m || nl < 0) throw new Error('bad header');
   const toks = text.slice(nl + 1).match(TOK) || [];
   const [tree, i] = parseNode(toks, 0);
   if (i !== toks.length) throw new Error('trailing tokens');
-  const plan = { plot: { w: parseFloat(m[1]), d: parseFloat(m[2]) }, beds: parseInt(m[3], 10), tree };
-  if (m[4] !== undefined) plan.baths = parseInt(m[4], 10);
-  if (m[5] !== undefined) plan.focus = m[5];
-  if (m[6] !== undefined) plan.style = m[6];
-  if (m[7] !== undefined) plan.src = m[7];
+  const W = parseFloat(m[1]), D = parseFloat(m[2]);
+  const plan = { plot: { w: W, d: D }, beds: parseInt(m[11], 10), tree };
+  if (m[3] !== undefined) {
+    const [bx, by, bw, bd, ux, uy, uw, ud] = m.slice(3, 11).map(parseFloat);
+    if (bw <= 0 || bd <= 0 || bx + bw > W + 0.01 || by + bd > D + 0.01) throw new Error('box outside the plot');
+    plan.floor = 1;
+    plan.box = { x: bx, y: by, w: bw, d: bd };
+    plan.up = { x: ux, y: uy, w: uw, d: ud };
+    plan.tree = wrap(W, D, plan.box, tree);
+  }
+  if (m[12] !== undefined) plan.baths = parseInt(m[12], 10);
+  if (m[13] !== undefined) plan.focus = m[13];
+  if (m[14] !== undefined) plan.storeys = parseInt(m[14], 10);
+  if (m[15] !== undefined) plan.style = m[15];
+  if (m[16] !== undefined) plan.src = m[16];
   return plan;
 }
 
@@ -141,6 +193,7 @@ export function check(plan, beds = plan.beds) {
   if (errs) return out;
   const rects = toRects(plan);
   if (rects.some((r) => r.own && r.parent < 0)) { add('err', 'bath fit', 'washroom next to no room'); errs++; }
+  if (plan.floor) return checkUpper(plan, rects, beds, out, errs);
   return checkRects(plan, rects, beds, out, errs);
 }
 

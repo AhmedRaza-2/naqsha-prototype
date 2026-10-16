@@ -2,7 +2,7 @@
 // scores a plan exactly like the training pipeline did (verified against Python in tools/verify_js_port.py).
 import { ruleFor, MARLA } from './layout.js';
 
-export const OPEN = new Set(['lawn', 'void', 'porch', 'courtyard', 'garage', 'balcony']);
+export const OPEN = new Set(['lawn', 'void', 'porch', 'courtyard', 'garage', 'balcony', 'terrace']);   // terrace: open roof of a lower floor
 export const BEDS = new Set(['bed', 'master']);
 export const MARLA_SQFT = 225;
 const TYPES = new Set([...OPEN, ...BEDS, 'bath', 'kitchen', 'lounge', 'drawing', 'dining', 'stairs', 'store', 'lobby', 'passage', 'prayer', 'study', 'servant', 'dress', 'other']);
@@ -263,6 +263,8 @@ export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
   for (const r of rects) if (r.parent === undefined) count[r.t] = (count[r.t] || 0) + 1;
   const nb = (count.bed || 0) + (count.master || 0);
   for (const need of ['kitchen', 'drawing']) if (!count[need]) { add('err', `missing ${need}`); errs++; }   // a lobby is optional
+  if ((plan.storeys || 1) >= 2 && !count.stairs) { add('err', 'stairs', 'a two-storey house needs stairs'); errs++; }
+  if (count.terrace) { add('err', 'terrace', 'a terrace is the open roof of a lower floor'); errs++; }
   if (beds != null && nb !== beds) { add('err', 'bed count', `asked for ${beds}, plan has ${nb}`); errs++; }
   const nbath = rects.filter((r) => r.parent !== undefined).length;
   if (plan.baths != null && nbath !== plan.baths) { add('err', 'bath count', `asked for ${plan.baths}, plan has ${nbath}`); errs++; }
@@ -333,6 +335,64 @@ export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
       : f === 'lounge' ? [share(['lounge']), 0.20] : [share(['kitchen']), 0.10];
     add(got >= need ? 'ok' : 'warn', `bigger ${f}`, `${Math.round(got * 100)}% of built area, wanted ${Math.round(need * 100)}%`);
   }
+  return out;
+}
+
+const UPPER_NOT = ['drawing', 'porch', 'garage', 'lawn', 'courtyard'];   // rooms that belong on the ground floor
+
+/** Rule checks for a first floor (plan.box, plan.up: the ground floor's built box and its stairs, in the box): same as
+ *  check_upper in tools/bands.py. */
+export function checkUpper(plan, rects, beds = plan.beds, out = [], errs = 0) {
+  const add = (level, name, detail = '') => out.push({ level, name, detail });
+  const count = {};
+  for (const r of rects) if (r.parent === undefined) count[r.t] = (count[r.t] || 0) + 1;
+  const nb = (count.bed || 0) + (count.master || 0);
+  if (beds != null && nb !== beds) { add('err', 'bed count', `asked for ${beds}, plan has ${nb}`); errs++; }
+  const nbath = rects.filter((r) => r.parent !== undefined).length;
+  if (plan.baths != null && nbath !== plan.baths) { add('err', 'bath count', `asked for ${plan.baths}, plan has ${nbath}`); errs++; }
+  const b = plan.box, u = plan.up;
+  const sx = b.x + u.x, sy = b.y + u.y;
+  const onTop = rects.filter((r) => r.t === 'stairs' && Math.abs(r.x - sx) < 0.01 && Math.abs(r.y - sy) < 0.01
+    && Math.abs(r.w - u.w) < 0.01 && Math.abs(r.d - u.d) < 0.01);
+  if (!onTop.length) { add('err', 'stairs above stairs', `no stairs at ${u.x},${u.y} (${u.w}x${u.d}) in the box`); errs++; }
+  const bad = UPPER_NOT.filter((t) => count[t]);
+  if (bad.length) { add('err', 'ground-floor rooms', bad.join(',')); errs++; }
+  if (errs) return out;
+
+  const mains = rects.filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
+  const small = [];
+  for (const r of mains) {
+    if (MINSZ[r.t]) {
+      const net = r.w * r.d - (r.bath ? r.bath[0] * r.bath[1] : 0);
+      if (net < MINSZ[r.t][0] || Math.min(r.w, r.d) < MINSZ[r.t][1]) small.push(r.t);
+    }
+  }
+  add(small.length ? 'warn' : 'ok', 'min room sizes', small.join(','));
+  const nobath = mains.filter((r) => BEDS.has(r.t) && !r.bath && !r.ensuite).map((r) => r.t);
+  add(nobath.length ? 'warn' : 'ok', 'attached baths', `${nobath.length} bedroom(s) without`);
+  const byi = new Map(rects.map((r) => [r.i, r]));
+  const lk = links(rects, mains, Math.min(...mains.map((r) => r.y)));
+  const adj = new Map();
+  for (const [p, q] of lk) {
+    if (!adj.has(p)) adj.set(p, []);
+    if (!adj.has(q)) adj.set(q, []);
+    adj.get(p).push(q); adj.get(q).push(p);
+  }
+  const start = onTop[0].i;
+  const seen = new Set([start]);
+  const q = [start];
+  while (q.length) {
+    const n = q.pop();
+    for (const m of adj.get(n) || []) if (!seen.has(m)) { seen.add(m); q.push(m); }
+  }
+  const lost = rects.filter((r) => !OPEN.has(r.t) && !seen.has(r.i)).map((r) => r.t);
+  add(lost.length ? 'warn' : 'ok', 'every room reachable from the stairs', lost.join(','));
+  const isBed = (i) => BEDS.has(byi.get(i).t) || (byi.get(i).t === 'bath' && BEDS.has(byi.get(byi.get(i).parent).t));
+  const kitIds = new Set(mains.filter((r) => r.t === 'kitchen').map((k) => k.i));
+  const bk = lk.some(([p, c]) => (kitIds.has(p) && isBed(c)) || (kitIds.has(c) && isBed(p)));
+  add(bk ? 'warn' : 'ok', 'bedroom not opening into kitchen');
+  const dark = mains.filter((r) => BEDS.has(r.t) && !hasWindow(r, rects)).map((r) => r.t);
+  add(dark.length ? 'warn' : 'ok', 'natural light', dark.join(','));
   return out;
 }
 

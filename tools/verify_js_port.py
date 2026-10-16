@@ -42,6 +42,22 @@ for src, k in (("data/pk11/test.jsonl", 300), ("data/world11/val.jsonl", 150), (
     if not (ROOT / src).exists(): continue
     rows = [json.loads(l) for l in open(ROOT / src, encoding="utf-8")]
     trees += [r["prompt"] + "\n" + r["completion"] for r in rng.sample(rows, min(k, len(rows)))]
+# two-storey houses: ground floors with STOREYS 2, first floors (FLOOR 1 BOX .. UP ..), and broken first floors
+if (ROOT / "data/pk13/test.jsonl").exists():
+    rows = [json.loads(l) for l in open(ROOT / "data/pk13/test.jsonl", encoding="utf-8")]
+    two = [r["prompt"] + "\n" + r["completion"] for r in rows if "STOREYS" in r["prompt"] or "FLOOR" in r["prompt"]]
+    picked = rng.sample(two, min(400, len(two)))
+    trees += picked
+    for t in rng.sample([t for t in picked if "FLOOR" in t], 60):
+        head, body = t.split("\n", 1)
+        mode = rng.choice(["stairs", "drawing", "terrace", "beds"])
+        if mode == "stairs": head = head.replace(" UP ", " UP 1", 1)          # the stairs moved: not above the ground floor's
+        elif mode == "drawing": body = body.replace("[bed", "[drawing", 1)
+        elif mode == "terrace": body = body.replace("[lounge", "[terrace", 1)
+        else: head = head.replace(" BEDS ", " BEDS 1", 1)
+        trees.append(head + "\n" + body)
+    for t in rng.sample([t for t in picked if "STOREYS" in t], 20):
+        trees.append(t.replace("[stairs]", "[store]"))
 for t in rng.sample(trees, min(80, len(trees))):
     head, body = t.split("\n", 1)
     mode = rng.choice(["size", "type", "bracket", "bath"])

@@ -18,11 +18,14 @@ import tree  # noqa: E402  (slicing-tree plan language, same checker)
 
 # ---------------------------------------------------------------- tokenizer
 NUMS = [f"{v / 2:g}" for v in range(1, 301)]                       # 0.5 .. 150 on the 0.5 ft grid
-WORDS = ["PLOT", "BEDS", "BATHS", "FOCUS", "rest", "bath", "L", "R", "balanced", "bedrooms"] + sorted(bands.TYPES - {"bath"})
+NEW_TYPES = {"terrace"}                                            # room types added after v12: their tokens are in EXTRA2
+WORDS = ["PLOT", "BEDS", "BATHS", "FOCUS", "rest", "bath", "L", "R", "balanced", "bedrooms"] + sorted(bands.TYPES - {"bath"} - NEW_TYPES)
 PUNCT = ["\n", ":", "|", "+", "x"]
 # added for slicing trees and prompt tags; appended at the end so the ids of older models stay the same
 EXTRA = ["[", "]", "H", "V", "STYLE", "SRC", "rows", "compact", "corridor", "wing", "world", "pk"]
-VOCAB = ["<pad>", "<bos>", "<eos>"] + PUNCT + WORDS + NUMS + EXTRA
+# added for two-storey houses (v13): "0" for box and stairs positions on the box edge, the first-floor request and terrace
+EXTRA2 = ["0", "FLOOR", "BOX", "UP", "STOREYS", "terrace"]
+VOCAB = ["<pad>", "<bos>", "<eos>"] + PUNCT + WORDS + NUMS + EXTRA + EXTRA2
 STOI = {t: i for i, t in enumerate(VOCAB)}
 PAD, BOS, EOS, NL = STOI["<pad>"], STOI["<bos>"], STOI["<eos>"], STOI["\n"]
 
@@ -170,9 +173,15 @@ def parse_plan(text):
 
 def mirror_text(prompt, completion):
     """Left-right mirrored completion text, for either plan language."""
+    return mirror_example(prompt, completion)[1]
+
+
+def mirror_example(prompt, completion):
+    """Left-right mirrored (prompt, completion). The prompt changes only for a first floor: its box and stairs move."""
     text = prompt + "\n" + completion
     mod = tree if is_tree(text) else bands
-    return mod.serialize(mod.mirror(mod.parse(text))).split("\n", 1)[1]
+    p2, c2 = mod.serialize(mod.mirror(mod.parse(text))).split("\n", 1)
+    return (p2 if " FLOOR " in prompt else prompt), c2
 
 
 def reward(prompt, completion_ids):

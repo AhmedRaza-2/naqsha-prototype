@@ -82,7 +82,7 @@ def bed_bath(w, d, side, rng):
     return [4.5 if w < 11.5 else rng.choice([5, 5.5]), min(rng.choice([7, 7.5, 8]), d - 3), side]
 
 
-def corridor(W, D, beds, rng, baths, focus):
+def corridor(W, D, beds, rng, baths, focus, stairs=False):
     f = frame(W, D, rng, focus)
     if not f or beds != 2: return None
     rule, s, front, Bw, Bd, rear = f
@@ -101,7 +101,12 @@ def corridor(W, D, beds, rng, baths, focus):
     guest, common = baths >= beds + 1, baths >= beds + 2
     drawing = R("drawing", [4.5, min(6.5, dd - 3), "L"] if guest else None)
     lounge = R("lounge", [5, min(6.5, ld - 3), "L"] if common else None)
-    rooms_col = H([dd, kd], [drawing, R("kitchen"), lounge])
+    kitchen = R("kitchen")
+    if stairs:                                              # a two-storey house: stairs beside the kitchen, off the corridor
+        sw = round(u(4, 4.5) * 2) / 2
+        if cw - sw < 7: return None
+        kitchen = V([cw - sw], [kitchen, R("stairs")])
+    rooms_col = H([dd, kd], [drawing, kitchen, lounge])
     pass_col = H([lob], [R("lobby"), R("passage")])
     top = V([cw], [rooms_col, pass_col])                               # corridor on the right (mirrored half the time)
     a = round(u(0.45, 0.55) * Bw * 2) / 2                              # back row: bed under the lounge | bed at the corridor end
@@ -113,7 +118,7 @@ def corridor(W, D, beds, rng, baths, focus):
     return wrap(W, D, beds, baths, focus, rule, s, front, Bw, Bd, rear, core, cw + c / 2, rng)
 
 
-def wing(W, D, beds, rng, baths, focus):
+def wing(W, D, beds, rng, baths, focus, stairs=False):
     f = frame(W, D, rng, focus)
     if not f or not (2 <= beds <= 5): return None
     rule, s, front, Bw, Bd_max, rear = f
@@ -135,8 +140,12 @@ def wing(W, D, beds, rng, baths, focus):
         if min(bdep) < 13: return None
     room = Bd_max - sum(bdep)
     extras = []
-    for t, a, b in rng.sample([("stairs", 8, 10), ("study", 10, 13), ("store", 6, 8)], 3):
-        if room < a + 4 or focus == "bedrooms" or (room < 20 and rng.random() < 0.25): continue   # else back yard or bedrooms
+    order = rng.sample([("stairs", 8, 10), ("study", 10, 13), ("store", 6, 8)], 3)
+    if stairs: order.sort(key=lambda e: e[0] != "stairs")  # a two-storey house: the stairs first
+    for t, a, b in order:
+        if t == "stairs" and stairs:
+            if room < a: return None
+        elif room < a + 4 or focus == "bedrooms" or (room < 20 and rng.random() < 0.25): continue   # else back yard or bedrooms
         d_ = r5(u(a, min(b, room)))
         extras.append((t, d_)); room -= d_
     if room > 4:                                           # spare depth makes the bedrooms bigger, up to 17-18 ft
@@ -177,10 +186,10 @@ def wing(W, D, beds, rng, baths, focus):
     return wrap(W, D, beds, baths, focus, rule, s, front, Bw, Bd, rear, core, pw_ + c / 2, rng)
 
 
-def generate(W, D, beds, rng, baths=None, focus="balanced", family=None):
+def generate(W, D, beds, rng, baths=None, focus="balanced", family=None, stairs=False):
     baths = beds + 1 if baths is None else baths
     fam = family or rng.choice(FAMILIES)
-    return {"corridor": corridor, "wing": wing}[fam](W, D, beds, rng, baths, focus)
+    return {"corridor": corridor, "wing": wing}[fam](W, D, beds, rng, baths, focus, stairs)
 
 
 def _probe():

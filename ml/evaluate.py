@@ -135,6 +135,12 @@ def summarize(res, prompts, name):
         marla = W * D / 225
         by["<=6 marla" if marla <= 6 else "6-14 marla" if marla <= 14 else ">14 marla"] += [g["reward"] for g in grp]
     out["score_by_size"] = {k: round(sum(v) / len(v), 3) for k, v in by.items()}
+    # single-storey plans, ground floors of two-storey houses (STOREYS 2) and first floors (FLOOR 1)
+    kinds = defaultdict(list)
+    for p, grp in zip(prompts, res):
+        kinds["first floor" if " FLOOR " in p else "two-storey ground" if " STOREYS " in p else "single storey"] += grp
+    out["by_floor"] = {k: {"plans": len(v), "valid%": round(100 * sum(g["valid"] for g in v) / len(v), 1),
+                           "perfect%": round(100 * sum(g["perfect"] for g in v) / len(v), 1)} for k, v in sorted(kinds.items())}
     return out
 
 
@@ -170,7 +176,8 @@ def main():
     random.Random(0).shuffle(test)
     prompts = list(dict.fromkeys(r["prompt"] for r in test))[: a.n]      # test rows are already shuffled: a random sample of requests
     train_set = {(r["prompt"], r["completion"]) for r in map(json.loads, open(f"{a.data}/train.jsonl", encoding="utf-8"))}
-    rows = [summarize(baseline(prompts), prompts, "rule-based generator (1 try)")]
+    ground = [p for p in prompts if " FLOOR " not in p]                 # the rule-based generator draws ground floors only
+    rows = [summarize(baseline(ground), ground, "rule-based generator (1 try, ground floors)")]
     for c in a.ckpt:
         res = run(L.load(c), prompts, a.samples, a.temp, a.top_k, train_set)
         rows.append(summarize(res, prompts, c))

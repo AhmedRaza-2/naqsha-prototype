@@ -24,7 +24,7 @@ from collections import Counter
 from pathlib import Path
 
 MARLA = 225
-OPEN = {"lawn", "void", "porch", "courtyard", "garage", "balcony"}      # unbuilt / not enclosed
+OPEN = {"lawn", "void", "porch", "courtyard", "garage", "balcony", "terrace"}      # unbuilt / not enclosed (terrace: open roof of a lower floor)
 BEDS = {"bed", "master"}
 TYPES = OPEN | BEDS | {"bath", "kitchen", "lounge", "drawing", "dining", "stairs", "store", "lobby", "passage",
                        "prayer", "study", "servant", "dress", "other"}
@@ -340,6 +340,8 @@ def check_rects(plan, rects, beds=None, out=None, errs=0):
     nb = types["bed"] + types["master"]
     for need in ("kitchen", "drawing"):                                 # a lobby is optional: real houses are often entered from the porch
         if not types[need]: add("err", f"missing {need}"); errs += 1
+    if (plan.get("storeys") or 1) >= 2 and not types["stairs"]: add("err", "stairs", "a two-storey house needs stairs"); errs += 1
+    if types["terrace"]: add("err", "terrace", "a terrace is the open roof of a lower floor"); errs += 1
     if beds is not None and nb != beds: add("err", "bed count", f"asked for {beds}, plan has {nb}"); errs += 1
     nbath = sum(1 for r in rects if "parent" in r)
     if plan.get("baths") is not None and nbath != plan["baths"]: add("err", "bath count", f"asked for {plan['baths']}, plan has {nbath}"); errs += 1
@@ -406,6 +408,63 @@ def check_rects(plan, rects, beds=None, out=None, errs=0):
     return out
 
 
+UPPER_NOT = ("drawing", "porch", "garage", "lawn", "courtyard")          # rooms that belong on the ground floor
+
+
+def check_upper(plan, rects, beds=None, out=None, errs=0):
+    """Rule checks for a first floor (plan has box and up: the ground floor's built box and its stairs, in the box).
+    Broken: wrong bedroom or washroom count, no stairs exactly above the ground floor's stairs, ground-floor rooms
+    (drawing room, porch, lawn). Rules: room sizes, attached washrooms, every room reachable from the stairs,
+    bedrooms with a window, no bedroom opening into a kitchen. Same as checkUpper in js/bands.js."""
+    out = [] if out is None else out
+    add = lambda lvl, n, d="": out.append((lvl, n, d))
+    beds = beds if beds is not None else plan.get("beds")
+    types = Counter(r["t"] for r in rects if "parent" not in r)
+    nb = types["bed"] + types["master"]
+    if beds is not None and nb != beds: add("err", "bed count", f"asked for {beds}, plan has {nb}"); errs += 1
+    nbath = sum(1 for r in rects if "parent" in r)
+    if plan.get("baths") is not None and nbath != plan["baths"]: add("err", "bath count", f"asked for {plan['baths']}, plan has {nbath}"); errs += 1
+    b, u = plan["box"], plan["up"]
+    sx, sy = b["x"] + u["x"], b["y"] + u["y"]
+    on_top = [r for r in rects if r["t"] == "stairs" and abs(r["x"] - sx) < 0.01 and abs(r["y"] - sy) < 0.01
+              and abs(r["w"] - u["w"]) < 0.01 and abs(r["d"] - u["d"]) < 0.01]
+    if not on_top: add("err", "stairs above stairs", f"no stairs at {u['x']:g},{u['y']:g} ({u['w']:g}x{u['d']:g}) in the box"); errs += 1
+    bad = [t for t in UPPER_NOT if types[t]]
+    if bad: add("err", "ground-floor rooms", ",".join(bad)); errs += 1
+    if errs:
+        return out
+
+    mains = [r for r in rects if r["t"] not in OPEN and r["t"] != "bath"]
+    small = []
+    for r in mains:
+        if r["t"] in MINSZ:
+            net = r["w"] * r["d"] - (r["bath"][0] * r["bath"][1] if r["bath"] else 0)
+            if net < MINSZ[r["t"]][0] or min(r["w"], r["d"]) < MINSZ[r["t"]][1]: small.append(r["t"])
+    add("warn" if small else "ok", "min room sizes", ",".join(small))
+    nobath = [r["t"] for r in mains if r["t"] in BEDS and not r["bath"] and not r.get("ensuite")]
+    add("warn" if nobath else "ok", "attached baths", f"{len(nobath)} bedroom(s) without")
+    byi = {r["i"]: r for r in rects}
+    links = _links(rects, mains, min(r["y"] for r in mains))
+    adj = {}
+    for x, y in links:
+        adj.setdefault(x, []).append(y); adj.setdefault(y, []).append(x)
+    start = on_top[0]["i"]
+    seen, q = {start}, [start]
+    while q:
+        n = q.pop()
+        for m in adj.get(n, []):
+            if m not in seen: seen.add(m); q.append(m)
+    lost = [r["t"] for r in rects if r["t"] not in OPEN and r["i"] not in seen]
+    add("warn" if lost else "ok", "every room reachable from the stairs", ",".join(lost))
+    is_bed = lambda i: byi[i]["t"] in BEDS or (byi[i]["t"] == "bath" and byi[byi[i]["parent"]]["t"] in BEDS)
+    kit = {r["i"] for r in mains if r["t"] == "kitchen"}
+    bk = any((a in kit and is_bed(c)) or (c in kit and is_bed(a)) for a, c in links)
+    add("warn" if bk else "ok", "bedroom not opening into kitchen")
+    dark = [r["t"] for r in mains if r["t"] in BEDS and not _has_window(r, rects)]
+    add("warn" if dark else "ok", "natural light", ",".join(dark))
+    return out
+
+
 def score(checks):
     """Reward in [0,1]: 0 if broken, else fraction of rule checks passed."""
     if any(c[0] == "err" for c in checks): return 0.0
@@ -441,7 +500,7 @@ def _grid(rng, lo, hi):
     return None if b < a else rng.randint(a, b) / 2
 
 
-def generate_small(W, D, beds, rng, baths=None, focus="balanced", tries=40):
+def generate_small(W, D, beds, rng, baths=None, focus="balanced", tries=40, stairs=False):
     """Compact layout for plots up to 6 marla, modelled on real 3-6 marla houses (for example Zameen's 25x50 plans: an
     11x15 garage beside a 12x12 drawing room, a 20x11 lounge with the stairs, 11x14 bedrooms with 5x8 baths, a 7x14
     kitchen and a 4-5 ft back yard). The car porch sits beside the drawing room in the front row and is the front open
@@ -452,12 +511,12 @@ def generate_small(W, D, beds, rng, baths=None, focus="balanced", tries=40):
     if baths is None: baths = beds + 1
     if not (beds <= baths <= beds + 2): return None
     for _ in range(tries):
-        plan = _small_once(W, D, beds, rng, baths, focus)
+        plan = _small_once(W, D, beds, rng, baths, focus, stairs)
         if plan: return plan
     return None
 
 
-def _small_once(W, D, beds, rng, baths, focus):
+def _small_once(W, D, beds, rng, baths, focus, stairs=False):
     rule = rule_for(W, D)
     u = rng.uniform
     pick = lambda lo, hi: _grid(rng, lo, hi)
@@ -488,7 +547,7 @@ def _small_once(W, D, beds, rng, baths, focus):
         if kf is None: return None
     lob0 = pw + kf
     dw = W - lob0 - lw
-    sf = pick(3.5, 4) if dw > 15.5 or (dw >= 14 and rng.random() < 0.4) else 0.0     # stair hall beside the entrance
+    sf = pick(3.5, 4) if dw > 15.5 or (dw >= 14 and rng.random() < 0.4) or (stairs and dw >= 12.5) else 0.0     # stair hall beside the entrance
     dw -= sf
     if not (9 <= dw <= 16): return None
     front = ([{"t": "porch", "w": pw}] if porch else []) + ([{"t": "kitchen", "w": kf}] if kf else []) + [{"t": "lobby", "w": lw}] \
@@ -523,7 +582,7 @@ def _small_once(W, D, beds, rng, baths, focus):
             km = pick(7, min(pw, (8 if focus == "lounge" else 9.5 + kx), lob0 + lw - 3.5))
             if km is None: return None
             mid.append({"t": "kitchen", "w": km})
-        sw = pick(3.5, 4) if W >= 24 and not sf and focus != "lounge" and rng.random() < 0.6 else 0.0   # stairs rising from the lounge
+        sw = pick(3.5, 4) if not sf and ((W >= 24 and focus != "lounge" and rng.random() < 0.6) or stairs) else 0.0   # stairs rising from the lounge
         lounge_w = W - km - sw
         mid.append({"t": "lounge", "w": lounge_w})
         if sw: mid.append({"t": "stairs", "w": sw})
@@ -607,14 +666,14 @@ def _small_once(W, D, beds, rng, baths, focus):
     return mirror(plan) if rng.random() < 0.5 else plan
 
 
-def generate(W, D, beds, rng, baths=None, focus="balanced"):
+def generate(W, D, beds, rng, baths=None, focus="balanced", stairs=False):
     """One randomised Pakistani-style layout: lawn / front band (drawing, lobby, guest beds) / middle band
     (kitchen, dining, lounge) / back band (bedrooms) / rear setback. Mirrors js/layout.js with jitter.
     baths = total washrooms (bedrooms + 0..2: attached to every bedroom, plus a guest bath, plus a common bath off the
     lounge). focus = which rooms get more of the built area (balanced / bedrooms / lounge / kitchen).
     Plots up to 6 marla use the compact layout (generate_small)."""
     if W * D / MARLA <= 6:
-        return generate_small(W, D, beds, rng, baths, focus)
+        return generate_small(W, D, beds, rng, baths, focus, stairs=stairs)
     rule = rule_for(W, D)
     s = rule["side"]
     Bw = W - 2 * s
@@ -647,7 +706,10 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
     lob = {"k": "lobby", "fixed": lobby_w}
     avail = Bw - lobby_w - extra * 10.5                                   # width left for the drawing room
     stairs_w = round(min(9.5, avail - u(14.5, 16.5)) * 2) / 2 if (not narrow and avail > 18.5) else 0
-    if stairs_w >= 6:                                                      # stair hall: real drawing rooms are about 12-16 ft wide
+    if stairs and stairs_w < 6:                                            # a two-storey house on a narrow plot: a straight
+        sw_ = round(u(3.5, 4.5) * 2) / 2                                   # flight beside the entrance lobby
+        stairs_w = sw_ if avail - sw_ >= 11 else 0
+    if stairs_w >= 6 or (stairs and stairs_w):                             # stair hall: real drawing rooms are about 12-16 ft wide
         lob = {"k": "entry", "fixed": lobby_w + stairs_w}                  # lobby and stairs are placed together below
     else:
         stairs_w = 0
@@ -691,17 +753,19 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
         if abs(sum(ws) - Bw) > 0.01 or min(ws) < 8.5 or ws[-1] < need_r: return None
         return [{"t": t, "w": w} for t, w in zip(names, ws)]
 
-    # middle band
+    # middle band (a two-storey house without a stair hall in front gets a straight flight beside the lounge)
+    mid_stairs = stairs and not stairs_w
+    msw = round(u(3.5, 4.5) * 2) / 2
     court = s == 0 or rng.random() < 0.2     # light well: the only window source for the kitchen on plots with no side yards
     for _ in range(60):
-        mid = ["kitchen", "dining", "lounge"] + (["courtyard"] if court else [])
+        mid = ["kitchen", "dining", "lounge"] + (["courtyard"] if court else []) + (["stairs"] if mid_stairs else [])
         rng.shuffle(mid)
         if narrow or rng.random() < 0.28: mid.remove("dining")
         kw, lw = (u(0.30, 0.40), u(0.40, 0.50)) if focus == "kitchen" else (u(0.20, 0.26), u(0.52, 0.62)) if focus == "lounge" else (u(0.24, 0.32), u(0.42, 0.54))
         wts = {"kitchen": kw, "dining": u(0.26, 0.34), "lounge": lw} if "dining" in mid else {"kitchen": min(kw + 0.08, 0.46) if focus != "lounge" else u(0.26, 0.32), "lounge": u(0.62, 0.72) if focus != "kitchen" else u(0.54, 0.62)}
         wts["courtyard"] = 0.0
         cw = round(u(4, 5.5) * 2) / 2
-        mw = _split(Bw, [{"fixed": cw} if t == "courtyard" else {"wt": wts[t]} for t in mid])
+        mw = _split(Bw, [{"fixed": cw} if t == "courtyard" else {"fixed": msw} if t == "stairs" else {"wt": wts[t]} for t in mid])
         pairs = list(zip(mid, mw))
         ext = lambda seq: next((i for i, (t, _) in enumerate(seq) if t in ("lounge", "dining")), len(seq))
         li, ri = ext(pairs), ext(pairs[::-1])
@@ -722,6 +786,9 @@ def generate(W, D, beds, rng, baths=None, focus="balanced"):
             if not any(min(be + r["w"], hi) - max(be, lo) >= 3.2 for lo, hi in spans): ok_beds = False
             be += r["w"]
         ok_dine = "dining" not in pos_ or abs(pos_["dining"] - pos_["lounge"]) == 1
+        if "stairs" in pos_:                     # stairs rise from the lounge, and do not cut the kitchen off from it
+            ok_dine = ok_dine and abs(pos_["stairs"] - pos_["lounge"]) == 1 and any(
+                abs(pos_["kitchen"] - pos_[t]) == 1 for t in ("lounge", "dining") if t in pos_)
         k_i = pos_["kitchen"]
         ok_kit = (court and abs(k_i - pos_["courtyard"]) == 1) or (s > 0 and k_i in (0, len(mid) - 1))
         if ok_lobby and ok_dine and ok_kit and ok_beds: break
