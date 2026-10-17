@@ -1,0 +1,12 @@
+{"id": "ee6c93d29cc1909e", "image": "images/ee6c93d29cc1909e.jpg",
+ "note": "about 44.5x68 from the overall dimensions (plot not printed): porch and drawing at the front, spiral stair in a double-height stair hall with powder room, dining, big lounge and kitchen with service kitchen, master with dress-bath and second bedroom at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [44.5, 68],
+   "rows": [[{"t": "porch", "w": 21, "d": 15}, {"t": "drawing", "w": 21.5, "d": 12.5}],
+            [{"t": "void", "w": 5.5, "d": 13}, {"t": "stairs", "w": 9, "d": 12}, {"t": "lobby", "w": 16, "d": 12}, {"t": "dining", "w": 13, "d": 14.5}],
+            [{"t": "void", "w": 5.5, "d": 21}, {"t": "lounge", "w": 19, "d": 21}, {"t": "kitchen", "w": 17.5, "d": 16.5}],
+            [{"t": "void", "w": 5.5, "d": 18}, {"t": "master", "w": 19, "d": 18}, {"t": "bed", "w": 17.5, "d": 20}]],
+   "baths": [{"row": 2, "col": 3, "w": 4.5, "d": 7, "side": "L"},
+             {"row": 4, "col": 2, "w": 14, "d": 7.5, "side": "R"},
+             {"row": 4, "col": 3, "w": 8.5, "d": 8, "side": "R"}]},
+ "first_floor": null}

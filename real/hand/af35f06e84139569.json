@@ -1,0 +1,12 @@
+{"id": "af35f06e84139569", "image": "images/af35f06e84139569.jpg",
+ "note": "1 kanal 50x90 (4500 sq ft plot, 3dfrontelevation.co): driveway and front lawn, two-car porch beside drawing room, entrance lobby with curved stairs and powder room, dining, lounge with open kitchen (store and wet kitchen behind), two bedrooms at the back, 5 ft side passages and back courtyard",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 90],
+   "rows": [[{"t": "void", "w": 22, "d": 12.5}, {"t": "lawn", "w": 28, "d": 12.5}],
+            [{"t": "porch", "w": 22, "d": 19}, {"t": "drawing", "w": 21.5, "d": 15}, {"t": "void", "w": 6.5, "d": 15}],
+            [{"t": "lawn", "w": 6, "d": 11}, {"t": "stairs", "w": 7, "d": 11}, {"t": "lobby", "w": 16, "d": 11}, {"t": "dining", "w": 15, "d": 11}, {"t": "void", "w": 6, "d": 11}],
+            [{"t": "lawn", "w": 8, "d": 16}, {"t": "lounge", "w": 20, "d": 16}, {"t": "kitchen", "w": 16, "d": 16}, {"t": "void", "w": 6, "d": 16}],
+            [{"t": "void", "w": 6, "d": 23}, {"t": "bed", "w": 16, "d": 23}, {"t": "lobby", "w": 7, "d": 23}, {"t": "master", "w": 15, "d": 23}, {"t": "void", "w": 6, "d": 23}],
+            [{"t": "courtyard", "w": 50, "d": 5}]],
+   "baths": [{"row": 3, "col": 3, "w": 6.5, "d": 6.5, "side": "L"}, {"row": 5, "col": 2, "w": 7, "d": 8, "side": "L"}, {"row": 5, "col": 4, "w": 9, "d": 8, "side": "L"}]},
+ "first_floor": null}

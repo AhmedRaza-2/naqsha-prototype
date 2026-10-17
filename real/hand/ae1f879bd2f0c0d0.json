@@ -1,0 +1,8 @@
+{"id": "ae1f879bd2f0c0d0", "image": "images/ae1f879bd2f0c0d0.jpg",
+ "note": "35x25 corner plot (Ali House Plan), road along the 35 ft front: bedroom and living at the front, small entrance beside dining, two bedrooms with attached baths behind, stairs with toilet, kitchen at the back right",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [35, 25],
+   "rows": [[{"t": "bed", "w": 12.5, "d": 11.75}, {"t": "lounge", "w": 12.5, "d": 11.75}, {"t": "dining", "w": 10, "d": 8.5}],
+            [{"t": "bed", "w": 18.5, "d": 11}, {"t": "stairs", "w": 7.5, "d": 11}, {"t": "kitchen", "w": 9, "d": 11}]],
+   "baths": [{"row": 1, "col": 1, "w": 6, "d": 5.5, "side": "L"}, {"row": 2, "col": 1, "w": 6, "d": 5.5, "side": "L"}, {"row": 2, "col": 2, "w": 6.25, "d": 3.5, "side": "L"}]},
+ "first_floor": null}

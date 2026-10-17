@@ -1,0 +1,11 @@
+{"id": "efae44b970984396", "image": "images/efae44b970984396.jpg",
+ "note": "30x60 (Ideal Architect): two-car porch and 9 ft front lawn, drawing room, staircase hall, TV lounge, kitchen with common bath, two bedrooms with washrooms at the back, 3.5 ft open strips on the right and at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [30, 60],
+   "rows": [[{"t": "lawn", "w": 12.5, "d": 9}, {"t": "porch", "w": 17.5, "d": 9}],
+            [{"t": "drawing", "w": 12.5, "d": 14}, {"t": "stairs", "w": 13.5, "d": 7.5}, {"t": "void", "w": 4, "d": 7.5}],
+            [{"t": "kitchen", "w": 8.8, "d": 9.5}, {"t": "lounge", "w": 16.5, "d": 11.5}, {"t": "void", "w": 4.7, "d": 11.5}],
+            [{"t": "bed", "w": 13.5, "d": 12}, {"t": "bed", "w": 11.5, "d": 14}, {"t": "void", "w": 5, "d": 14}],
+            [{"t": "void", "w": 30, "d": 3.5}]],
+   "baths": [{"row": 3, "col": 1, "w": 4.5, "d": 6, "side": "L"}, {"row": 4, "col": 1, "w": 7, "d": 4.5, "side": "L"}, {"row": 4, "col": 2, "w": 7, "d": 4.5, "side": "R"}]},
+ "first_floor": null}

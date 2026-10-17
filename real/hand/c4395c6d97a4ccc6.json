@@ -1,0 +1,10 @@
+{"id": "c4395c6d97a4ccc6", "image": "images/c4395c6d97a4ccc6.jpg",
+ "note": "5 marla 30x40: drawing room beside a car porch with stairs, TV lounge with common bath and small light well, open kitchen with dining, two equal bedrooms with baths at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [30, 40],
+   "rows": [[{"t": "lawn", "w": 15, "d": 3}, {"t": "porch", "w": 15, "d": 3}],
+            [{"t": "drawing", "w": 15, "d": 10}, {"t": "porch", "w": 11, "d": 10}, {"t": "stairs", "w": 4, "d": 10}],
+            [{"t": "lounge", "w": 20, "d": 9}, {"t": "kitchen", "w": 10, "d": 9}],
+            [{"t": "master", "w": 15, "d": 15}, {"t": "bed", "w": 15, "d": 15}]],
+   "baths": [{"row": 3, "col": 1, "w": 6, "d": 4.5, "side": "L"}, {"row": 4, "col": 1, "w": 8, "d": 4, "side": "L"}, {"row": 4, "col": 2, "w": 8, "d": 4, "side": "R"}]},
+ "first_floor": null}

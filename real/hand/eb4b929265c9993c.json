@@ -1,0 +1,10 @@
+{"id": "eb4b929265c9993c", "image": "images/eb4b929265c9993c.jpg",
+ "note": "20x50 plot (DK HomeDesignX): parking and stairs on the right, three beds down the left side, drawing/dining and kitchen on the right, common toilet and one attached toilet",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [20, 50],
+   "rows": [[{"t": "bed", "w": 10, "d": 13.2}, {"t": "porch", "w": 6.75, "d": 19}, {"t": "stairs", "w": 3.25, "d": 15.75}],
+            [{"t": "bed", "w": 10, "d": 13}, {"t": "drawing", "w": 10, "d": 13}],
+            [{"t": "passage", "w": 10, "d": 5}, {"t": "dining", "w": 10, "d": 13}],
+            [{"t": "master", "w": 10, "d": 17}, {"t": "kitchen", "w": 10, "d": 9.6}]],
+   "baths": [{"row": 3, "col": 1, "w": 6.5, "d": 4, "side": "R"}, {"row": 4, "col": 1, "w": 6, "d": 4, "side": "L"}]},
+ "first_floor": null}

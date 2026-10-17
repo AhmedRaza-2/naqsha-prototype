@@ -1,0 +1,10 @@
+{"id": "eec391cfc00e7368", "image": "images/eec391cfc00e7368.jpg",
+ "note": "80 sq yd 20x36 (pins.pk): small porch beside stairs and open wash area, drawing room at the front, kitchen and common toilet, full-width living/dining, two bedrooms at the back",
+ "drawn": "road on the right",
+ "rooms": {"plot": [20, 36],
+   "rows": [[{"t": "store", "w": 4.5, "d": 7}, {"t": "stairs", "w": 6, "d": 7.5}, {"t": "porch", "w": 9.5, "d": 5}],
+            [{"t": "kitchen", "w": 8, "d": 8},{"t": "drawing", "w": 9, "d": 11}],
+            [{"t": "lounge", "w": 20, "d": 11}],
+            [{"t": "bed", "w": 10.5, "d": 12}, {"t": "bed", "w": 9, "d": 12}]],
+   "baths": [{"row": 3, "col": 1, "w": 4.5, "d": 7, "side": "L"}, {"row": 4, "col": 1, "w": 4, "d": 7, "side": "L"}]},
+ "first_floor": null}

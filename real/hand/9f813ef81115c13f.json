@@ -1,0 +1,12 @@
+{"id": "9f813ef81115c13f", "image": "images/9f813ef81115c13f.jpg",
+ "note": "1 kanal 50x90 Taj Residencia Islamabad (proposal 3): two-car porch and front lawn, drawing/dining/stairs down the right, living and kitchen on the left, master and second bed at the back with dress and baths, 5 ft passages both sides",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 90],
+   "rows": [[{"t": "porch", "w": 21, "d": 14}, {"t": "lawn", "w": 29, "d": 17}],
+            [{"t": "porch", "w": 21, "d": 13}, {"t": "lobby", "w": 9, "d": 19}, {"t": "drawing", "w": 15, "d": 17}, {"t": "void", "w": 5, "d": 19}],
+            [{"t": "void", "w": 5, "d": 11}, {"t": "kitchen", "w": 16, "d": 10}, {"t": "passage", "w": 9, "d": 11}, {"t": "dining", "w": 15, "d": 11}, {"t": "void", "w": 5, "d": 11}],
+            [{"t": "void", "w": 5, "d": 15}, {"t": "lawn", "w": 5, "d": 15.5}, {"t": "lounge", "w": 20, "d": 15.5}, {"t": "stairs", "w": 15, "d": 9}, {"t": "void", "w": 5, "d": 9}],
+            [{"t": "void", "w": 5, "d": 15}, {"t": "master", "w": 18, "d": 15}, {"t": "lobby", "w": 7, "d": 15}, {"t": "bed", "w": 15, "d": 15}],
+            [{"t": "void", "w": 50, "d": 15}]],
+   "baths": [{"row": 2, "col": 2, "w": 4.5, "d": 6, "side": "L"}, {"row": 5, "col": 2, "w": 8, "d": 8, "side": "R"}, {"row": 5, "col": 4, "w": 6.5, "d": 6, "side": "R"}]},
+ "first_floor": null}

@@ -1,0 +1,12 @@
+{"id": "88cb31d6deb4274a", "image": "images/88cb31d6deb4274a.jpg",
+ "note": "50x60 plot (Engr Khalil Malik): front lawn, drive way and car porch, drawing room, big TV lounge in the middle, kitchen and stairs lobby on the right, four bedrooms with washrooms and dressing, back yard",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 60],
+   "rows": [[{"t": "void", "w": 9.5, "d": 6.5}, {"t": "lawn", "w": 26.5, "d": 6.5}, {"t": "void", "w": 14, "d": 6.5}],
+            [{"t": "bed", "w": 14.5, "d": 12.25}, {"t": "passage", "w": 6, "d": 12}, {"t": "drawing", "w": 15.25, "d": 12}, {"t": "porch", "w": 13.5, "d": 12}],
+            [{"t": "courtyard", "w": 4.5, "d": 7}, {"t": "store", "w": 10, "d": 7.5}, {"t": "lounge", "w": 21, "d": 21}, {"t": "lobby", "w": 7, "d": 10}, {"t": "stairs", "w": 6.5, "d": 10}],
+            [{"t": "bed", "w": 14.5, "d": 12}, {"t": "lounge", "w": 21.5, "d": 11}, {"t": "kitchen", "w": 14, "d": 10.7}],
+            [{"t": "bed", "w": 20.5, "d": 14}, {"t": "master", "w": 23.5, "d": 14}, {"t": "void", "w": 6, "d": 14}],
+            [{"t": "void", "w": 50, "d": 5.5}]],
+   "baths": [{"row": 2, "col": 1, "w": 9, "d": 6.5, "side": "L"}, {"row": 2, "col": 2, "w": 5, "d": 6.5, "side": "L"}, {"row": 4, "col": 1, "w": 5, "d": 6, "side": "L"}, {"row": 5, "col": 1, "w": 5, "d": 8, "side": "L"}, {"row": 5, "col": 2, "w": 7.5, "d": 8.5, "side": "R"}]},
+ "first_floor": null}

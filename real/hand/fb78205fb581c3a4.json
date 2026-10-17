@@ -1,0 +1,11 @@
+{"id": "fb78205fb581c3a4", "image": "images/fb78205fb581c3a4.jpg",
+ "note": "35x65: porch on the left with the drawing room beside it, stairs and lobby with a small washroom, dining, lounge with kitchen, two bedrooms at the back with washrooms and an open court between them, 5 ft open passage along the right side",
+ "drawn": "road on the left",
+ "rooms": {"plot": [35, 65],
+   "rows": [[{"t": "porch", "w": 15, "d": 5}, {"t": "lawn", "w": 14, "d": 5}, {"t": "void", "w": 6, "d": 5}],
+            [{"t": "porch", "w": 15, "d": 11.5}, {"t": "drawing", "w": 14, "d": 16}, {"t": "void", "w": 6, "d": 16}],
+            [{"t": "stairs", "w": 8.5, "d": 10}, {"t": "lobby", "w": 6.5, "d": 14}, {"t": "dining", "w": 14, "d": 10.5}, {"t": "void", "w": 6, "d": 10.5}],
+            [{"t": "lounge", "w": 18, "d": 13.25}, {"t": "kitchen", "w": 11, "d": 11.5}, {"t": "void", "w": 6, "d": 13}],
+            [{"t": "bed", "w": 13.5, "d": 19}, {"t": "bed", "w": 15.5, "d": 19}, {"t": "void", "w": 6, "d": 19}]],
+   "baths": [{"row": 3, "col": 2, "w": 8, "d": 4, "side": "L"}, {"row": 5, "col": 1, "w": 7, "d": 6, "side": "L"}, {"row": 5, "col": 2, "w": 7, "d": 6, "side": "R"}]},
+ "first_floor": null}

@@ -1,0 +1,9 @@
+{"id": "e164967396369693", "image": "images/e164967396369693.jpg",
+ "note": "20x40 ground floor: drawing room and car porch with a narrow stair at the front, lounge with a common toilet, bedroom with attached bath at the back left, small kitchen and open light well at the back right",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [20, 40],
+   "rows": [[{"t": "drawing", "w": 10.5, "d": 13}, {"t": "porch", "w": 6, "d": 13}, {"t": "stairs", "w": 3.5, "d": 13}],
+            [{"t": "lounge", "w": 20, "d": 11.3}],
+            [{"t": "bed", "w": 12.5, "d": 14.4}, {"t": "kitchen", "w": 7.5, "d": 13}]],
+   "baths": [{"row": 2, "col": 1, "w": 4, "d": 7, "side": "R"}, {"row": 3, "col": 1, "w": 7, "d": 4, "side": "R"}]},
+ "first_floor": null}

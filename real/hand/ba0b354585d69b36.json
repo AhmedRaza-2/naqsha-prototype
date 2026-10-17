@@ -1,0 +1,12 @@
+{"id": "ba0b354585d69b36", "image": "images/ba0b354585d69b36.jpg",
+ "note": "30x60 (about 8 marla, hint said 3 marla): planter strip and drawing room on the left, car porch and entrance with stairs and PWD on the right, dining, TV lounge and kitchen, two bedrooms with baths at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [30, 60],
+   "rows": [[{"t": "lawn", "w": 16.5, "d": 6.3}, {"t": "porch", "w": 13.5, "d": 6.3}],
+            [{"t": "drawing", "w": 16.5, "d": 10.75}, {"t": "porch", "w": 13.5, "d": 10}],
+            [{"t": "dining", "w": 16.5, "d": 8}, {"t": "stairs", "w": 13.5, "d": 9}],
+            [{"t": "lounge", "w": 16.5, "d": 14.5}, {"t": "kitchen", "w": 10.5, "d": 11.5}, {"t": "void", "w": 3, "d": 14}],
+            [{"t": "bed", "w": 11, "d": 13}, {"t": "bed", "w": 14.5, "d": 15}, {"t": "void", "w": 4.5, "d": 14}],
+            [{"t": "void", "w": 30, "d": 5}]],
+   "baths": [{"row": 3, "col": 2, "w": 9.5, "d": 3.5, "side": "L"}, {"row": 5, "col": 1, "w": 6.75, "d": 5, "side": "R"}, {"row": 5, "col": 2, "w": 6.75, "d": 5, "side": "R"}]},
+ "first_floor": null}

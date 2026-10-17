@@ -48,14 +48,25 @@ export function finalize(L) {
     main = { room: r.id, wall: ['h', r.z, r.x, r.x + r.w] };
   }
   const doorWalls = new Set();
+  // a door the user dragged is remembered as a fraction along its wall (plan.doorPos), so it stays put as walls move
+  const pos = (L.plan && L.plan.doorPos) || {};
+  const place = (key, lo, hi, w) => {
+    const half = w / 2 + 0.3;
+    if (pos[key] == null || hi - lo < 2 * half) return { at: (lo + hi) / 2, key, lo, hi };
+    return { at: Math.max(lo + half, Math.min(hi - half, lo + pos[key] * (hi - lo))), key, lo, hi };
+  };
   const outDoor = (d, isMain) => {
     const [o, c, lo, hi] = d.wall;
-    openings.push({ o, c, at: (lo + hi) / 2, w: Math.min(isMain ? 3.5 : 3, hi - lo - 0.5), kind: 'door', main: isMain, sill: 0, top: isMain ? 7.2 : 7, room: d.room });
+    const w = Math.min(isMain ? 3.5 : 3, hi - lo - 0.5);
+    const pl = place(`out|${d.room}|${isMain ? 'm' : 'g'}`, lo, hi, w);
+    openings.push({ o, c, at: pl.at, span: [lo, hi], key: pl.key, w, kind: 'door', main: isMain, sill: 0, top: isMain ? 7.2 : 7, room: d.room });
     links.push(['outside', d.room]);
     doorWalls.add(`${d.room}|${o}|${c}`);
   };
-  outDoor(main, true);
-  (dOut.guests || []).forEach((g) => outDoor(g, false));
+  if (!L.upper) {                                                // a first floor has no door to the road: its way in is the stairs
+    outDoor(main, true);
+    (dOut.guests || []).forEach((g) => outDoor(g, false));
+  }
 
   const PREF = {
     lobby: ['lounge', 'dining', 'passage'],
@@ -69,7 +80,7 @@ export function finalize(L) {
       ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge', 'passage'] : ['lounge', 'dining', 'lobby', 'passage', 'drawing', 'kitchen'])
       : (PREF[r.type] || ['lounge', 'passage', 'lobby', 'dining']);
     let pick = null;
-    for (const t of prefs) {
+    for (const t of L.upper ? [...prefs, 'stairs'] : prefs) {
       for (const q of mains.filter((m) => m.type === t)) {
         const s = shared(r, q);
         if (s && s.hi - s.lo >= 3.2) { pick = { q, s }; break; }
@@ -81,14 +92,16 @@ export function finalize(L) {
     const len = s.hi - s.lo;
     const open = (r.type === 'lobby' && q.type === 'lounge') || (r.type === 'dining' && q.type === 'lounge');
     const w = open ? Math.min(6, len - 1.5) : 3;
-    openings.push({ o: s.o, c: s.c, at: (s.lo + s.hi) / 2, w, kind: open ? 'opening' : 'door', sill: 0, top: open ? 8 : 7, room: r.id, to: q.id });
+    const pl = open ? { at: (s.lo + s.hi) / 2 } : place(`${r.id}|${q.id}`, s.lo, s.hi, w);
+    openings.push({ o: s.o, c: s.c, at: pl.at, span: [s.lo, s.hi], key: pl.key, w, kind: open ? 'opening' : 'door', sill: 0, top: open ? 8 : 7, room: r.id, to: q.id });
     links.push([r.id, q.id]);
   }
   // bath doors
   for (const b of rooms.filter((r) => r.parent)) {
     const p = byId(b.parent);
     const right = b.x > p.x;
-    openings.push({ o: 'v', c: right ? b.x : b.x + b.w, at: b.z + b.d / 2, w: 2.5, kind: 'door', sill: 0, top: 7, room: b.id, to: p.id });
+    const pl = place(`${b.id}|${p.id}`, b.z, b.z + b.d, 2.5);
+    openings.push({ o: 'v', c: right ? b.x : b.x + b.w, at: pl.at, span: [b.z, b.z + b.d], key: pl.key, w: 2.5, kind: 'door', sill: 0, top: 7, room: b.id, to: p.id });
     links.push([b.id, p.id]);
   }
 

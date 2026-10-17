@@ -1,0 +1,13 @@
+{"id": "bdc91ce31c2ce319", "image": "images/bdc91ce31c2ce319.jpg",
+ "note": "40x80 (Glory Architecture; OCR hint 36x70 is wrong): 10 ft front lawn, car porch, stair hall, drawing and dining on the left, TV lounge, kitchen and store with a bed room beside the lobby, two big bedrooms with baths and dressing at the back, 10 ft rear lawn, 4 ft open-to-sky strips on the sides",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [40, 80],
+   "rows": [[{"t": "lawn", "w": 22.5, "d": 10}, {"t": "porch", "w": 17.5, "d": 15}],
+            [{"t": "drawing", "w": 14, "d": 10}, {"t": "stairs", "w": 7.75, "d": 10.5}, {"t": "porch", "w": 18.25, "d": 10.5}],
+            [{"t": "dining", "w": 14, "d": 10}, {"t": "lounge", "w": 24, "d": 11}, {"t": "void", "w": 2, "d": 11}],
+            [{"t": "void", "w": 4, "d": 12.5}, {"t": "kitchen", "w": 10.75, "d": 12.5}, {"t": "lobby", "w": 9.33, "d": 12.5}, {"t": "bed", "w": 10, "d": 17.5}, {"t": "void", "w": 5.92, "d": 12.5}],
+            [{"t": "void", "w": 4, "d": 8.25}, {"t": "store", "w": 10, "d": 8.25}, {"t": "lobby", "w": 9.33, "d": 8.25}, {"t": "void", "w": 16.67, "d": 8.25}],
+            [{"t": "void", "w": 1.5, "d": 18}, {"t": "bed", "w": 18.5, "d": 18}, {"t": "bed", "w": 18.5, "d": 18}, {"t": "void", "w": 1.5, "d": 18}],
+            [{"t": "lawn", "w": 40, "d": 10}]],
+   "baths": [{"row": 4, "col": 4, "w": 6, "d": 5.4, "side": "L"}, {"row": 6, "col": 2, "w": 6, "d": 8, "side": "L"}, {"row": 6, "col": 3, "w": 6, "d": 8, "side": "R"}]},
+ "first_floor": null}

@@ -1,0 +1,10 @@
+{"id": "e3cc7692a89f291a", "image": "images/e3cc7692a89f291a.jpg",
+ "note": "5 marla, plan dimensioned 24x45 (Urdu title says 26x50): 12x15 parking beside the drawing room, kitchen and lounge in the middle, two bedrooms with baths at the back around an open light well",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [24, 45],
+   "rows": [[{"t": "porch", "w": 12.5, "d": 15}, {"t": "drawing", "w": 11.5, "d": 14.5}],
+            [{"t": "kitchen", "w": 7.5, "d": 9}, {"t": "lounge", "w": 16.5, "d": 10}],
+            [{"t": "bed", "w": 12, "d": 13}, {"t": "bed", "w": 12, "d": 13}],
+            [{"t": "void", "w": 7, "d": 5.5}, {"t": "courtyard", "w": 10, "d": 5.5}, {"t": "void", "w": 7, "d": 5.5}]],
+   "baths": [{"row": 3, "col": 1, "w": 6, "d": 5, "side": "L"}, {"row": 3, "col": 2, "w": 6, "d": 5, "side": "R"}]},
+ "first_floor": null}

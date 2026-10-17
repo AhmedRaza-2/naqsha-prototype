@@ -1,0 +1,12 @@
+{"id": "aa5b641b3791649d", "image": "images/aa5b641b3791649d.jpg",
+ "note": "1 kanal 50x90 (Manawan, Lahore): driveway and 16 ft lawn, wide porch, entrance lobby with podium and bath, big drawing room, front bedroom, curved staircase, dining, TV lounge, kitchen, two master bedrooms with dress and bath at the back, 4 ft side and back open strips",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 90],
+   "rows": [[{"t": "void", "w": 23, "d": 15}, {"t": "lawn", "w": 27, "d": 15}],
+            [{"t": "porch", "w": 23, "d": 21}, {"t": "lobby", "w": 8.5, "d": 21}, {"t": "drawing", "w": 14, "d": 21}, {"t": "void", "w": 4.5, "d": 21}],
+            [{"t": "void", "w": 4, "d": 16}, {"t": "bed", "w": 12.5, "d": 15}, {"t": "stairs", "w": 14.5, "d": 16}, {"t": "dining", "w": 14.5, "d": 17}, {"t": "void", "w": 4.5, "d": 16}],
+            [{"t": "void", "w": 4, "d": 15.5}, {"t": "lounge", "w": 27, "d": 17.5}, {"t": "kitchen", "w": 14.5, "d": 14}, {"t": "void", "w": 4.5, "d": 15.5}],
+            [{"t": "void", "w": 4, "d": 23}, {"t": "bed", "w": 17.5, "d": 23}, {"t": "master", "w": 24, "d": 23}, {"t": "void", "w": 4.5, "d": 23}],
+            [{"t": "void", "w": 50, "d": 4}]],
+   "baths": [{"row": 2, "col": 2, "w": 6.5, "d": 5.5, "side": "L"}, {"row": 3, "col": 2, "w": 10.5, "d": 5.5, "side": "L"}, {"row": 5, "col": 2, "w": 9, "d": 7, "side": "L"}, {"row": 5, "col": 3, "w": 7, "d": 10, "side": "R"}]},
+ "first_floor": null}

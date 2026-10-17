@@ -1,0 +1,12 @@
+{"id": "fe9a419c59a4458f", "image": "images/fe9a419c59a4458f.jpg",
+ "note": "35x65 (Ideal Architect, 10 marla): car porch, staircase and drawing room behind a 6 ft front lawn, lounge and dining, kitchen, two bedrooms with washrooms (one with dressing), small open court, 3 ft side lawn and 6 ft rear lawn",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [35, 65],
+   "rows": [[{"t": "porch", "w": 13, "d": 6}, {"t": "lawn", "w": 22, "d": 6}],
+            [{"t": "porch", "w": 13, "d": 12}, {"t": "stairs", "w": 9, "d": 15.25}, {"t": "drawing", "w": 13, "d": 15.25}],
+            [{"t": "void", "w": 3, "d": 14}, {"t": "lounge", "w": 18.5, "d": 14}, {"t": "dining", "w": 13.5, "d": 10}],
+            [{"t": "void", "w": 3, "d": 12}, {"t": "bed", "w": 13, "d": 15}, {"t": "lobby", "w": 5.5, "d": 10}, {"t": "kitchen", "w": 13.5, "d": 10}],
+            [{"t": "void", "w": 3, "d": 12}, {"t": "dress", "w": 13, "d": 5}, {"t": "bed", "w": 12.5, "d": 14}, {"t": "courtyard", "w": 6.5, "d": 5.25}],
+            [{"t": "lawn", "w": 35, "d": 6}]],
+   "baths": [{"row": 4, "col": 2, "w": 7, "d": 5, "side": "L"}, {"row": 5, "col": 3, "w": 5, "d": 8, "side": "R"}]},
+ "first_floor": null}

@@ -1,0 +1,10 @@
+{"id": "f389fc30dc2bf081", "image": "images/f389fc30dc2bf081.jpg",
+ "note": "30x40 plot (2dhouses style, sheet shows the same plan twice, left copy used): porch with stairs and toilet at the front, two beds, 17x14 living, kitchen and store, toilet between the beds",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [30, 40],
+   "rows": [[{"t": "void", "w": 6, "d": 6.8}, {"t": "stairs", "w": 11.75, "d": 6.8}, {"t": "porch", "w": 12.25, "d": 14.33}],
+            [{"t": "bed", "w": 11.5, "d": 13.3}, {"t": "lobby", "w": 18.5, "d": 7.3}],
+            [{"t": "passage", "w": 11.5, "d": 5.7}, {"t": "lounge", "w": 18.5, "d": 14.6}],
+            [{"t": "master", "w": 11.75, "d": 13.3}, {"t": "store", "w": 5, "d": 5.9}, {"t": "kitchen", "w": 13.25, "d": 10}]],
+   "baths": [{"row": 2, "col": 1, "w": 5, "d": 6, "side": "L"}, {"row": 3, "col": 1, "w": 8, "d": 5, "side": "R"}]},
+ "first_floor": null}

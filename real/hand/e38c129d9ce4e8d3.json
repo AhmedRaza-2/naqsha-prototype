@@ -1,0 +1,11 @@
+{"id": "e38c129d9ce4e8d3", "image": "images/e38c129d9ce4e8d3.jpg",
+ "note": "9 marla 50x50 modern house map: 16x17 car porch and 33 ft front lawn, drawing room with bath, stair hall, 18x15 lounge, kitchen, two big bedrooms with bath and dress at the back, passages 3 to 5 ft around",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 50],
+   "rows": [[{"t": "porch", "w": 17, "d": 6.75}, {"t": "lawn", "w": 33, "d": 6.75}],
+            [{"t": "porch", "w": 17, "d": 9.25}, {"t": "lawn", "w": 11.5, "d": 9.25}, {"t": "drawing", "w": 21.5, "d": 12.5}],
+            [{"t": "kitchen", "w": 10, "d": 10}, {"t": "lounge", "w": 18.5, "d": 15}, {"t": "stairs", "w": 16.5, "d": 8}, {"t": "void", "w": 5, "d": 8}],
+            [{"t": "bed", "w": 20.5, "d": 16}, {"t": "bed", "w": 24.5, "d": 14}, {"t": "void", "w": 5, "d": 14}],
+            [{"t": "void", "w": 50, "d": 3.5}]],
+   "baths": [{"row": 2, "col": 3, "w": 6, "d": 7.25, "side": "R"}, {"row": 4, "col": 1, "w": 6, "d": 9, "side": "L"}, {"row": 4, "col": 2, "w": 6.5, "d": 8, "side": "L"}]},
+ "first_floor": null}

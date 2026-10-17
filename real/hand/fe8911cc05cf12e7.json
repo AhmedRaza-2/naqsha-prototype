@@ -1,0 +1,11 @@
+{"id": "fe8911cc05cf12e7", "image": "images/fe8911cc05cf12e7.jpg",
+ "note": "30x50 (Ideal Architect): car porch with stairs, 10 ft gate and 5 ft front lawn, drawing room with common bath, lounge, kitchen, two bedrooms with baths and an open light strip at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [30, 50],
+   "rows": [[{"t": "porch", "w": 15, "d": 5}, {"t": "lawn", "w": 15, "d": 5}],
+            [{"t": "stairs", "w": 4, "d": 10}, {"t": "porch", "w": 11, "d": 10}, {"t": "drawing", "w": 15, "d": 12}],
+            [{"t": "lounge", "w": 14, "d": 14}, {"t": "passage", "w": 4.5, "d": 14}, {"t": "kitchen", "w": 7.5, "d": 11}, {"t": "void", "w": 4, "d": 11}],
+            [{"t": "bed", "w": 13, "d": 13}, {"t": "bed", "w": 14.75, "d": 13}, {"t": "void", "w": 2.25, "d": 13}],
+            [{"t": "void", "w": 8, "d": 5}, {"t": "courtyard", "w": 13.75, "d": 5}, {"t": "void", "w": 8.25, "d": 5}]],
+   "baths": [{"row": 2, "col": 3, "w": 4, "d": 6, "side": "R"}, {"row": 4, "col": 1, "w": 7, "d": 5, "side": "L"}, {"row": 4, "col": 2, "w": 7, "d": 5, "side": "R"}]},
+ "first_floor": null}

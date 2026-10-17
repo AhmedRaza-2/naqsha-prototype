@@ -1,0 +1,10 @@
+{"id": "f2c635a3388d2dcc", "image": "images/f2c635a3388d2dcc.jpg",
+ "note": "30x50 plot drawn turned (road on the left, gates and parking at the left): stairs, kitchen, living area, dining, common toilet, three bedrooms with attached toilets",
+ "drawn": "road on the left",
+ "rooms": {"plot": [30, 50],
+   "rows": [[{"t": "stairs", "w": 11.75, "d": 8.5}, {"t": "void", "w": 5.75, "d": 8.5}, {"t": "porch", "w": 11.5, "d": 14.5}],
+            [{"t": "kitchen", "w": 11.5, "d": 11.25}, {"t": "lounge", "w": 17.5, "d": 12.5}],
+            [{"t": "dining", "w": 11.5, "d": 15.5}, {"t": "passage", "w": 6.25, "d": 13}, {"t": "bed", "w": 11, "d": 11}],
+            [{"t": "bed", "w": 11.5, "d": 12.5}, {"t": "master", "w": 16.5, "d": 12.5}]],
+   "baths": [{"row": 3, "col": 1, "w": 7, "d": 4.75, "side": "L"}, {"row": 3, "col": 3, "w": 5, "d": 6, "side": "R"}, {"row": 4, "col": 2, "w": 5, "d": 6, "side": "R"}]},
+ "first_floor": null}

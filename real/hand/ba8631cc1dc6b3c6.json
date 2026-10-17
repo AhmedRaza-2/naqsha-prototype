@@ -1,0 +1,10 @@
+{"id": "ba8631cc1dc6b3c6", "image": "images/ba8631cc1dc6b3c6.jpg",
+ "note": "28x40 from the overall dimensions, 1012 sq ft ground floor: porch beside a drawing/dining room, stairs and living, one bedroom with washroom and kitchen at the back, 5 ft back yard",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [28, 40],
+   "rows": [[{"t": "porch", "w": 10, "d": 14.75}, {"t": "drawing", "w": 17, "d": 12}],
+            [{"t": "stairs", "w": 9, "d": 8}, {"t": "lounge", "w": 17, "d": 10}],
+            [{"t": "master", "w": 15, "d": 11}, {"t": "kitchen", "w": 11.5, "d": 11}],
+            [{"t": "void", "w": 28, "d": 5}]],
+   "baths": [{"row": 3, "col": 1, "w": 9, "d": 4, "side": "L"}]},
+ "first_floor": null}

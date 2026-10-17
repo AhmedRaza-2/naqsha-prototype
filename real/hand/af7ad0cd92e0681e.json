@@ -1,0 +1,242 @@
+{
+ "id": "af7ad0cd92e0681e",
+ "image": "images/af7ad0cd92e0681e.jpg",
+ "note": "35x70 Bahria Town sheet: car porch and drawing room at the front, stairs, lounge/dining, kitchen, two beds with baths at the back, open to sky at the rear; first floor drawn too",
+ "drawn": "road at the bottom",
+ "rooms": {
+  "plot": [
+   35,
+   70
+  ],
+  "rows": [
+   [
+    {
+     "t": "void",
+     "w": 22,
+     "d": 5
+    },
+    {
+     "t": "lawn",
+     "w": 13,
+     "d": 6
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 4.75,
+     "d": 13
+    },
+    {
+     "t": "porch",
+     "w": 17,
+     "d": 12
+    },
+    {
+     "t": "drawing",
+     "w": 13.25,
+     "d": 16.5
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 5,
+     "d": 14
+    },
+    {
+     "t": "stairs",
+     "w": 12.5,
+     "d": 14
+    },
+    {
+     "t": "lounge",
+     "w": 17.5,
+     "d": 14
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 5,
+     "d": 11
+    },
+    {
+     "t": "kitchen",
+     "w": 12.5,
+     "d": 11
+    },
+    {
+     "t": "dining",
+     "w": 17.5,
+     "d": 11
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 5,
+     "d": 18
+    },
+    {
+     "t": "bed",
+     "w": 12.5,
+     "d": 18
+    },
+    {
+     "t": "master",
+     "w": 17.5,
+     "d": 18
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 35,
+     "d": 7
+    }
+   ]
+  ],
+  "baths": [
+   {
+    "row": 3,
+    "col": 2,
+    "w": 7,
+    "d": 6.5,
+    "side": "R"
+   },
+   {
+    "row": 5,
+    "col": 2,
+    "w": 6.5,
+    "d": 6,
+    "side": "L"
+   },
+   {
+    "row": 5,
+    "col": 3,
+    "w": 8,
+    "d": 6,
+    "side": "R"
+   }
+  ]
+ },
+ "first_floor": {
+  "plot": [
+   35,
+   70
+  ],
+  "rows": [
+   [
+    {
+     "t": "void",
+     "w": 35,
+     "d": 5.5
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 5.5,
+     "d": 13
+    },
+    {
+     "t": "lawn",
+     "w": 16.5,
+     "d": 12
+    },
+    {
+     "t": "master",
+     "w": 13,
+     "d": 13
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 5.5,
+     "d": 11
+    },
+    {
+     "t": "stairs",
+     "w": 11,
+     "d": 11
+    },
+    {
+     "t": "passage",
+     "w": 5.5,
+     "d": 11.5
+    },
+    {
+     "t": "dress",
+     "w": 13,
+     "d": 11
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 5.5,
+     "d": 14
+    },
+    {
+     "t": "kitchen",
+     "w": 12,
+     "d": 14
+    },
+    {
+     "t": "lounge",
+     "w": 17.5,
+     "d": 14
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 5.5,
+     "d": 18
+    },
+    {
+     "t": "bed",
+     "w": 12,
+     "d": 18
+    },
+    {
+     "t": "bed",
+     "w": 17.5,
+     "d": 18
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 35,
+     "d": 7
+    }
+   ]
+  ],
+  "baths": [
+   {
+    "row": 3,
+    "col": 4,
+    "w": 11.5,
+    "d": 6,
+    "side": "R"
+   },
+   {
+    "row": 5,
+    "col": 2,
+    "w": 7,
+    "d": 6,
+    "side": "L"
+   },
+   {
+    "row": 5,
+    "col": 3,
+    "w": 8,
+    "d": 6,
+    "side": "R"
+   }
+  ]
+ }
+}

@@ -1,0 +1,11 @@
+{"id": "cfa02736aa49e89d", "image": "images/cfa02736aa49e89d.jpg",
+ "note": "6 marla 30x55: open car space and 14 ft front lawn, stairs, kitchen and drawing room at the front, central lobby lounge with a common toilet, bedroom and master bedroom with dressings at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [30, 55],
+   "rows": [[{"t": "porch", "w": 12, "d": 14}, {"t": "lawn", "w": 18, "d": 14}],
+            [{"t": "stairs", "w": 8.5, "d": 13.5}, {"t": "kitchen", "w": 8, "d": 8.5}, {"t": "drawing", "w": 12, "d": 12.5}],
+            [{"t": "lounge", "w": 17, "d": 15.25}, {"t": "dress", "w": 12, "d": 7}],
+            [{"t": "bed", "w": 11.5, "d": 10.5}, {"t": "dress", "w": 5, "d": 6}, {"t": "void", "w": 1.5, "d": 6}, {"t": "master", "w": 12, "d": 14.5}]],
+   "baths": [{"row": 3, "col": 1, "w": 8.5, "d": 5, "side": "R"},
+             {"row": 4, "col": 4, "w": 5, "d": 7, "side": "R"}]},
+ "first_floor": null}

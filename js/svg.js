@@ -24,12 +24,14 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
   o += `<rect x="${X(0)}" y="${Y(D)}" width="${W * s}" height="${D * s}" fill="${PAPER}" stroke="${INK}" stroke-width="1.5"/>`;
   const open = L.open || [];
   const innerPorch = open.some((p) => p.type === 'porch');      // any car porch: the front strip is then just lawn
-  o += `<rect x="${X(0)}" y="${Y(B.z)}" width="${W * s}" height="${B.z * s}" fill="${YARD}"/>`;
-  o += `<text x="${X(W / 2)}" y="${Y(B.z / 2) + 3}" font-size="9" fill="#8a8678" text-anchor="middle">${innerPorch ? 'lawn' : 'porch / lawn'}</text>`;
+  if (!L.upper) {
+    o += `<rect x="${X(0)}" y="${Y(B.z)}" width="${W * s}" height="${B.z * s}" fill="${YARD}"/>`;
+    o += `<text x="${X(W / 2)}" y="${Y(B.z / 2) + 3}" font-size="9" fill="#8a8678" text-anchor="middle">${innerPorch ? 'lawn' : 'porch / lawn'}</text>`;
+  }
   o += `<rect x="${X(B.x)}" y="${Y(B.z + B.d)}" width="${B.w * s}" height="${B.d * s}" fill="none" stroke="#999" stroke-dasharray="3 3" stroke-width=".8"/>`;
   // car porch and light wells inside the house outline: open to the sky or roofed, but not rooms
   for (const p of open) {
-    o += `<rect x="${X(p.x)}" y="${Y(p.z + p.d)}" width="${p.w * s}" height="${p.d * s}" fill="${p.type === 'porch' ? YARD : '#dbe5d8'}" stroke="#8a7f78" stroke-dasharray="4 3" stroke-width=".9"/>`;
+    o += `<rect x="${X(p.x)}" y="${Y(p.z + p.d)}" width="${p.w * s}" height="${p.d * s}" fill="${p.type === 'porch' ? YARD : p.type === 'terrace' ? '#d8ecc8' : '#dbe5d8'}" stroke="#8a7f78" stroke-dasharray="4 3" stroke-width=".9"/>`;
   }
   const order = [...L.rooms.filter((r) => !r.parent), ...L.rooms.filter((r) => r.parent)];
   for (const r of order) {
@@ -76,7 +78,7 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
     }
     for (const p of open) {
       const cx = X(p.x + p.w / 2), cy = Y(p.z + p.d / 2), maxPx = p.w * s - 4;
-      const nm = p.type === 'porch' ? 'Car porch' : 'Light well', size = `${fmtFt(p.w)}' x ${fmtFt(p.d)}'`;
+      const nm = p.type === 'porch' ? 'Car porch' : p.type === 'terrace' ? 'Terrace' : 'Light well', size = `${fmtFt(p.w)}' x ${fmtFt(p.d)}'`;
       o += `<text x="${cx}" y="${cy}" font-size="${fit(nm, 8.5, maxPx)}" text-anchor="middle" fill="#6f6b5e" font-weight="600" ${halo}>${nm}</text>`;
       o += `<text x="${cx}" y="${cy + 10}" font-size="${fit(size, 7.2, maxPx)}" text-anchor="middle" fill="#6f6b5e" ${halo}>${size}</text>`;
     }
@@ -88,13 +90,15 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
   return o + '</svg>';
 }
 
-export function elevationSVG(L, st) {
+/** Front elevation. U: the first-floor layout of a two-storey house (its storey is drawn above the ground floor). */
+export function elevationSVG(L, st, U = null) {
   const { w: W } = L.plot;
   const B = L.B;
   const s = 10, pad = 3;
   const vw = (W + 2 * pad) * s, gh = 2 * s, top = 3 * s;
-  const H = 10, vh = top + (H + 3) * s + gh;
-  const gy = top + (H + 3) * s;
+  const H = 10, SLAB = 0.6, TOP = U ? H + SLAB + H : H;            // height of the highest wall
+  const vh = top + (TOP + 3) * s + gh;
+  const gy = top + (TOP + 3) * s;
   const X = (x) => (x + pad) * s;
   const Y = (h) => gy - h * s;
   let o = `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Front elevation, ${st.name}">`;
@@ -103,19 +107,30 @@ export function elevationSVG(L, st) {
   o += `<rect x="0" y="${gy}" width="${vw}" height="${gh}" fill="#9aa08f"/><rect x="0" y="${gy}" width="${vw}" height="3" fill="#7f8a73"/>`;
   const bx = X(B.x), bw = B.w * s;
   o += `<rect x="${bx}" y="${Y(H)}" width="${bw}" height="${H * s}" fill="${st.wall}" stroke="#00000022"/>`;
-  // parapet / roof edge
-  o += `<rect x="${bx - 4}" y="${Y(H + 2.6)}" width="${bw + 8}" height="${2.6 * s}" fill="${st.id === 'spanish' ? st.roof : st.id === 'modern' ? st.trim : st.wall}" stroke="#00000022"/>`;
-  if (st.id === 'classic') o += `<rect x="${bx - 7}" y="${Y(H + 3.1)}" width="${bw + 14}" height="6" fill="${st.trim}" stroke="#00000033"/><rect x="${bx - 6}" y="${Y(H)}" width="${bw + 12}" height="7" fill="${st.trim}" stroke="#00000033"/>`;
-  if (st.id === 'spanish') for (let i = 0; i < bw; i += 8) o += `<rect x="${bx - 4 + i}" y="${Y(H + 2.6)}" width="4" height="${2.6 * s}" fill="#00000018"/>`;
-  const front = L.openings.filter((p) => p.o === 'h' && Math.abs(p.c - B.z) < 0.01);
-  for (const p of front) {
-    const x0 = X(p.at - p.w / 2), w = p.w * s;
-    if (p.kind === 'window') {
-      o += `<rect x="${x0}" y="${Y(p.top)}" width="${w}" height="${(p.top - p.sill) * s}" fill="${st.glass}" stroke="${st.frame}" stroke-width="2.5"/>`;
-      o += `<line x1="${x0 + w / 2}" x2="${x0 + w / 2}" y1="${Y(p.top)}" y2="${Y(p.sill)}" stroke="${st.frame}" stroke-width="1.5"/>`;
-      if (st.id !== 'modern') o += `<rect x="${x0 - 3}" y="${Y(p.sill) }" width="${w + 6}" height="4" fill="${st.trim}" stroke="#00000033"/>`;
-    }
+  // the top storey: parapet / roof edge, and for a two-storey house the first-floor walls, slab and low terrace parapet
+  const T = U ? U.B : B, topH = U ? H + SLAB + H : H;
+  const tx = X(T.x), tw = T.w * s;
+  const paraFill = st.id === 'spanish' ? st.roof : st.id === 'modern' ? st.trim : st.wall;
+  if (U) {
+    o += `<rect x="${bx - 4}" y="${Y(H + SLAB + 3)}" width="${bw + 8}" height="${3 * s}" fill="${paraFill}" stroke="#00000022"/>`;     // parapet round the open terrace
+    o += `<rect x="${bx - 6}" y="${Y(H + SLAB)}" width="${bw + 12}" height="${SLAB * s}" fill="${st.trim}" stroke="#00000033"/>`;          // slab edge
+    o += `<rect x="${tx}" y="${Y(topH)}" width="${tw}" height="${H * s}" fill="${st.wall}" stroke="#00000022"/>`;
   }
+  o += `<rect x="${tx - 4}" y="${Y(topH + 2.6)}" width="${tw + 8}" height="${2.6 * s}" fill="${paraFill}" stroke="#00000022"/>`;
+  if (st.id === 'classic') o += `<rect x="${tx - 7}" y="${Y(topH + 3.1)}" width="${tw + 14}" height="6" fill="${st.trim}" stroke="#00000033"/><rect x="${tx - 6}" y="${Y(topH)}" width="${tw + 12}" height="7" fill="${st.trim}" stroke="#00000033"/>`;
+  if (st.id === 'spanish') for (let i = 0; i < tw; i += 8) o += `<rect x="${tx - 4 + i}" y="${Y(topH + 2.6)}" width="4" height="${2.6 * s}" fill="#00000018"/>`;
+  const windows = (layout, lift) => {
+    for (const p of layout.openings.filter((q) => q.o === 'h' && Math.abs(q.c - layout.B.z) < 0.01)) {
+      const x0 = X(p.at - p.w / 2), w = p.w * s;
+      if (p.kind === 'window') {
+        o += `<rect x="${x0}" y="${Y(p.top + lift)}" width="${w}" height="${(p.top - p.sill) * s}" fill="${st.glass}" stroke="${st.frame}" stroke-width="2.5"/>`;
+        o += `<line x1="${x0 + w / 2}" x2="${x0 + w / 2}" y1="${Y(p.top + lift)}" y2="${Y(p.sill + lift)}" stroke="${st.frame}" stroke-width="1.5"/>`;
+        if (st.id !== 'modern') o += `<rect x="${x0 - 3}" y="${Y(p.sill + lift)}" width="${w + 6}" height="4" fill="${st.trim}" stroke="#00000033"/>`;
+      }
+    }
+  };
+  windows(L, 0);
+  if (U) windows(U, H + SLAB);
   const door = L.openings.find((p) => p.main);                  // may be set back behind the car porch
   const dx = X(door.at - door.w / 2), dw = door.w * s;
   if (st.id === 'modern') o += `<rect x="${dx - 12}" y="${Y(H)}" width="${dw + 24}" height="${H * s}" fill="${st.accent}" opacity=".92"/>`;

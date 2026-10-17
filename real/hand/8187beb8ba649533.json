@@ -1,0 +1,12 @@
+{"id": "8187beb8ba649533", "image": "images/8187beb8ba649533.jpg",
+ "note": "plan drawn turned (road on the left); title says 5 marla but the room sizes add up to about 30x60, so 30x60 is used (not printed, least sure): car porch beside drawing/dining, stairs, kitchen, 17.5x14 TV lounge, two bedrooms with baths and an open strip at the back",
+ "drawn": "road on the left",
+ "rooms": {"plot": [30, 60],
+   "rows": [[{"t": "lawn", "w": 30, "d": 5.5}],
+            [{"t": "porch", "w": 16.5, "d": 16.25}, {"t": "drawing", "w": 13.5, "d": 16.6}],
+            [{"t": "void", "w": 3, "d": 14}, {"t": "stairs", "w": 9, "d": 9.4}, {"t": "lounge", "w": 18, "d": 14}],
+            [{"t": "void", "w": 3, "d": 11.5}, {"t": "kitchen", "w": 8, "d": 11.5}, {"t": "void", "w": 19, "d": 11.5}],
+            [{"t": "bed", "w": 15.5, "d": 13.25}, {"t": "bed", "w": 14.5, "d": 16.4}],
+            [{"t": "void", "w": 9.5, "d": 5.3}, {"t": "courtyard", "w": 11, "d": 5.3}, {"t": "void", "w": 9.5, "d": 5.3}]],
+   "baths": [{"row": 5, "col": 1, "w": 9.33, "d": 5, "side": "L"}, {"row": 5, "col": 2, "w": 7, "d": 5, "side": "R"}]},
+ "first_floor": null}

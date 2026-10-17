@@ -1,0 +1,9 @@
+{"id": "8eb761d8d8493237", "image": "images/8eb761d8d8493237.jpg",
+ "note": "25x50: stairs and car porch beside a drawing room with its own small bath at the front, kitchen and lounge in the middle, two bedrooms with baths and wardrobes at the back, duct between the baths",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 50],
+   "rows": [[{"t": "stairs", "w": 3.5, "d": 17}, {"t": "porch", "w": 9.5, "d": 17}, {"t": "drawing", "w": 12, "d": 17}],
+            [{"t": "kitchen", "w": 7.5, "d": 12.5}, {"t": "lounge", "w": 17.5, "d": 12.5}],
+            [{"t": "master", "w": 12.5, "d": 20}, {"t": "bed", "w": 12.5, "d": 20}]],
+   "baths": [{"row": 1, "col": 3, "w": 6, "d": 4.5, "side": "R"}, {"row": 3, "col": 1, "w": 7, "d": 5, "side": "L"}, {"row": 3, "col": 2, "w": 7, "d": 5, "side": "R"}]},
+ "first_floor": null}

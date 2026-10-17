@@ -1,0 +1,9 @@
+{"id": "eb9a6198e69ca5c1", "image": "images/eb9a6198e69ca5c1.jpg",
+ "note": "22x45: car parking with stairs beside a front bedroom and bath, full-width drawing room with dining, kitchen with wash area and second bedroom at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [22, 45],
+   "rows": [[{"t": "stairs", "w": 3, "d": 13}, {"t": "porch", "w": 7.5, "d": 17}, {"t": "bed", "w": 11.5, "d": 16.5}],
+            [{"t": "drawing", "w": 22, "d": 12.5}],
+            [{"t": "kitchen", "w": 10.5, "d": 15}, {"t": "bed", "w": 11.5, "d": 15}]],
+   "baths": [{"row": 1, "col": 3, "w": 7.5, "d": 4.5, "side": "R"}]},
+ "first_floor": null}

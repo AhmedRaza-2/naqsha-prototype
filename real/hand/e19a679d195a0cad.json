@@ -1,0 +1,12 @@
+{"id": "e19a679d195a0cad", "image": "images/e19a679d195a0cad.jpg",
+ "note": "6.5 marla 30x60 modern map (video thumbnail, drawn stretched): car porch and drawing at the front, dining, stair hall, lounge and kitchen, two beds with baths at the back, 3 ft passages",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [30, 60],
+   "rows": [[{"t": "lawn", "w": 13, "d": 5.5}, {"t": "void", "w": 17, "d": 5.5}],
+            [{"t": "drawing", "w": 13, "d": 11}, {"t": "porch", "w": 17, "d": 11}],
+            [{"t": "dining", "w": 14, "d": 9.75}, {"t": "stairs", "w": 5.5, "d": 9.75}, {"t": "lobby", "w": 6, "d": 9.75}, {"t": "void", "w": 4.5, "d": 9.75}],
+            [{"t": "lounge", "w": 13, "d": 13.75}, {"t": "kitchen", "w": 12.5, "d": 8}, {"t": "void", "w": 4.5, "d": 8}],
+            [{"t": "bed", "w": 13, "d": 12.6}, {"t": "master", "w": 12.5, "d": 17}, {"t": "void", "w": 4.5, "d": 12.6}],
+            [{"t": "void", "w": 30, "d": 3.5}]],
+   "baths": [{"row": 3, "col": 3, "w": 5, "d": 5, "side": "R"}, {"row": 5, "col": 1, "w": 6, "d": 6, "side": "R"}, {"row": 5, "col": 2, "w": 6, "d": 6, "side": "R"}]},
+ "first_floor": null}

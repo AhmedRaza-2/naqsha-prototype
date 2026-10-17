@@ -36,7 +36,8 @@ function makeTex(kind) {
   return t;
 }
 
-export function createViewer(host, L, styleId, hooks = {}) {
+/** U: the first-floor layout of a two-storey house (built above the ground floor, stairs between). */
+export function createViewer(host, L, styleId, hooks = {}, U = null) {
   const st = STYLES[styleId];
   const { w: W, d: D } = L.plot;
   const { B, rule } = L;
@@ -69,14 +70,16 @@ export function createViewer(host, L, styleId, hooks = {}) {
   const world = new THREE.Group(); scene.add(world);
   const walls = new THREE.Group(); world.add(walls);
   const roofG = new THREE.Group(); world.add(roofG);
-  const colliders = [];
+  const colliders = [], upperColliders = [];
+  let curColl = colliders;                                         // where wall boxes register their collision (the storey being built)
+  const SLAB = 0.6, STOREY = H + SLAB;                              // thickness of the floor slab, floor-to-floor height
 
   const box = (parent, x0, x1, y0, y1, z0, z1, m, collide) => {
     if (x1 - x0 < 1e-3 || y1 - y0 < 1e-3 || z1 - z0 < 1e-3) return null;
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), m);
     mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
     parent.add(mesh);
-    if (collide) colliders.push({ x0, x1, z0, z1 });
+    if (collide) curColl.push({ x0, x1, z0, z1 });
     return mesh;
   };
   const bx = (parent, cx, cy, cz, w, h, d, m) => box(parent, cx - w / 2, cx + w / 2, cy - h / 2, cy + h / 2, cz - d / 2, cz + d / 2, m);
@@ -112,7 +115,12 @@ export function createViewer(host, L, styleId, hooks = {}) {
   if (rule.side > 0) { cwall(-cw / 2, cw / 2, 0, D); cwall(W - cw / 2, W + cw / 2, 0, D); }
   [gateLo - 0.4, gateHi + 0.4].forEach((x) => box(world, x - 0.6, x + 0.6, 0, 6, -0.7, 0.7, mTrim, true));
 
-  // ---------- walls ----------
+  // ---------- walls, floors, furniture: one storey (dy = height of its floor) ----------
+  function buildStorey(L, dy, upper) {
+  const { B } = L;
+  const open = L.open || [];
+  const walls = new THREE.Group(); walls.position.y = dy; world.add(walls);
+  curColl = upper ? upperColliders : colliders;
   const hl = new Map(), vl = new Map();
   const addEdge = (map, c, a, b) => {
     const k = Math.round(c * 100);
@@ -217,18 +225,19 @@ export function createViewer(host, L, styleId, hooks = {}) {
   const floorKind = (r) => (r.type.endsWith('bath') || r.type === 'kitchen' ? 'tile' : r.type === 'bed' ? st.floorBed : st.floorLiving);
   const order = [...L.rooms.filter((r) => !r.parent), ...L.rooms.filter((r) => r.parent)];
   order.forEach((r) => {
+    if (upper && r.type === 'stairs') return;                      // the stairwell: open down to the stairs below
     const f = new THREE.Mesh(new THREE.PlaneGeometry(r.w, r.d), floorMat(floorKind(r), r.w, r.d));
     f.rotation.x = -Math.PI / 2;
     f.position.set(r.x + r.w / 2, r.parent ? 0.05 : 0.03, r.z + r.d / 2);
-    world.add(f);
+    walls.add(f);
     if (!r.parent) {
       const pl = new THREE.PointLight('#fff1d6', 38, 0, 2);
       pl.position.set(r.x + r.w / 2, 8, r.z + r.d / 2);
-      world.add(pl);
+      walls.add(pl);
     }
   });
 
-  const furn = new THREE.Group(); world.add(furn);
+  const furn = new THREE.Group(); walls.add(furn);
   const fb = (cx, y0, cz, w, h, d, color) => box(furn, cx - w / 2, cx + w / 2, y0, y0 + h, cz - d / 2, cz + d / 2, mat(color));
   for (const r of L.rooms) {
     const cx = r.x + r.w / 2, cz = r.z + r.d / 2;
@@ -269,23 +278,52 @@ export function createViewer(host, L, styleId, hooks = {}) {
     }
   }
 
-  // ---------- roof ----------
-  const ov = 0.45;
-  box(roofG, B.x - ov, B.x + B.w + ov, H, H + 0.6, B.z - ov, B.z + B.d + ov, mat(st.roof));
-  const pm = st.id === 'spanish' ? mat(st.roof) : st.id === 'modern' ? mTrim : mExt;
-  const ph = 2.6, pt = 0.6;
-  box(roofG, B.x - ov, B.x + B.w + ov, H + 0.6, H + 0.6 + ph, B.z - ov, B.z - ov + pt, pm);
-  box(roofG, B.x - ov, B.x + B.w + ov, H + 0.6, H + 0.6 + ph, B.z + B.d + ov - pt, B.z + B.d + ov, pm);
-  box(roofG, B.x - ov, B.x - ov + pt, H + 0.6, H + 0.6 + ph, B.z - ov, B.z + B.d + ov, pm);
-  box(roofG, B.x + B.w + ov - pt, B.x + B.w + ov, H + 0.6, H + 0.6 + ph, B.z - ov, B.z + B.d + ov, pm);
-  if (st.id === 'classic') box(roofG, B.x - 1, B.x + B.w + 1, H + 0.6 + ph, H + 1 + ph, B.z - 1, B.z + B.d + 1, mTrim);
-  if (st.id === 'classic') {
-    const c0 = 0.9, ct = 0.6, x0 = B.x - c0, x1 = B.x + B.w + c0, z0 = B.z - c0, z1 = B.z + B.d + c0;
-    box(world, x0, x1, H - 0.7, H, z0, z0 + ct, mTrim); box(world, x0, x1, H - 0.7, H, z1 - ct, z1, mTrim);
-    box(world, x0, x0 + ct, H - 0.7, H, z0, z1, mTrim); box(world, x1 - ct, x1, H - 0.7, H, z0, z1, mTrim);
   }
-  // water tank
-  box(roofG, B.x + B.w - 5, B.x + B.w - 2, H + 0.6, H + 3.4, B.z + B.d - 4, B.z + B.d - 1.5, mat('#2f3f4a'));
+  buildStorey(L, 0, false);
+  if (U) buildStorey(U, STOREY, true);
+  curColl = colliders;
+  const stairsRoom = L.rooms.find((r) => r.type === 'stairs');
+  const upStairs = U && U.rooms.find((r) => r.type === 'stairs');
+
+  // ---------- roof ----------
+  // slab over a storey (with a stairwell hole when the storey above reaches it), a parapet round it, a cornice, a water tank
+  const ov = 0.45;
+  const pm = st.id === 'spanish' ? mat(st.roof) : st.id === 'modern' ? mTrim : mExt;
+  const roofOf = (B, y, parent, ph, hole) => {                    // y: top of the walls
+    const x0 = B.x - ov, x1 = B.x + B.w + ov, z0 = B.z - ov, z1 = B.z + B.d + ov, pt = 0.6, m = mat(st.roof);
+    if (hole) {
+      const hx0 = hole.x, hx1 = hole.x + hole.w, hz0 = hole.z, hz1 = hole.z + hole.d;
+      box(parent, x0, x1, y, y + SLAB, z0, hz0, m); box(parent, x0, x1, y, y + SLAB, hz1, z1, m);
+      box(parent, x0, hx0, y, y + SLAB, hz0, hz1, m); box(parent, hx1, x1, y, y + SLAB, hz0, hz1, m);
+    } else box(parent, x0, x1, y, y + SLAB, z0, z1, m);
+    box(parent, x0, x1, y + SLAB, y + SLAB + ph, z0, z0 + pt, pm);
+    box(parent, x0, x1, y + SLAB, y + SLAB + ph, z1 - pt, z1, pm);
+    box(parent, x0, x0 + pt, y + SLAB, y + SLAB + ph, z0, z1, pm);
+    box(parent, x1 - pt, x1, y + SLAB, y + SLAB + ph, z0, z1, pm);
+    if (st.id === 'classic') {
+      box(parent, B.x - 1, B.x + B.w + 1, y + SLAB + ph, y + 0.4 + ph + SLAB, B.z - 1, B.z + B.d + 1, mTrim);
+      const c0 = 0.9, ct = 0.6, cx0 = B.x - c0, cx1 = B.x + B.w + c0, cz0 = B.z - c0, cz1 = B.z + B.d + c0;
+      box(world, cx0, cx1, y - 0.7, y, cz0, cz0 + ct, mTrim); box(world, cx0, cx1, y - 0.7, y, cz1 - ct, cz1, mTrim);
+      box(world, cx0, cx0 + ct, y - 0.7, y, cz0, cz1, mTrim); box(world, cx1 - ct, cx1, y - 0.7, y, cz0, cz1, mTrim);
+    }
+    box(parent, B.x + B.w - 5, B.x + B.w - 2, y + SLAB, y + SLAB + 2.8, B.z + B.d - 4, B.z + B.d - 1.5, mat('#2f3f4a'));   // water tank
+  };
+  if (!U) roofOf(B, H, roofG, 2.6, null);
+  else {
+    roofOf(B, H, world, 3, stairsRoom);                           // the ground floor's roof is the upstairs floor, and its open part the terrace
+    roofOf(U.B, STOREY + H, roofG, 2.6, null);
+    // a guard wall round the terrace edge keeps walkers on the slab
+    upperColliders.push({ x0: B.x - 2, x1: B.x - 0.4, z0: B.z - 2, z1: B.z + B.d + 2 }, { x0: B.x + B.w + 0.4, x1: B.x + B.w + 2, z0: B.z - 2, z1: B.z + B.d + 2 },
+      { x0: B.x - 2, x1: B.x + B.w + 2, z0: B.z - 2, z1: B.z - 0.4 }, { x0: B.x - 2, x1: B.x + B.w + 2, z0: B.z + B.d + 0.4, z1: B.z + B.d + 2 });
+    if (stairsRoom) {                                             // the flight: steps climbing along the longer side of the stairs room
+      const alongX = stairsRoom.w > stairsRoom.d, len = alongX ? stairsRoom.w : stairsRoom.d, n = 16, run = len / n;
+      for (let i = 0; i < n; i++) {
+        const top = ((i + 1) / n) * STOREY;
+        if (alongX) box(world, stairsRoom.x + i * run, stairsRoom.x + (i + 1) * run, 0, top, stairsRoom.z + 0.2, stairsRoom.z + stairsRoom.d - 0.2, mTrim);
+        else box(world, stairsRoom.x + 0.2, stairsRoom.x + stairsRoom.w - 0.2, 0, top, stairsRoom.z + i * run, stairsRoom.z + (i + 1) * run, mTrim);
+      }
+    }
+  }
 
   // ---------- porch ----------
   const pd = Math.min(rule.front - 1, 7);
@@ -350,7 +388,7 @@ export function createViewer(host, L, styleId, hooks = {}) {
   tree(-6, -3, 1.2); tree(W + 6, -3, 1.2);
 
   // ---------- controls ----------
-  const state = { mode: 'walk', yaw: Math.PI, pitch: 0, pos: new THREE.Vector3(gateX, EYE, 3), keys: new Set() };
+  const state = { mode: 'walk', yaw: Math.PI, pitch: 0, pos: new THREE.Vector3(gateX, EYE, 3), keys: new Set(), floor: 0 };
   const orbit = new OrbitControls(camera, renderer.domElement);
   orbit.enabled = false;
   orbit.target.set(W / 2, 0, D / 2);
@@ -369,7 +407,16 @@ export function createViewer(host, L, styleId, hooks = {}) {
     hooks.onMode?.(mode, roofG.visible);
   }
   function setRoof(v) { roofG.visible = v; }
-  function resetWalk() { state.pos.set(gateX, EYE, 3); state.yaw = Math.PI; state.pitch = 0; }
+  function resetWalk() { state.floor = 0; state.pos.set(gateX, EYE, 3); state.yaw = Math.PI; state.pitch = 0; hooks.onFloor?.(0); }
+  /** Climb to the first floor (or come back down): the visitor stands at the foot or head of the stairs. */
+  function setFloor(f) {
+    if (!U || f === state.floor) return;
+    const at = (f ? upStairs : stairsRoom) || stairsRoom;
+    state.floor = f;
+    state.pos.set(at.x + at.w / 2, EYE + f * STOREY, at.z + at.d / 2);
+    if (state.mode === 'orbit') setMode('walk');
+    hooks.onFloor?.(f);
+  }
 
   let drag = null;
   const el = renderer.domElement;
@@ -389,9 +436,14 @@ export function createViewer(host, L, styleId, hooks = {}) {
   window.addEventListener('keydown', kd);
   window.addEventListener('keyup', ku);
 
-  const blocked = (x, z, r) => colliders.some((c) => x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r);
+  const blocked = (x, z, r) => (state.floor ? upperColliders : colliders).some((c) => x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r);
   function roomAt(x, z) {
-    const hit = L.rooms.filter((r) => x >= r.x && x <= r.x + r.w && z >= r.z && z <= r.z + r.d);
+    const here = state.floor ? U : L;
+    const hit = here.rooms.filter((r) => x >= r.x && x <= r.x + r.w && z >= r.z && z <= r.z + r.d);
+    if (state.floor) {
+      const terrace = (U.open || []).find((p) => x >= p.x && x <= p.x + p.w && z >= p.z && z <= p.z + p.d);
+      return (hit.find((r) => r.parent) || hit[0])?.name || (terrace ? 'Terrace' : x >= B.x && x <= B.x + B.w && z >= B.z && z <= B.z + B.d ? 'Terrace' : 'Outside');
+    }
     const space = open.find((p) => x >= p.x && x <= p.x + p.w && z >= p.z && z <= p.z + p.d);
     return (hit.find((r) => r.parent) || hit[0])?.name || space?.name || (z < 0 ? 'Road' : z < B.z ? (porch ? 'Lawn' : 'Porch & lawn') : 'Outside');
   }
@@ -435,7 +487,8 @@ export function createViewer(host, L, styleId, hooks = {}) {
   raf = requestAnimationFrame(loop);
 
   return {
-    setMode, setRoof, resetWalk,
+    setMode, setRoof, resetWalk, setFloor,
+    get floor() { return state.floor; },
     get roofVisible() { return roofG.visible; },
     get mode() { return state.mode; },
     dispose() {

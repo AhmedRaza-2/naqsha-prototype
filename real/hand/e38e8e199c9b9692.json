@@ -1,0 +1,10 @@
+{"id": "e38e8e199c9b9692", "image": "images/e38e8e199c9b9692.jpg",
+ "note": "25x50 (Ideal Architect): car porch with stairs up the left side, drawing room with bath, TV lounge with kitchen, child bed and master bed at the back each with dress and washroom",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 50],
+   "rows": [[{"t": "porch", "w": 13, "d": 2.5}, {"t": "lawn", "w": 12, "d": 2.5}],
+            [{"t": "stairs", "w": 4, "d": 14.5}, {"t": "porch", "w": 9, "d": 14.5}, {"t": "drawing", "w": 12, "d": 11.5}],
+            [{"t": "lounge", "w": 15.5, "d": 11}, {"t": "kitchen", "w": 9.5, "d": 9}],
+            [{"t": "bed", "w": 12, "d": 12}, {"t": "master", "w": 13, "d": 14}]],
+   "baths": [{"row": 2, "col": 3, "w": 6.5, "d": 4, "side": "L"}, {"row": 4, "col": 1, "w": 6, "d": 5, "side": "L"}, {"row": 4, "col": 2, "w": 6.5, "d": 5, "side": "R"}]},
+ "first_floor": null}

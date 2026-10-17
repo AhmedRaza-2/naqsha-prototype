@@ -1,0 +1,13 @@
+{"id": "c6ba619c6d9c3163", "image": "images/c6ba619c6d9c3163.jpg",
+ "note": "40x60 (Ideal Architect): two-car porch beside a big front lawn, drawing room behind the lawn, stairs with bath under stair, lounge with kitchen, two bedrooms at the back each with washroom, side openings",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [40, 60],
+   "rows": [[{"t": "porch", "w": 16, "d": 14}, {"t": "lawn", "w": 24, "d": 13.75}],
+            [{"t": "stairs", "w": 17.5, "d": 7}, {"t": "drawing", "w": 16, "d": 12}, {"t": "void", "w": 6.5, "d": 12}],
+            [{"t": "void", "w": 2.5, "d": 13}, {"t": "lounge", "w": 19.75, "d": 13}, {"t": "kitchen", "w": 12, "d": 8}, {"t": "void", "w": 4, "d": 13}],
+            [{"t": "bed", "w": 16, "d": 17}, {"t": "master", "w": 17.5, "d": 17}, {"t": "void", "w": 4, "d": 17}],
+            [{"t": "void", "w": 40, "d": 4}]],
+   "baths": [{"row": 2, "col": 1, "w": 4, "d": 7, "side": "L"},
+             {"row": 4, "col": 1, "w": 8, "d": 5, "side": "L"},
+             {"row": 4, "col": 2, "w": 5, "d": 7, "side": "L"}]},
+ "first_floor": null}

@@ -2,21 +2,22 @@ import { PRESETS, MARLA, ruleFor, estimateCost } from './layout.js';
 import { planSVG, elevationSVG } from './svg.js';
 import { STYLES, STYLE_IDS } from './styles.js';
 import { createViewer } from './scene.js';
-import { modelLayouts, planToLayout, FAMILY } from './modelplans.js';
+import { modelLayouts, upperLayouts, planToLayout, knowsStoreys, FAMILY } from './modelplans.js';
 import { check, score, serialize } from './bands.js';
 import { check as treeCheck, serialize as treeSerialize } from './tree.js';
 import { mountEditor } from './editor.js';
 import { onModelState, preloadModel } from './model.js';
 
 const $ = (id) => document.getElementById(id);
-const S = { seen: new Set(), plot: null, beds: 3, layouts: [], sel: null, style: null, viewer: null };
+const S = { seen: new Set(), seenUp: new Set(), plot: null, beds: 3, layouts: [], sel: null, upperLayouts: [], up: null, style: null, viewer: null };
 
+const SECTIONS = { 1: 's1', 2: 's2', 2.5: 'su', 3: 's3' };                  // 2.5: the first floor of a two-storey house
 function show(n) {
-  for (let i = 1; i <= 3; i++) $('s' + i).hidden = i !== n;
+  for (const [k, id] of Object.entries(SECTIONS)) $(id).hidden = +k !== n;
   document.querySelectorAll('#steps li').forEach((li) => {
-    const k = +li.dataset.s;
-    li.classList.toggle('on', k === n);
-    li.classList.toggle('done', k < n);
+    const k = +li.dataset.s, at = Math.floor(n);
+    li.classList.toggle('on', k === at);
+    li.classList.toggle('done', k < at);
   });
   window.scrollTo(0, 0);
 }
@@ -31,13 +32,13 @@ function readPlot() {
   document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', +c.dataset.w === w && +c.dataset.d === d));
   // every choice stays open; each is labelled by how well it suits this plot
   const cap = maxBedsFor(w, d), lo = minBedsFor(w, d), rec = recBedsFor(w, d);
-  if (!userBeds && cap > 0) $('pb').value = String(rec);
+  if (!userBeds && cap > 0) $('pb').value = String(floors() === 2 ? Math.min(rec, 2) : rec);
   [...$('pb').options].forEach((o) => {
     const n = +o.value;
     o.textContent = `${n}${n === rec ? ' (recommended)' : n > cap || n < lo ? ' (may not fit)' : ''}`;
   });
   const beds = +$('pb').value;
-  $('plotinfo').textContent += cap === 0 ? '' : beds > cap
+  $('plotinfo').textContent += cap === 0 ? '' : floors() === 2 ? ` Two floors: up to ${cap} bedroom${cap > 1 ? 's' : ''} fit downstairs; more go upstairs.` : beds > cap
     ? ` One floor here fits ${cap} bedroom${cap > 1 ? 's' : ''} comfortably; with ${beds} the model shows the closest layouts that fit.`
     : ` Recommended for this plot: ${rec} bedroom${rec > 1 ? 's' : ''}.`;
   if (typeof syncBaths === 'function') syncBaths();
@@ -91,6 +92,25 @@ const recBedsFor = (w, d) => {
   return Math.max(minBedsFor(w, d), Math.min(maxBedsFor(w, d), typical));
 };
 let userBeds = false;                                              // once the visitor picks a bedroom count, keep it
+const floors = () => +$('pfloors').value;
+const setShown = (el, on) => { el.style.display = on ? '' : 'none'; };
+setShown($('floorsrow'), false);                                   // shown once the loaded model knows two-storey houses
+function syncFloors() {
+  const two = floors() === 2;
+  setShown($('pupl'), two); setShown($('pupbl'), two);
+  $('pbl').childNodes[0].nodeValue = two ? 'Bedrooms downstairs\n            ' : 'Bedrooms\n            ';
+  const ub = +$('pup').value, sel = $('pupbaths'), keep = +sel.value;
+  sel.innerHTML = '';
+  [[ub, 'attached only'], [ub + 1, 'attached + a common one']].forEach(([n, label]) => {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = `${n}: ${label}${n === ub + 1 ? ' (recommended)' : ''}`;
+    sel.appendChild(o);
+  });
+  sel.value = [ub, ub + 1].includes(keep) ? keep : ub + 1;
+  readPlot();
+}
+$('pfloors').addEventListener('change', syncFloors);
+$('pup').addEventListener('change', syncFloors);
 // washrooms: one per bedroom + a guest washroom, + a common one off the lounge above 6 marla (same as max_baths)
 const extraBathsFor = (w, d) => ((w * d) / MARLA <= 6 ? 1 : 2);
 function syncBaths(want) {
@@ -134,7 +154,8 @@ onModelState((st) => {
     : st.phase === 'error' ? 'The Naqsha model could not load. Check the connection; Generate tries again.' : '';
   if (waitingBtn && st.phase === 'loading') waitingBtn.textContent = `Downloading the Naqsha model ${st.pct}%`;
 });
-preloadModel().catch((err) => console.warn('Naqsha model could not load.', err));
+preloadModel().then(() => knowsStoreys()).then((ok) => { setShown($('floorsrow'), ok); if (!ok) $('pfloors').value = '1'; syncFloors(); })
+  .catch((err) => console.warn('Naqsha model could not load.', err));
 
 /** Draft layouts with the model for S.plot / S.prefs. regen = different layouts from the ones already shown. */
 async function generate(regen) {
@@ -164,10 +185,14 @@ async function generate(regen) {
     // a bedroom count this plot cannot hold on one floor: the closest count that fits, with the usual washrooms
     const fitBeds = Math.min(Math.max(beds, minBedsFor(S.plot.w, S.plot.d)), maxBedsFor(S.plot.w, S.plot.d));
     if (fitBeds !== beds) {
-      const fit = [{ beds: fitBeds, baths: fitBeds + 1, focus: 'balanced', porch: 'any' },
-        beds > fitBeds ? `${beds} bedrooms do not fit on one floor of ${S.plot.w} x ${S.plot.d} ft, so these are the closest layouts, with ${fitBeds}. Double-storey plans are coming.`
+      const fit = [{ ...S.prefs, beds: fitBeds, baths: fitBeds + 1, focus: 'balanced', porch: 'any' },
+        beds > fitBeds ? `${beds} bedrooms do not fit on ${S.prefs.storeys === 2 ? 'the ground floor' : 'one floor'} of ${S.plot.w} x ${S.plot.d} ft, so these are the closest layouts, with ${fitBeds}.${S.prefs.storeys === 2 ? '' : ' Choose 2 floors to fit more bedrooms.'}`
           : `Plots this size are planned with at least ${fitBeds} bedrooms, so these layouts have ${fitBeds}.`];
       relax.splice(0, relax.length, fit);                           // other relaxations cannot help here; go straight to it
+    }
+    if (S.prefs.storeys === 2) {                                  // a ground floor with stairs holds fewer bedrooms: step down until one fits
+      for (let b = Math.min(beds, fitBeds) - 1; b >= 2; b--) relax.push([{ ...S.prefs, beds: b, baths: b + 1, focus: 'balanced', porch: 'any' },
+        `${beds} bedrooms do not fit on the ground floor of ${S.plot.w} x ${S.plot.d} ft together with the stairs, so these are the closest layouts, with ${b}.`]);
     }
     for (const [prefs, note] of relax) {
       if (layouts.length) break;
@@ -201,16 +226,20 @@ $('gen').onclick = async () => {
   $('formerr').textContent = problem;
   if (problem) return;
   S.beds = +$('pb').value;
-  S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, family: $('pfamily').value };
-  S.seen = new Set();
+  S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, family: $('pfamily').value,
+    storeys: floors(), upBeds: +$('pup').value, upBaths: +$('pupbaths').value };
+  S.seen = new Set(); S.upperLayouts = []; S.up = null;
+  $('uerr').hidden = true;
   await generate(false);
 };
 $('regen').onclick = () => generate(true);
 
 // ---------- step 2 ----------
 function renderLayouts() {
-  const L0 = S.layouts[0];
-  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedroom${L0.beds === 1 ? '' : 's'}. Drafted by the Naqsha model and rule-checked. Pick one to adjust its walls.${S.note ? ` ${S.note}` : ''}`;
+  const L0 = S.layouts[0], two = S.prefs.storeys === 2;
+  $('s2').querySelector('h2').textContent = two ? 'Choose the ground floor' : 'Choose a layout';
+  $('to3').textContent = two ? 'Use this ground floor' : 'Use this layout';
+  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedroom${L0.beds === 1 ? '' : 's'}${two ? ' downstairs. The stairs are placed for the first floor, which comes next' : ''}. Drafted by the Naqsha model and rule-checked. Pick one to adjust its walls.${S.note ? ` ${S.note}` : ''}`;
   const host = $('layouts');
   host.innerHTML = '';
   S.layouts.forEach((L) => {
@@ -269,10 +298,115 @@ function select(id) {
   });
   if (fresh) $('editor').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
 }
-$('to3').onclick = () => { renderStyles(); show(3); };
+$('to3').onclick = async () => {
+  if (S.prefs.storeys !== 2) { renderStyles(); show(3); return; }
+  S.upperLayouts = []; S.seenUp = new Set();
+  await draftUpper(false);
+};
+
+// ---------- the first floor of a two-storey house: drafted by the model over the chosen ground floor ----------
+const upCost = () => ({ covered: S.sel.covered + (S.up ? S.up.covered : 0) });
+async function draftUpper(regen) {
+  const btn = $(regen ? 'uregen' : 'to3'), label = btn.textContent;
+  btn.disabled = true;
+  $('uerr').hidden = true;
+  let layouts = [], note = '';
+  try {
+    const { upBeds, upBaths } = S.prefs;
+    const tries = [[upBeds, upBaths, '']];
+    if (upBaths > upBeds) tries.push([upBeds, upBeds, `${upBaths} washrooms upstairs do not fit with this ground floor, so these have ${upBeds}, one attached to each bedroom.`]);
+    for (let b = upBeds - 1; b >= 1; b--) tries.push([b, b + 1, `${upBeds} bedrooms do not fit upstairs over this ground floor, so these have ${b}.`], [b, b, `${upBeds} bedrooms do not fit upstairs over this ground floor, so these have ${b}.`]);
+    for (const [beds, baths, msg] of tries) {
+      layouts = await upperLayouts(S.sel, { beds, baths }, (m) => (btn.textContent = m),
+        { exclude: regen ? S.seenUp : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12 });
+      if (layouts.length) { note = msg; break; }
+      if (regen) break;                                          // Regenerate keeps the request; only the first try relaxes it
+    }
+  } catch (err) {
+    console.warn('Naqsha model could not draft the first floor.', err);
+  }
+  btn.disabled = false;
+  btn.textContent = label;
+  if (!layouts.length) {
+    $('uerr').textContent = regen ? 'No new first floor passed the checks this time. Press Regenerate again.'
+      : 'The model could not draft a first floor over this ground floor. Pick another ground floor or press Regenerate layouts.';
+    $('uerr').hidden = false;
+    return;
+  }
+  layouts.forEach((L) => S.seenUp.add(L.text));
+  S.upperLayouts = layouts; S.up = null; S.upNote = note;
+  upEditor?.destroy(); upEditor = null; upIdx = -1; upEditState.clear(); $('ueditor').hidden = true;
+  renderUpper();
+  show(2.5);
+}
+const upEditState = new Map();
+let upEditor = null, upIdx = -1;
+const upCard = (L) => `${planSVG(L)}<h4>${L.label}${L.tag === 'First floor, edited' ? ', edited' : ''}</h4><p>${L.beds} bedroom${L.beds === 1 ? '' : 's'}, ${L.covered.toLocaleString()} sq ft covered</p><span class="badge ${L.checks.length - L.score ? 'w' : ''}">${L.score}/${L.checks.length} checks passed</span>`;
+function showUpperChecks() {
+  const L = S.up;
+  $('uchkscore').textContent = `(${L.score}/${L.checks.length})`;
+  $('uchecks').innerHTML = L.checks.map((c) => `<li><span class="ico ${c.level}">${c.level === 'ok' ? '&#10003;' : '&#9888;'}</span><div><b>${c.title}</b><span>${c.detail}</span></div></li>`).join('');
+  $('ucost').innerHTML = '<table>' + estimateCost(upCost()).map((t) => `<tr><td>${t.tier} <small>(Rs ${t.rate.toLocaleString()}/sq ft)</small></td><td>Rs ${(t.total / 1e6).toFixed(1)} M</td></tr>`).join('') + '</table>';
+  drawPair();
+}
+/** Pick a first floor and open it in the editor (drag walls; the stairs stay where the stairs below are). */
+function selectUpper(idx) {
+  S.up = S.upperLayouts[idx];
+  const host = $('ulayouts');
+  [...host.children].forEach((c, i) => c.classList.toggle('sel', i === idx));
+  showUpperChecks();
+  $('uto3').disabled = false;
+  if (upEditor && upIdx === idx) return;
+  upEditor?.destroy();
+  upIdx = idx;
+  $('ueditor').hidden = false;
+  if (!upEditState.has(S.up.id)) upEditState.set(S.up.id, {});
+  upEditor = mountEditor($('uedhost'), S.up, {
+    undoBtn: $('uedundo'), resetBtn: $('uedreset'), state: upEditState.get(S.up.id),
+    accept: (plan) => !treeCheck(plan, plan.beds).some((c) => c.level === 'err'),
+    rebuild: (plan) => {
+      const checks = treeCheck(plan, plan.beds);
+      const L = planToLayout({ text: treeSerialize(plan), plan, checks, score: score(checks) }, idx);
+      if (JSON.stringify(plan) !== JSON.stringify(upEditState.get(L.id).original)) L.tag = 'First floor, edited';
+      return L;
+    },
+    onChange: (L, live) => {
+      S.upperLayouts[idx] = S.up = L;
+      showUpperChecks();
+      if (!live) host.children[idx].innerHTML = upCard(L);
+    },
+  });
+}
+/** Both floors side by side: the chosen ground floor and the first floor being picked. */
+function drawPair(host = $('pair')) {
+  const half = (title, L) => `<figure><figcaption>${title}</figcaption>${L ? planSVG(L, { maxW: 420, maxH: 520 }) : '<p class="fine">Pick a first floor below.</p>'}</figure>`;
+  host.innerHTML = half('Ground floor', S.sel) + half('First floor', S.up);
+}
+function renderUpper() {
+  $('usub').textContent = `Over the ${S.sel.beds}-bedroom ground floor, the stairs come up in the same place. Drafted by the Naqsha model and rule-checked. Open roof of the floor below is shown as terrace.${S.upNote ? ` ${S.upNote}` : ''}`;
+  const host = $('ulayouts');
+  host.innerHTML = '';
+  S.upperLayouts.forEach((L, i) => {
+    const warn = L.checks.length - L.score;
+    const el = document.createElement('button');
+    el.className = 'opt';
+    el.innerHTML = upCard(L);
+    el.onclick = () => selectUpper(i);
+    host.appendChild(el);
+  });
+  $('uto3').disabled = true;
+  drawPair();
+  $('uchecks').innerHTML = '<li><span></span><span>Select a first floor to see its rule check and the cost of both floors.</span></li>';
+  $('ucost').innerHTML = ''; $('uchkscore').textContent = '';
+}
+$('uregen').onclick = () => draftUpper(true);
+$('uto3').onclick = () => { renderStyles(); show(3); };
 
 // ---------- step 3 ----------
 function renderStyles() {
+  $('s3back').dataset.go = S.prefs.storeys === 2 ? '2.5' : '2';
+  $('pair3').hidden = !S.up;
+  if (S.up) drawPair($('pair3'));
   const host = $('styles');
   host.innerHTML = '';
   S.style = null; $('to4').disabled = true;
@@ -280,7 +414,7 @@ function renderStyles() {
     const st = STYLES[id];
     const el = document.createElement('button');
     el.className = 'opt';
-    el.innerHTML = `${elevationSVG(S.sel, st)}<h4>${st.name}</h4><p>${st.blurb}</p>`;
+    el.innerHTML = `${elevationSVG(S.sel, st, S.up)}<h4>${st.name}</h4><p>${st.blurb}</p>`;
     el.onclick = () => {
       S.style = id;
       [...host.children].forEach((c) => c.classList.toggle('sel', c === el));
@@ -294,8 +428,11 @@ function renderStyles() {
 $('to4').onclick = () => {
   $('viewer').hidden = false;
   document.body.style.overflow = 'hidden';
+  $('vfloor').hidden = !S.up;
+  $('vfloor').textContent = 'Go upstairs';
   S.viewer = createViewer($('vhost'), S.sel, S.style, {
     onRoom: (n) => ($('hudroom').textContent = n),
+    onFloor: (f) => ($('vfloor').textContent = f ? 'Go downstairs' : 'Go upstairs'),
     onMode: (mode, roof) => {
       $('vmode').textContent = mode === 'walk' ? 'Overview' : 'Walk inside';
       $('vroof').textContent = roof ? 'Hide roof' : 'Show roof';
@@ -304,17 +441,18 @@ $('to4').onclick = () => {
         ? 'Drag to look. W/A/S/D or arrows to move, Q/E to turn, Shift to run.'
         : 'Drag to orbit, scroll to zoom, right-drag to pan.';
     },
-  });
+  }, S.up);
 };
 $('vmode').onclick = () => S.viewer.setMode(S.viewer.mode === 'orbit' ? 'walk' : 'orbit');
 $('vroof').onclick = () => { const v = S.viewer; v.setRoof(!v.roofVisible); $('vroof').textContent = v.roofVisible ? 'Hide roof' : 'Show roof'; };
 $('vreset').onclick = () => S.viewer.resetWalk();
+$('vfloor').onclick = () => S.viewer.setFloor(S.viewer.floor ? 0 : 1);
 $('vback').onclick = () => {
   S.viewer.dispose(); S.viewer = null;
   $('viewer').hidden = true; document.body.style.overflow = '';
 };
 
-readPlot();
+syncFloors();
 show(1);
 
 // hand-over from the landing page: ?q=10+marla+3+bed&w=35&d=65&baths=4&focus=lounge fills the form and generates straight away

@@ -1,0 +1,10 @@
+{"id": "e834b5cd5249ad69", "image": "images/e834b5cd5249ad69.jpg",
+ "note": "30x60 plot (design house plan): verandah and garage at the front, 18x20 living, kitchen/dining 18x14, family lounge with two toilets, two beds with a wash area at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [30, 60],
+   "rows": [[{"t": "lawn", "w": 19, "d": 12.67}, {"t": "porch", "w": 11, "d": 12.67}],
+            [{"t": "lounge", "w": 19, "d": 20}, {"t": "porch", "w": 11, "d": 12}],
+            [{"t": "kitchen", "w": 19, "d": 14}, {"t": "lounge", "w": 11, "d": 14}],
+            [{"t": "bed", "w": 10.5, "d": 12}, {"t": "store", "w": 8.5, "d": 9}, {"t": "bed", "w": 11, "d": 12}]],
+   "baths": [{"row": 3, "col": 2, "w": 10, "d": 5, "side": "R"}, {"row": 4, "col": 2, "w": 4, "d": 4.5, "side": "R"}]},
+ "first_floor": null}

@@ -1,0 +1,11 @@
+{"id": "91ec4ee0441e3d3f", "image": "images/91ec4ee0441e3d3f.jpg",
+ "note": "40x50 plot (Urdu video thumbnail): lawn, car porch, drawing room with bath at the front, kitchen, store, central dining hall, sitting with stairs, two beds with baths around a patio at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [40, 50],
+   "rows": [[{"t": "lawn", "w": 12.5, "d": 10.5}, {"t": "void", "w": 12.5, "d": 10.5}, {"t": "void", "w": 15, "d": 10.5}],
+            [{"t": "void", "w": 2.5, "d": 11.5}, {"t": "kitchen", "w": 13, "d": 11}, {"t": "porch", "w": 11, "d": 11.5}, {"t": "drawing", "w": 13.5, "d": 11.5}],
+            [{"t": "store", "w": 9.5, "d": 10.25}, {"t": "dining", "w": 16, "d": 14}, {"t": "lounge", "w": 14.5, "d": 12.5}],
+            [{"t": "void", "w": 25.5, "d": 5.5}, {"t": "stairs", "w": 9, "d": 5.5}, {"t": "void", "w": 5.5, "d": 5.5}],
+            [{"t": "bed", "w": 14.5, "d": 14.3}, {"t": "courtyard", "w": 10.5, "d": 14.3}, {"t": "master", "w": 15, "d": 14.3}]],
+   "baths": [{"row": 2, "col": 4, "w": 6.5, "d": 4.5, "side": "R"}, {"row": 5, "col": 1, "w": 7, "d": 5.5, "side": "R"}, {"row": 5, "col": 3, "w": 7, "d": 5.5, "side": "L"}]},
+ "first_floor": null}

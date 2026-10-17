@@ -1,0 +1,10 @@
+{"id": "80e1decc27cec88f", "image": "images/80e1decc27cec88f.jpg",
+ "note": "7 marla 37x50 (YouTube thumbnail): car porch and front open strip, drawing room with bath, stairs hall, big lounge, kitchen, two bedrooms and a patio at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [37, 50],
+   "rows": [[{"t": "lawn", "w": 23, "d": 6}, {"t": "porch", "w": 14, "d": 6}],
+            [{"t": "drawing", "w": 11.5, "d": 13.5}, {"t": "stairs", "w": 5, "d": 13.5}, {"t": "lobby", "w": 4, "d": 13.5}, {"t": "porch", "w": 14, "d": 9.5}],
+            [{"t": "lounge", "w": 24, "d": 12.5}, {"t": "kitchen", "w": 11.5, "d": 10}, {"t": "void", "w": 1.5, "d": 10}],
+            [{"t": "courtyard", "w": 7, "d": 14}, {"t": "bed", "w": 13, "d": 13}, {"t": "bed", "w": 15, "d": 14.5}]],
+   "baths": [{"row": 2, "col": 1, "w": 5, "d": 6, "side": "L"}, {"row": 4, "col": 2, "w": 6, "d": 8, "side": "L"}, {"row": 4, "col": 3, "w": 6, "d": 7, "side": "R"}]},
+ "first_floor": null}

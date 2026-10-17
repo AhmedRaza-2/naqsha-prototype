@@ -1,0 +1,11 @@
+{"id": "f4e0ab1ab68b3c8c", "image": "images/f4e0ab1ab68b3c8c.jpg",
+ "note": "irregular plot about 35x67 (34.5 to 36 ft wide, 65 to 69 ft deep; mapia.pk): two-car porch and 10.75 ft lawn at the front, drawing room, entrance lobby with powder room, 19.5x17.75 lounge, two big bedrooms with baths, stair hall and kitchen on the right, rear car porch; skewed frame so positions are approximate",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [35, 67],
+   "rows": [[{"t": "porch", "w": 21, "d": 10}, {"t": "lawn", "w": 14, "d": 10}],
+            [{"t": "porch", "w": 12, "d": 13}, {"t": "lobby", "w": 10, "d": 13}, {"t": "drawing", "w": 13, "d": 13}],
+            [{"t": "bed", "w": 14.5, "d": 15}, {"t": "lounge", "w": 20.5, "d": 17.5}],
+            [{"t": "bed", "w": 16.25, "d": 12.75}, {"t": "stairs", "w": 7, "d": 13.6}, {"t": "kitchen", "w": 11.75, "d": 18.8}],
+            [{"t": "porch", "w": 13, "d": 10.6}, {"t": "void", "w": 22, "d": 10.6}]],
+   "baths": [{"row": 2, "col": 2, "w": 4, "d": 5.75, "side": "L"}, {"row": 3, "col": 1, "w": 13.5, "d": 6.8, "side": "L"}, {"row": 4, "col": 1, "w": 14.5, "d": 5.25, "side": "R"}]},
+ "first_floor": null}

@@ -1,0 +1,11 @@
+{"id": "ae0efc4df492e092", "image": "images/ae0efc4df492e092.jpg",
+ "note": "35x65 Lahore working plan: front lawn and long porch, drawing room, entrance with stairs and store, dining and lounge, kitchen beside a 5 ft open laundry strip, two bedrooms with dressing and washrooms at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [35, 65],
+   "rows": [[{"t": "lawn", "w": 14.5, "d": 10.5}, {"t": "porch", "w": 20.5, "d": 14}],
+            [{"t": "drawing", "w": 14.5, "d": 14}, {"t": "lobby", "w": 13, "d": 10}, {"t": "stairs", "w": 7.5, "d": 8}],
+            [{"t": "passage", "w": 6, "d": 12}, {"t": "dining", "w": 9.5, "d": 11}, {"t": "lounge", "w": 19.5, "d": 12}],
+            [{"t": "courtyard", "w": 6, "d": 12}, {"t": "kitchen", "w": 9.5, "d": 11.5}, {"t": "lobby", "w": 5.5, "d": 12}, {"t": "master", "w": 14, "d": 17}],
+            [{"t": "bed", "w": 19.5, "d": 15.5}, {"t": "void", "w": 2, "d": 15}, {"t": "dress", "w": 8.5, "d": 8.5}, {"t": "void", "w": 5, "d": 8}]],
+   "baths": [{"row": 3, "col": 1, "w": 5, "d": 6, "side": "L"}, {"row": 4, "col": 4, "w": 8, "d": 5, "side": "R"}, {"row": 5, "col": 1, "w": 5, "d": 8, "side": "L"}]},
+ "first_floor": null}

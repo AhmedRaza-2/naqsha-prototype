@@ -1,0 +1,10 @@
+{"id": "96e76298d84872b7", "image": "images/96e76298d84872b7.jpg",
+ "note": "25x50: stairs and a 9 ft car porch on the left, drawing room, open kitchen and lounge in the middle, two bedrooms with baths and duct at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 50],
+   "rows": [[{"t": "stairs", "w": 4, "d": 17}, {"t": "porch", "w": 9.5, "d": 17}, {"t": "drawing", "w": 11.5, "d": 13.5}],
+            [{"t": "kitchen", "w": 8, "d": 10.5}, {"t": "lounge", "w": 17, "d": 13.25}],
+            [{"t": "void", "w": 25, "d": 3}],
+            [{"t": "bed", "w": 12.5, "d": 13.5}, {"t": "bed", "w": 12.5, "d": 12}]],
+   "baths": [{"row": 4, "col": 1, "w": 7, "d": 5, "side": "L"}, {"row": 4, "col": 2, "w": 7, "d": 5, "side": "L"}]},
+ "first_floor": null}

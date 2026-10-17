@@ -1,0 +1,12 @@
+{"id": "ae34e8e8e818aeae", "image": "images/ae34e8e8e818aeae.jpg",
+ "note": "50x40 wide plot (Ideal Architect), single storey: central 19x21.75 lounge entered from a small front verandah (outside the 40 ft line, left out), front bed with bath and dress, kitchen with stairs behind it, two back beds with two baths between them, 2.5 ft side and back passages",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 40],
+   "rows": [[{"t": "void", "w": 2.5, "d": 16}, {"t": "bed", "w": 14, "d": 16}, {"t": "lounge", "w": 19.5, "d": 21.75}, {"t": "kitchen", "w": 12.5, "d": 15}],
+            [{"t": "void", "w": 2.5, "d": 7}, {"t": "dress", "w": 14, "d": 5.5}, {"t": "passage", "w": 19.5, "d": 7}, {"t": "stairs", "w": 12.5, "d": 7}],
+            [{"t": "void", "w": 2.5, "d": 13}, {"t": "master", "w": 28, "d": 13}, {"t": "bed", "w": 17.5, "d": 13}],
+            [{"t": "void", "w": 50, "d": 3}]],
+   "baths": [{"row": 2, "col": 2, "w": 8, "d": 5, "side": "L"},
+             {"row": 2, "col": 3, "w": 8.5, "d": 6.25, "side": "R"},
+             {"row": 3, "col": 2, "w": 9.5, "d": 6.25, "side": "R"}]},
+ "first_floor": null}

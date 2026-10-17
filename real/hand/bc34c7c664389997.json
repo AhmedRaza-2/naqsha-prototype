@@ -1,0 +1,11 @@
+{"id": "bc34c7c664389997", "image": "images/bc34c7c664389997.jpg",
+ "note": "40x80 plot, civilengineerinqs ground floor: front lawn, side car porch 30 ft long, guest room and bedroom with toilet, kitchen, dining with stairs, two beds at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [40, 80],
+   "rows": [[{"t": "lawn", "w": 27, "d": 17}, {"t": "void", "w": 13, "d": 17}],
+            [{"t": "void", "w": 4.5, "d": 16}, {"t": "bed", "w": 13.5, "d": 15.8}, {"t": "bed", "w": 11.5, "d": 17.3}, {"t": "porch", "w": 10.5, "d": 30}],
+            [{"t": "void", "w": 4.5, "d": 11.5}, {"t": "kitchen", "w": 9.5, "d": 11.5}, {"t": "passage", "w": 4.5, "d": 11.5}, {"t": "void", "w": 21.5, "d": 11.5}],
+            [{"t": "void", "w": 4.5, "d": 14.7}, {"t": "store", "w": 8, "d": 9.5}, {"t": "dining", "w": 16.5, "d": 14.7}, {"t": "stairs", "w": 4.5, "d": 15}, {"t": "void", "w": 6.5, "d": 14.7}],
+            [{"t": "void", "w": 4.5, "d": 16}, {"t": "bed", "w": 12, "d": 14.4}, {"t": "master", "w": 11.75, "d": 18}, {"t": "void", "w": 11.75, "d": 16}]],
+   "baths": [{"row": 2, "col": 3, "w": 6.75, "d": 4.75, "side": "R"}, {"row": 4, "col": 2, "w": 7.75, "d": 4.9, "side": "L"}, {"row": 5, "col": 3, "w": 7.75, "d": 4.25, "side": "R"}]},
+ "first_floor": null}

@@ -1,0 +1,12 @@
+{"id": "946a949595c31e6f", "image": "images/946a949595c31e6f.jpg",
+ "note": "8.5 marla 30x70 option 3 (EGI): 10 ft front lawn on the road side, car parking and drawing room with bath, stairs, 14x17.75 lounge and kitchen, two bedrooms with baths at the back, 8 ft rear lawn, 3 ft side passage; drawn turned with the road on the right",
+ "drawn": "road on the right",
+ "rooms": {"plot": [30, 70],
+   "rows": [[{"t": "lawn", "w": 30, "d": 10}],
+            [{"t": "porch", "w": 12.5, "d": 13.5}, {"t": "drawing", "w": 14, "d": 13.5}, {"t": "void", "w": 3.5, "d": 13.5}],
+            [{"t": "stairs", "w": 5.5, "d": 12}, {"t": "lounge", "w": 16, "d": 14}, {"t": "kitchen", "w": 8.5, "d": 10}],
+            [{"t": "bed", "w": 14, "d": 14}, {"t": "void", "w": 2, "d": 14}, {"t": "bed", "w": 14, "d": 14}],
+            [{"t": "void", "w": 30, "d": 6}],
+            [{"t": "lawn", "w": 30, "d": 8}]],
+   "baths": [{"row": 2, "col": 2, "w": 7, "d": 4, "side": "R"}, {"row": 4, "col": 1, "w": 8, "d": 6, "side": "L"}, {"row": 4, "col": 3, "w": 8, "d": 6, "side": "R"}]},
+ "first_floor": null}

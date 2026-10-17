@@ -1,0 +1,9 @@
+{"id": "c11b31729a6d669d", "image": "images/c11b31729a6d669d.jpg",
+ "note": "33x33 square plot: small porch between drawing room and a front bedroom, lobby/dining with stairs, common toilet between the two right-hand bedrooms, kitchen and rear open space at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [33, 33],
+   "rows": [[{"t": "drawing", "w": 11, "d": 12.25}, {"t": "porch", "w": 9.5, "d": 12}, {"t": "bed", "w": 12.5, "d": 12.25}],
+            [{"t": "stairs", "w": 7, "d": 10}, {"t": "dining", "w": 13, "d": 10}, {"t": "passage", "w": 13, "d": 5.5}],
+            [{"t": "kitchen", "w": 10.5, "d": 8}, {"t": "courtyard", "w": 10, "d": 8.5}, {"t": "bed", "w": 12.5, "d": 13}]],
+   "baths": [{"row": 2, "col": 3, "w": 7, "d": 5.5, "side": "R"}]},
+ "first_floor": null}

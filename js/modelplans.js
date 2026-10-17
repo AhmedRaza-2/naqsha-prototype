@@ -3,7 +3,7 @@
 import { OPEN, MARLA_SQFT, toRects, outsideDoors } from './bands.js';
 import { toRects as treeRects } from './tree.js';
 import { finalize, ruleFor } from './layout.js';
-import { draftPlans, knowsStyles } from './model.js';
+import { draftPlans, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
 const NAMES = { drawing: 'Drawing Room', lobby: 'Entrance', dining: 'Dining', kitchen: 'Kitchen', stairs: 'Stairs', passage: 'Corridor',
@@ -15,6 +15,8 @@ const TITLE = {
   'entrance on road side': 'Entrance on the road side', 'every room reachable': 'Every room reachable', 'guest privacy': 'Guest privacy',
   'bedroom not opening into kitchen': 'Bedrooms vs kitchen', 'kitchen ventilation': 'Kitchen ventilation', 'natural light': 'Natural light',
   'bigger bedrooms': 'Bigger bedrooms', 'bigger lounge': 'Bigger hall', 'bigger kitchen': 'Bigger kitchen',
+  'stairs above stairs': 'Stairs above the stairs below', 'every room reachable from the stairs': 'Every room reachable from the stairs',
+  'stairs on the ground floor': 'Stairs to the first floor', 'ground-floor rooms': 'Rooms that belong downstairs',
 };
 const OK_TEXT = {
   setbacks: 'Front, rear and side setbacks are kept for this plot size (indicative; verify with your development authority).',
@@ -30,6 +32,9 @@ const OK_TEXT = {
   'bigger bedrooms': 'Bedrooms take a larger share of the house, as you asked.',
   'bigger lounge': 'The hall (lounge) takes a larger share of the house, as you asked.',
   'bigger kitchen': 'The kitchen takes a larger share of the house, as you asked.',
+  'stairs above stairs': 'The stairs come up exactly where the stairs below end.',
+  'every room reachable from the stairs': 'Every room upstairs can be reached from the stairs.',
+  'stairs on the ground floor': 'The ground floor has stairs for the first floor.',
 };
 
 /** One drafted plan -> planner layout object, with doors and windows from the planner's own finalize(). */
@@ -55,7 +60,7 @@ export function planToLayout(item, index) {
     if (r.t === 'master') { type = 'bed'; name = 'Master Bedroom'; id = 'bed1'; }
     else if (r.t === 'bed') { bedNo += 1; name = nBeds === 1 ? 'Bedroom' : `Bedroom ${bedNo}`; id = `bed${bedNo}`; }
     else {
-      name = r.t === 'lounge' ? (hasDining ? 'TV Lounge' : 'Lounge & Dining') : NAMES[r.t];
+      name = r.t === 'lounge' ? (plan.floor ? 'Family Lounge' : hasDining ? 'TV Lounge' : 'Lounge & Dining') : NAMES[r.t];
       id = seenType[r.t] === 1 ? r.t : `${r.t}${seenType[r.t]}`;                // unique ids: doors and links refer to them
     }
     const room = { id, type, name, x: r.x, z: r.y, w: r.w, d: r.d };
@@ -75,8 +80,8 @@ export function planToLayout(item, index) {
 
   // open spaces inside the house outline: the car porch beside the drawing room (small plots) and light wells
   const inside = (r) => r.x >= B.x - 0.01 && r.x + r.w <= B.x + B.w + 0.01 && r.y >= B.z - 0.01 && r.y + r.d <= B.z + B.d + 0.01;
-  const open = rects.filter((r) => r.t === 'porch' || (r.t === 'courtyard' && inside(r)))
-    .map((r) => ({ type: r.t, name: r.t === 'porch' ? 'Car Porch' : 'Light Well', x: r.x, z: r.y, w: r.w, d: r.d }));
+  const open = rects.filter((r) => r.t === 'porch' || r.t === 'terrace' || (r.t === 'courtyard' && inside(r)))
+    .map((r) => ({ type: r.t, name: r.t === 'porch' ? 'Car Porch' : r.t === 'terrace' ? 'Terrace' : 'Light Well', x: r.x, z: r.y, w: r.w, d: r.d }));
 
   // doors to outside: the same rule the checker uses
   const rmains = rects.filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
@@ -87,9 +92,10 @@ export function planToLayout(item, index) {
   };
 
   const letter = String.fromCharCode(65 + index);
+  const upper = !!plan.floor;                                   // a first floor: no road entrance, the stairs are its way in
   const L = {
-    id: `M${letter}`, label: `Layout ${letter}`, tag: 'Naqsha model', source: 'model', text: item.text,
-    plot: { w: W, d: D }, rule: ruleFor(W, D), B, rooms, open, doorsOut, beds: plan.beds, narrow: B.w < 26, plan,
+    id: `${upper ? 'U' : 'M'}${letter}`, label: upper ? `First floor ${letter}` : `Layout ${letter}`, tag: upper ? 'First floor' : 'Naqsha model', source: 'model', text: item.text,
+    plot: { w: W, d: D }, rule: ruleFor(W, D), B, rooms, open, doorsOut, beds: plan.beds, narrow: B.w < 26, plan, rects, upper,
   };
   finalize(L);                                                  // doors, windows and links for the 2D plan and the 3D walkthrough
   // the planner's own checker does not know light wells; show the checker the model was trained against instead
@@ -122,4 +128,31 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
     n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles, keep,
   });
   return items.map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
+}
+
+/** The ground floor's built box and its stairs (inside the box), the two things a first floor is drafted around.
+ *  Same as box_and_stairs in tools/gen_upper.py; null when the ground floor has no stairs. */
+export function boxAndStairs(rects) {
+  const mains = rects.filter((r) => !OPEN.has(r.t) && r.parent === undefined && r.t !== 'bath');
+  const st = mains.find((r) => r.t === 'stairs');
+  if (!st) return null;
+  const x0 = Math.min(...mains.map((r) => r.x)), y0 = Math.min(...mains.map((r) => r.y));
+  const x1 = Math.max(...mains.map((r) => r.x + r.w)), y1 = Math.max(...mains.map((r) => r.y + r.d));
+  const r2 = (v) => Math.round(v * 100) / 100;
+  return { box: { x: r2(x0), y: r2(y0), w: r2(x1 - x0), d: r2(y1 - y0) }, up: { x: r2(st.x - x0), y: r2(st.y - y0), w: st.w, d: st.d } };
+}
+
+/** True when the loaded model can draw both floors of a two-storey house. */
+export { knowsStoreys };
+
+/** First floors over a chosen ground floor: three layouts drafted by the model, each rule-checked (the stairs sit exactly
+ *  above the stairs below). Empty list when the ground floor has no stairs or the model gives nothing valid. */
+export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
+  const fb = boxAndStairs(ground.rects);
+  if (!fb) return [];
+  const { w, d } = ground.plot;
+  const items = await draftPlans({ w, d, beds: prefs.beds, baths: prefs.baths, floor: fb }, {
+    n: opts.n ?? 12, top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles: [null],
+  });
+  return items.map((it, i) => planToLayout(it, i));
 }

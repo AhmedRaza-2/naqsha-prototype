@@ -1,0 +1,12 @@
+{"id": "af69b463706cb063", "image": "images/af69b463706cb063.jpg",
+ "note": "27x65: parking and green area at the front (small powder room beside them), drawing room, entrance porch with stairs, dining and kitchen, two bedrooms with dress and toilet each around a rear courtyard",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [27, 65],
+   "rows": [[{"t": "lawn", "w": 10, "d": 14.5}, {"t": "porch", "w": 15.5, "d": 15}],
+            [{"t": "drawing", "w": 12.5, "d": 11}, {"t": "lobby", "w": 9.5, "d": 13.5}, {"t": "stairs", "w": 3.25, "d": 13.5}],
+            [{"t": "dining", "w": 17, "d": 11}, {"t": "kitchen", "w": 7.5, "d": 11}],
+            [{"t": "bed", "w": 12, "d": 16}, {"t": "bed", "w": 13, "d": 16}],
+            [{"t": "void", "w": 8, "d": 5}, {"t": "courtyard", "w": 11, "d": 11}, {"t": "void", "w": 8, "d": 5}]],
+   "baths": [{"row": 4, "col": 1, "w": 7, "d": 5, "side": "L"},
+             {"row": 4, "col": 2, "w": 7, "d": 5, "side": "R"}]},
+ "first_floor": null}

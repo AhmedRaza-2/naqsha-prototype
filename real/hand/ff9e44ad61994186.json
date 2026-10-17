@@ -1,0 +1,12 @@
+{"id": "ff9e44ad61994186", "image": "images/ff9e44ad61994186.jpg",
+ "note": "35x70 (Ideal Architect): 18 ft gate, 10 ft front lawn and two-car porch, drawing room, staircase, dining, kitchen and 16x16 lounge, two bedrooms with baths and dress at the back, 7 ft rear lawn, 4 ft open strips on the sides",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [35, 70],
+   "rows": [[{"t": "lawn", "w": 13.5, "d": 10}, {"t": "porch", "w": 21.5, "d": 17}],
+            [{"t": "drawing", "w": 13, "d": 14}, {"t": "stairs", "w": 16, "d": 7}, {"t": "void", "w": 6, "d": 14}],
+            [{"t": "dining", "w": 13.5, "d": 9.25}, {"t": "lounge", "w": 16, "d": 16}, {"t": "void", "w": 5.5, "d": 16}],
+            [{"t": "void", "w": 4, "d": 12}, {"t": "kitchen", "w": 9.5, "d": 12}, {"t": "passage", "w": 16, "d": 12}, {"t": "void", "w": 5.5, "d": 12}],
+            [{"t": "bed", "w": 20, "d": 14}, {"t": "void", "w": 2, "d": 14}, {"t": "bed", "w": 13, "d": 14}],
+            [{"t": "lawn", "w": 35, "d": 7}]],
+   "baths": [{"row": 5, "col": 1, "w": 6.4, "d": 8, "side": "L"}, {"row": 5, "col": 3, "w": 7.5, "d": 5.5, "side": "R"}]},
+ "first_floor": null}

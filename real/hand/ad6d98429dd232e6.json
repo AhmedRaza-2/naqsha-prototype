@@ -1,0 +1,13 @@
+{"id": "ad6d98429dd232e6", "image": "images/ad6d98429dd232e6.jpg",
+ "note": "1 kanal-ish 50x90 (mapia.pk): front lawn, curved drawing room beside a two-car porch, foyer with stairs, lounge and dining, kitchen with store and laundry, two bedrooms with dress and bath at the back, 10 ft right setback",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 90],
+   "rows": [[{"t": "lawn", "w": 50, "d": 15}],
+            [{"t": "drawing", "w": 22, "d": 18}, {"t": "porch", "w": 22, "d": 18}, {"t": "void", "w": 6, "d": 18}],
+            [{"t": "void", "w": 6, "d": 9}, {"t": "lobby", "w": 21, "d": 9}, {"t": "stairs", "w": 11, "d": 9}, {"t": "void", "w": 12, "d": 9}],
+            [{"t": "void", "w": 6, "d": 12}, {"t": "lounge", "w": 17, "d": 21}, {"t": "dining", "w": 15, "d": 12}, {"t": "void", "w": 12, "d": 12}],
+            [{"t": "void", "w": 3, "d": 13}, {"t": "bed", "w": 14, "d": 17}, {"t": "passage", "w": 6, "d": 13}, {"t": "kitchen", "w": 15, "d": 13}, {"t": "void", "w": 12, "d": 13}],
+            [{"t": "void", "w": 3, "d": 14}, {"t": "dress", "w": 14, "d": 14}, {"t": "master", "w": 17, "d": 14}, {"t": "dress", "w": 5.5, "d": 14}, {"t": "void", "w": 10.5, "d": 14}],
+            [{"t": "void", "w": 50, "d": 5}]],
+   "baths": [{"row": 6, "col": 2, "w": 8, "d": 7, "side": "L"}, {"row": 6, "col": 3, "w": 5, "d": 8, "side": "R"}]},
+ "first_floor": null}

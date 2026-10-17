@@ -1,0 +1,13 @@
+{"id": "ea948639936b95c6", "image": "images/ea948639936b95c6.jpg",
+ "note": "1 kanal 50x90 (50 ft printed, depth read off the drawing), 3110 sq ft: driveway and front lawn, three-car porch beside drawing room, lobby with stairs and bath, dining, lounge with open-to-sky patio, kitchen with side kitchen, three bedrooms, master with tub bath and store, laundry at the back, 5 ft left setback",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 90],
+   "rows": [[{"t": "void", "w": 23, "d": 15}, {"t": "lawn", "w": 27, "d": 15}],
+            [{"t": "porch", "w": 31, "d": 13}, {"t": "drawing", "w": 19, "d": 14}],
+            [{"t": "void", "w": 5, "d": 10}, {"t": "stairs", "w": 16, "d": 9}, {"t": "lobby", "w": 10, "d": 10}, {"t": "dining", "w": 19, "d": 10.5}],
+            [{"t": "void", "w": 5, "d": 16}, {"t": "kitchen", "w": 17, "d": 15}, {"t": "lounge", "w": 20.5, "d": 16}, {"t": "courtyard", "w": 7.5, "d": 16}],
+            [{"t": "void", "w": 5, "d": 14}, {"t": "bed", "w": 16.5, "d": 14}, {"t": "passage", "w": 11, "d": 14}, {"t": "master", "w": 17.5, "d": 14.5}],
+            [{"t": "void", "w": 5, "d": 14}, {"t": "bed", "w": 21, "d": 14}, {"t": "dress", "w": 14.5, "d": 14}, {"t": "store", "w": 9.5, "d": 14}],
+            [{"t": "void", "w": 43, "d": 7}, {"t": "store", "w": 7, "d": 7}]],
+   "baths": [{"row": 3, "col": 2, "w": 5, "d": 6, "side": "L"}, {"row": 6, "col": 2, "w": 6, "d": 5.5, "side": "L"}, {"row": 6, "col": 3, "w": 10, "d": 6, "side": "R"}]},
+ "first_floor": null}

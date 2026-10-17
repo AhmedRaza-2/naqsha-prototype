@@ -1,0 +1,11 @@
+{"id": "94da667d99c01bc6", "image": "images/94da667d99c01bc6.jpg",
+ "note": "12 marla 36x75 (mapia.pk): two-car porch beside lawn, drawing room with powder room, stairs and lobby, big lounge, kitchen with dining nook, two beds at the back with attached baths, 5 ft left passage",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [36, 75],
+   "rows": [[{"t": "porch", "w": 18, "d": 10}, {"t": "lawn", "w": 18, "d": 10}],
+            [{"t": "porch", "w": 11, "d": 9}, {"t": "stairs", "w": 7, "d": 10}, {"t": "lobby", "w": 6, "d": 17}, {"t": "drawing", "w": 12, "d": 17}],
+            [{"t": "void", "w": 5, "d": 18}, {"t": "kitchen", "w": 12, "d": 17}, {"t": "lounge", "w": 19, "d": 17.5}],
+            [{"t": "void", "w": 5, "d": 22}, {"t": "bed", "w": 16, "d": 22}, {"t": "master", "w": 13, "d": 22}],
+            [{"t": "void", "w": 36, "d": 6}]],
+   "baths": [{"row": 2, "col": 3, "w": 4, "d": 5, "side": "L"}, {"row": 4, "col": 2, "w": 8.5, "d": 7, "side": "R"}, {"row": 4, "col": 3, "w": 7, "d": 6.5, "side": "R"}]},
+ "first_floor": null}

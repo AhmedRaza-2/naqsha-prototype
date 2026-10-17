@@ -16,7 +16,7 @@ echo "GPUs: $NG   start from $INIT, fine-tune $FT epochs, RL $RL steps"
 mkdir -p runs
 T0=$(date +%s)
 
-CUDA_VISIBLE_DEVICES=0 python ml/train.py --init "$INIT" --data data/pk13 --extra "data/world11/train.jsonl*1" --extra "data/real11/train.jsonl*20" \
+CUDA_VISIBLE_DEVICES=0 python ml/train.py --init "$INIT" --data data/pk13 --extra "data/world11/train.jsonl*1" --extra "data/real11/train.jsonl*20" --extra "data/real13/train.jsonl*20" \
   --mirror --epochs "$FT" --bs 256 --lr 6e-4 --out "runs/ft_$TAG" > "runs/ft_$TAG.log" 2>&1 &
 P_FT=$!
 CUDA_VISIBLE_DEVICES=$G1 python ml/evaluate.py --ckpt "$INIT" --data data/pk13 --n 400 --samples 4 --out "runs/eval_v12_on_$TAG.json" > "runs/eval_v12_on_$TAG.log" 2>&1 &
@@ -33,7 +33,7 @@ wait $P_RL; wait $P_EV
 T2=$(date +%s); echo "RL + evaluation (in parallel) took $((T2 - T1)) s"
 
 python ml/evaluate.py --ckpt "runs/rl_$TAG/model.pt" --data data/pk13 --n 400 --samples 4 --out "runs/eval_rl_$TAG.json" > "runs/eval_rl_$TAG.log" 2>&1
-python ml/eval_real.py --ckpt "$INIT" "runs/ft_$TAG/model.pt" "runs/rl_$TAG/model.pt" --real data/real11 --out "runs/eval_real_$TAG.json" > "runs/eval_real_$TAG.log" 2>&1
+python ml/eval_real.py --ckpt "$INIT" "runs/ft_$TAG/model.pt" "runs/rl_$TAG/model.pt" --real data/real13 --out "runs/eval_real_$TAG.json" > "runs/eval_real_$TAG.log" 2>&1
 python - <<EOF
 import json
 keys = ("valid%", "perfect%", "focus_ok%", "diversity", "style_followed%", "by_floor")

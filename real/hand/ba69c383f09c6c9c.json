@@ -1,0 +1,13 @@
+{"id": "ba69c383f09c6c9c", "image": "images/ba69c383f09c6c9c.jpg",
+ "note": "55x100 (Ground Floor Plan-3; OCR hint 50x90 is wrong): seven-car porch and driveway on the left, big lawn on the right, drawing/dining, stair lobby, guest bed with bath, lounge with patios, raw and open kitchens, bed and master bed with dress and baths at the back, 5 ft side and back passages",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [55, 100],
+   "rows": [[{"t": "porch", "w": 36.5, "d": 35.75}, {"t": "lawn", "w": 18.5, "d": 30}],
+            [{"t": "void", "w": 5.75, "d": 8.75}, {"t": "stairs", "w": 24, "d": 8.75}, {"t": "lobby", "w": 7, "d": 10}, {"t": "drawing", "w": 17, "d": 11.5}, {"t": "void", "w": 1.25, "d": 11.5}],
+            [{"t": "void", "w": 5.75, "d": 11}, {"t": "bed", "w": 17, "d": 11}, {"t": "passage", "w": 12.5, "d": 10.6}, {"t": "dining", "w": 17, "d": 11.5}, {"t": "void", "w": 2.75, "d": 11}],
+            [{"t": "void", "w": 10.5, "d": 15}, {"t": "lounge", "w": 26, "d": 15}, {"t": "kitchen", "w": 14, "d": 15}, {"t": "void", "w": 4.5, "d": 15}],
+            [{"t": "void", "w": 23, "d": 6}, {"t": "lobby", "w": 6, "d": 6}, {"t": "store", "w": 14, "d": 6}, {"t": "void", "w": 12, "d": 6}],
+            [{"t": "void", "w": 5.75, "d": 14}, {"t": "bed", "w": 17.5, "d": 14}, {"t": "master", "w": 20, "d": 14}, {"t": "dress", "w": 7.75, "d": 14}, {"t": "void", "w": 4, "d": 14}],
+            [{"t": "void", "w": 46, "d": 5.33}, {"t": "store", "w": 9, "d": 5.33}]],
+   "baths": [{"row": 3, "col": 2, "w": 4.6, "d": 8.75, "side": "L"}, {"row": 6, "col": 2, "w": 12, "d": 6, "side": "L"}, {"row": 6, "col": 4, "w": 7, "d": 12, "side": "R"}]},
+ "first_floor": null}

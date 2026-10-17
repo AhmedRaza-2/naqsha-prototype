@@ -1,0 +1,11 @@
+{"id": "fd08d033d7d0e2c3", "image": "images/fd08d033d7d0e2c3.jpg",
+ "note": "8 marla 30x60 Lahore (gharplans.pk), 1589 sq ft covered: two-car porch beside a front lawn and drawing room, TV lounge with stairs, kitchen with hot kitchen, two bedrooms at the back with washrooms, 5 ft side passage",
+ "drawn": "road on the right",
+ "rooms": {"plot": [30, 60],
+   "rows": [[{"t": "porch", "w": 18, "d": 9.5}, {"t": "lawn", "w": 12, "d": 9.5}],
+            [{"t": "porch", "w": 18, "d": 11.5}, {"t": "drawing", "w": 12, "d": 12}],
+            [{"t": "void", "w": 5, "d": 17}, {"t": "kitchen", "w": 10, "d": 17}, {"t": "stairs", "w": 3, "d": 10}, {"t": "lounge", "w": 12, "d": 17.5}],
+            [{"t": "void", "w": 5, "d": 15}, {"t": "bed", "w": 13, "d": 14}, {"t": "master", "w": 12, "d": 14.75}],
+            [{"t": "void", "w": 30, "d": 6.5}]],
+   "baths": [{"row": 4, "col": 2, "w": 7, "d": 5, "side": "L"}, {"row": 4, "col": 3, "w": 6, "d": 6.5, "side": "R"}]},
+ "first_floor": null}

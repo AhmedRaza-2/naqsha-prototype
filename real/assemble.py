@@ -26,7 +26,7 @@ KEYWORDS = [("master", "master"), ("dress|wardrobe|closet", "dress"), ("bath|toi
             ("stair", "stairs"), ("store|utility|laundry|wash|pantry|box", "store"), ("servant|s\\.?\\s?q", "servant"),
             ("prayer|namaz", "prayer"), ("study|office|library", "study"), ("passage|corridor|gallery", "passage"),
             ("void|setback|yard|space|side|back", "void")]
-KEEP = bands.TYPES - {"bath"}
+KEEP = bands.TYPES - {"bath", "terrace"}                  # a ground-floor "terrace" is a verandah: lawn
 
 
 def norm_type(t, keep_bath=False):

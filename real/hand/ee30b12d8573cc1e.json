@@ -1,0 +1,10 @@
+{"id": "ee30b12d8573cc1e", "image": "images/ee30b12d8573cc1e.jpg",
+ "note": "22x44 single-storey house: long living area from the gate with dining behind it, stairs and two bedrooms down the right side, kitchen and toilet at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [22, 44],
+   "rows": [[{"t": "lounge", "w": 10, "d": 12.5}, {"t": "bed", "w": 12, "d": 12.5}],
+            [{"t": "lounge", "w": 10, "d": 9.5}, {"t": "stairs", "w": 12, "d": 9.5}],
+            [{"t": "dining", "w": 10, "d": 12}, {"t": "bed", "w": 12, "d": 12}],
+            [{"t": "passage", "w": 10, "d": 8.5}, {"t": "kitchen", "w": 12, "d": 8.5}]],
+   "baths": [{"row": 4, "col": 1, "w": 5, "d": 8.5, "side": "L"}]},
+ "first_floor": null}

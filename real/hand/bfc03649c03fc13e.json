@@ -1,0 +1,10 @@
+{"id": "bfc03649c03fc13e", "image": "images/bfc03649c03fc13e.jpg",
+ "note": "7 marla corner 30x60 (plot size printed): front lawn and porch, drawing room with powder room, stair lobby with curved stairs, two bedrooms with dressing and bath down the left, big hall, wardrobe room and kitchen with a light well at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [30, 60],
+   "rows": [[{"t": "lawn", "w": 19, "d": 12}, {"t": "porch", "w": 11, "d": 12.5}],
+            [{"t": "drawing", "w": 19, "d": 11}, {"t": "stairs", "w": 11, "d": 10}],
+            [{"t": "bed", "w": 12.5, "d": 18}, {"t": "lounge", "w": 17.5, "d": 22}],
+            [{"t": "bed", "w": 12.5, "d": 18}, {"t": "dress", "w": 6.5, "d": 13.5}, {"t": "kitchen", "w": 11, "d": 13.5}]],
+   "baths": [{"row": 2, "col": 1, "w": 4, "d": 5, "side": "L"}, {"row": 3, "col": 1, "w": 6, "d": 5, "side": "L"}, {"row": 4, "col": 1, "w": 6, "d": 5, "side": "R"}]},
+ "first_floor": null}

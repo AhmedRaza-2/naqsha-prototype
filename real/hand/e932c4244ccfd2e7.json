@@ -1,0 +1,11 @@
+{"id": "e932c4244ccfd2e7", "image": "images/e932c4244ccfd2e7.jpg",
+ "note": "40x80 (DV Studio), 1 kanal class: 10 ft parking strip down the left with vehicle entry, steps and front lawn, drawing room and kitchen at the front, big living/dining, bedroom 1 with closet and toilet, small bedroom, back lawn and meditation room",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [40, 80],
+   "rows": [[{"t": "porch", "w": 22.25, "d": 13.5}, {"t": "lawn", "w": 17.75, "d": 13.5}],
+            [{"t": "porch", "w": 10.5, "d": 12.5}, {"t": "kitchen", "w": 11, "d": 17}, {"t": "drawing", "w": 12.5, "d": 12.2}, {"t": "lobby", "w": 6, "d": 12.5}],
+            [{"t": "porch", "w": 11, "d": 20}, {"t": "lounge", "w": 29, "d": 20.25}],
+            [{"t": "bed", "w": 10.5, "d": 9}, {"t": "dress", "w": 9.25, "d": 16.5}, {"t": "master", "w": 20.25, "d": 16.5}],
+            [{"t": "store", "w": 10.5, "d": 8.75}, {"t": "lawn", "w": 22.5, "d": 9.8}, {"t": "prayer", "w": 7, "d": 9}]],
+   "baths": [{"row": 4, "col": 2, "w": 9, "d": 6, "side": "L"}, {"row": 5, "col": 1, "w": 10, "d": 4.5, "side": "L"}]},
+ "first_floor": null}

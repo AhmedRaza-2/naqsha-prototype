@@ -1,0 +1,145 @@
+{
+ "id": "9fc36899e150a69d",
+ "image": "images/9fc36899e150a69d.jpg",
+ "note": "40 ft wide (depth about 67 ft worked out from the scale, no depth printed), 10 marla group: two-car porch, lawn and deck at the front, stair hall, 19.5x14 lounge, kitchen, drawing and dining on the right with powder room, master with dress and bath and a bed with bath at the back, 3.5 ft rear passage",
+ "drawn": "road at the bottom",
+ "rooms": {
+  "plot": [
+   40,
+   67.5
+  ],
+  "rows": [
+   [
+    {
+     "t": "porch",
+     "w": 18,
+     "d": 17.25
+    },
+    {
+     "t": "void",
+     "w": 6.5,
+     "d": 10.25
+    },
+    {
+     "t": "lawn",
+     "w": 15.5,
+     "d": 10.25
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 4.5,
+     "d": 13
+    },
+    {
+     "t": "stairs",
+     "w": 13.5,
+     "d": 12
+    },
+    {
+     "t": "void",
+     "w": 6.5,
+     "d": 13
+    },
+    {
+     "t": "drawing",
+     "w": 15.5,
+     "d": 14
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 4.5,
+     "d": 14
+    },
+    {
+     "t": "lounge",
+     "w": 21,
+     "d": 14
+    },
+    {
+     "t": "dining",
+     "w": 14.5,
+     "d": 10
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 4.5,
+     "d": 8.5
+    },
+    {
+     "t": "kitchen",
+     "w": 13,
+     "d": 8.5
+    },
+    {
+     "t": "passage",
+     "w": 6.5,
+     "d": 8.5
+    },
+    {
+     "t": "store",
+     "w": 9,
+     "d": 8.5
+    },
+    {
+     "t": "void",
+     "w": 7,
+     "d": 8.5
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 4.5,
+     "d": 15
+    },
+    {
+     "t": "master",
+     "w": 20,
+     "d": 14.5
+    },
+    {
+     "t": "bed",
+     "w": 15.5,
+     "d": 17
+    }
+   ],
+   [
+    {
+     "t": "void",
+     "w": 40,
+     "d": 3.5
+    }
+   ]
+  ],
+  "baths": [
+   {
+    "row": 3,
+    "col": 3,
+    "w": 5,
+    "d": 4.5,
+    "side": "R"
+   },
+   {
+    "row": 5,
+    "col": 2,
+    "w": 5,
+    "d": 9,
+    "side": "L"
+   },
+   {
+    "row": 5,
+    "col": 3,
+    "w": 8,
+    "d": 6,
+    "side": "R"
+   }
+  ]
+ },
+ "first_floor": null
+}

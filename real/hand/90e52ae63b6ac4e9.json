@@ -1,0 +1,10 @@
+{"id": "90e52ae63b6ac4e9", "image": "images/90e52ae63b6ac4e9.jpg",
+ "note": "25x40 single bedroom house: porch beside front lawn, open living and dining with stairs on the right, kitchen and common toilet behind, bedroom at the back right, small back lawn behind the kitchen",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 40],
+   "rows": [[{"t": "lawn", "w": 12.5, "d": 8}, {"t": "porch", "w": 12.5, "d": 12}],
+            [{"t": "lounge", "w": 11, "d": 13.5}, {"t": "dining", "w": 9, "d": 13.5}, {"t": "stairs", "w": 4.5, "d": 14}],
+            [{"t": "kitchen", "w": 8.5, "d": 13}, {"t": "passage", "w": 5, "d": 13}, {"t": "bed", "w": 11.5, "d": 13}],
+            [{"t": "lawn", "w": 13.5, "d": 4}, {"t": "void", "w": 11.5, "d": 4}]],
+   "baths": [{"row": 3, "col": 2, "w": 4.5, "d": 7.5, "side": "L"}]},
+ "first_floor": null}

@@ -1,0 +1,13 @@
+{"id": "da30e995b1c3a7c8", "image": "images/da30e995b1c3a7c8.jpg",
+ "note": "no plot size printed; 33x66 worked out from the room sizes and lane widths (8 marla size): 12.6 ft porch, 10 ft front lawn, 5 ft side lane and 7 ft back lane, drawing room, stair case with entrance, kitchen and lounge, two bedrooms with baths and dress at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [33, 66],
+   "rows": [[{"t": "lawn", "w": 33, "d": 10}],
+            [{"t": "porch", "w": 19.75, "d": 12.6}, {"t": "drawing", "w": 12.25, "d": 13}, {"t": "void", "w": 1, "d": 13}],
+            [{"t": "void", "w": 5.5, "d": 8.75}, {"t": "stairs", "w": 9.75, "d": 8.75}, {"t": "lobby", "w": 5, "d": 8.75}, {"t": "void", "w": 12.75, "d": 8.75}],
+            [{"t": "void", "w": 5.5, "d": 12.5}, {"t": "kitchen", "w": 9.5, "d": 11}, {"t": "lounge", "w": 18, "d": 14}],
+            [{"t": "void", "w": 19.5, "d": 6.5}, {"t": "lobby", "w": 5, "d": 6.5}, {"t": "store", "w": 7, "d": 6.5}, {"t": "void", "w": 1.5, "d": 6.5}],
+            [{"t": "void", "w": 5.5, "d": 12}, {"t": "bed", "w": 14, "d": 12}, {"t": "bed", "w": 12.25, "d": 12}, {"t": "void", "w": 1.25, "d": 12}],
+            [{"t": "void", "w": 33, "d": 7}]],
+   "baths": [{"row": 6, "col": 2, "w": 7, "d": 6, "side": "L"}, {"row": 6, "col": 3, "w": 7, "d": 5, "side": "R"}]},
+ "first_floor": null}

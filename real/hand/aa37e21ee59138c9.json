@@ -1,0 +1,13 @@
+{"id": "aa37e21ee59138c9", "image": "images/aa37e21ee59138c9.jpg",
+ "note": "1 kanal 50x90 (mapia.pk): 28 ft porch and front lawn, curved stair hall, entrance lobby, drawing room, dining, guest bed with washroom, kitchen with hot kitchen and store, lounge beside a patio, two bedrooms with dressing and washrooms at the back, 5 ft setbacks",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 90],
+   "rows": [[{"t": "porch", "w": 28, "d": 16}, {"t": "lawn", "w": 22, "d": 15}],
+            [{"t": "void", "w": 5, "d": 14}, {"t": "stairs", "w": 14, "d": 14}, {"t": "lobby", "w": 8, "d": 14}, {"t": "drawing", "w": 18, "d": 17.5}, {"t": "void", "w": 5, "d": 14}],
+            [{"t": "void", "w": 5, "d": 14}, {"t": "dining", "w": 14.5, "d": 14.5}, {"t": "lobby", "w": 7, "d": 14}, {"t": "bed", "w": 18.5, "d": 12.5}, {"t": "void", "w": 5, "d": 14}],
+            [{"t": "void", "w": 5, "d": 12}, {"t": "kitchen", "w": 16.5, "d": 12}, {"t": "lounge", "w": 16, "d": 17}, {"t": "courtyard", "w": 7.5, "d": 17}, {"t": "void", "w": 5, "d": 12}],
+            [{"t": "void", "w": 5, "d": 7.5}, {"t": "stairs", "w": 4, "d": 8}, {"t": "kitchen", "w": 7.5, "d": 8.5}, {"t": "store", "w": 6, "d": 6.5}, {"t": "lobby", "w": 22.5, "d": 7}, {"t": "void", "w": 5, "d": 7.5}],
+            [{"t": "void", "w": 5, "d": 20}, {"t": "bed", "w": 15.5, "d": 20}, {"t": "master", "w": 24.5, "d": 18.5}, {"t": "void", "w": 5, "d": 20}],
+            [{"t": "void", "w": 50, "d": 5}]],
+   "baths": [{"row": 3, "col": 4, "w": 5, "d": 6, "side": "R"}, {"row": 6, "col": 2, "w": 8, "d": 6, "side": "L"}, {"row": 6, "col": 3, "w": 9, "d": 6, "side": "L"}]},
+ "first_floor": null}

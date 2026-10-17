@@ -1,0 +1,10 @@
+{"id": "e818e563396966c7", "image": "images/e818e563396966c7.jpg",
+ "note": "25x50 plot: 11 ft gate, porch with stairs beside the drawing room (powder at front), kitchen and 16x10 lounge, two beds with attached baths at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 50],
+   "rows": [[{"t": "void", "w": 25, "d": 4}],
+            [{"t": "stairs", "w": 4, "d": 12}, {"t": "porch", "w": 9, "d": 12.25}, {"t": "drawing", "w": 12, "d": 14}],
+            [{"t": "kitchen", "w": 8, "d": 8.5}, {"t": "lounge", "w": 17, "d": 10}],
+            [{"t": "bed", "w": 12, "d": 20.75}, {"t": "master", "w": 13, "d": 20.75}]],
+   "baths": [{"row": 2, "col": 3, "w": 6, "d": 4, "side": "R"}, {"row": 4, "col": 1, "w": 6, "d": 5, "side": "L"}, {"row": 4, "col": 2, "w": 6, "d": 5, "side": "R"}]},
+ "first_floor": null}

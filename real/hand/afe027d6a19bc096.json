@@ -1,0 +1,10 @@
+{"id": "afe027d6a19bc096", "image": "images/afe027d6a19bc096.jpg",
+ "note": "25x50 (Glory Architecture): porch on the right beside a 10 ft front lawn and drawing room, lounge/dining across with stairs, bedroom at the back left, common bath and kitchen at the back with a 4 ft open strip",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 50],
+   "rows": [[{"t": "lawn", "w": 12, "d": 10}, {"t": "porch", "w": 13, "d": 10}],
+            [{"t": "drawing", "w": 12, "d": 11.5}, {"t": "porch", "w": 13, "d": 11.5}],
+            [{"t": "lounge", "w": 20.5, "d": 10.5}, {"t": "stairs", "w": 4.5, "d": 10.5}],
+            [{"t": "bed", "w": 12, "d": 16}, {"t": "passage", "w": 5.5, "d": 16}, {"t": "kitchen", "w": 7.5, "d": 10.5}]],
+   "baths": [{"row": 4, "col": 2, "w": 5, "d": 6.5, "side": "L"}]},
+ "first_floor": null}

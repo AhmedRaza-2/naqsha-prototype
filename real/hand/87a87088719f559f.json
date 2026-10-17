@@ -1,0 +1,10 @@
+{"id": "87a87088719f559f", "image": "images/87a87088719f559f.jpg",
+ "note": "25x44 plot drawn turned (road on the left): porch and drawing room at the front, stairs, lounge and kitchen in the middle, two bedrooms with baths and wardrobes at the back",
+ "drawn": "road on the left",
+ "rooms": {"plot": [25, 44],
+   "rows": [[{"t": "void", "w": 25, "d": 5.5}],
+            [{"t": "drawing", "w": 11, "d": 12}, {"t": "porch", "w": 10, "d": 12}, {"t": "stairs", "w": 4, "d": 11}],
+            [{"t": "lounge", "w": 16, "d": 10}, {"t": "kitchen", "w": 8, "d": 10}],
+            [{"t": "bed", "w": 11.5, "d": 17.5}, {"t": "master", "w": 12, "d": 17.5}]],
+   "baths": [{"row": 4, "col": 1, "w": 7, "d": 4.5, "side": "L"}, {"row": 4, "col": 2, "w": 7, "d": 4.5, "side": "R"}]},
+ "first_floor": null}

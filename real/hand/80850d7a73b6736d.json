@@ -1,0 +1,12 @@
+{"id": "80850d7a73b6736d", "image": "images/80850d7a73b6736d.jpg",
+ "note": "44x64 (about 12 marla): deep porch beside front lawn and a wide drawing/dining, entrance lobby with round stair, lounge, open and dirty kitchens on the left, three bedrooms with washrooms at the back, 3.5 ft side passage, 3 ft back lawn",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [44, 64],
+   "rows": [[{"t": "porch", "w": 18.5, "d": 7}, {"t": "lawn", "w": 25.5, "d": 7}],
+            [{"t": "porch", "w": 18.5, "d": 12}, {"t": "drawing", "w": 25.5, "d": 12}],
+            [{"t": "void", "w": 3.5, "d": 13}, {"t": "lobby", "w": 7.5, "d": 13}, {"t": "stairs", "w": 13, "d": 12.5}, {"t": "lounge", "w": 20, "d": 13.25}],
+            [{"t": "void", "w": 3.5, "d": 13}, {"t": "kitchen", "w": 13.5, "d": 8}, {"t": "lobby", "w": 6, "d": 13}, {"t": "bed", "w": 21, "d": 13}],
+            [{"t": "void", "w": 3.5, "d": 16}, {"t": "master", "w": 15.5, "d": 20}, {"t": "bed", "w": 25, "d": 12.5}],
+            [{"t": "lawn", "w": 44, "d": 3}]],
+   "baths": [{"row": 3, "col": 2, "w": 7, "d": 5.5, "side": "L"}, {"row": 4, "col": 4, "w": 5, "d": 8, "side": "R"}, {"row": 5, "col": 2, "w": 7.5, "d": 5, "side": "L"}, {"row": 5, "col": 3, "w": 6, "d": 6, "side": "R"}]},
+ "first_floor": null}

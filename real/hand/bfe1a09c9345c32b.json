@@ -1,0 +1,9 @@
+{"id": "bfe1a09c9345c32b", "image": "images/bfe1a09c9345c32b.jpg",
+ "note": "35x36 single storey, four bedrooms (Build My Home): stair by the main gate on the left, living/dining down the middle, kitchen and a bedroom on the right, one common toilet+bath, three bedrooms across the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [35, 36],
+   "rows": [[{"t": "stairs", "w": 8, "d": 16.5}, {"t": "lounge", "w": 14, "d": 16}, {"t": "bed", "w": 13, "d": 13.5}],
+            [{"t": "passage", "w": 11, "d": 9}, {"t": "dining", "w": 11.5, "d": 9}, {"t": "kitchen", "w": 12.5, "d": 9}],
+            [{"t": "bed", "w": 11, "d": 13.5}, {"t": "bed", "w": 10.5, "d": 9}, {"t": "bed", "w": 13, "d": 13}]],
+   "baths": [{"row": 2, "col": 1, "w": 10.5, "d": 5, "side": "L"}]},
+ "first_floor": null}

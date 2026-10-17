@@ -1,0 +1,10 @@
+{"id": "845f3b5fe240f832", "image": "images/845f3b5fe240f832.jpg",
+ "note": "36x41 plot (Al Hadi Building Designer, Gojra): car porch with stairs on the right, 4 ft front passage, drawing room, kitchen with common bath at the front-left, big TV lounge, two bedrooms at the back each with washroom and dress",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [36, 41],
+   "rows": [[{"t": "void", "w": 5.5, "d": 5}, {"t": "passage", "w": 15, "d": 4.5}, {"t": "porch", "w": 12, "d": 5}, {"t": "void", "w": 3.5, "d": 5}],
+            [{"t": "kitchen", "w": 9, "d": 12}, {"t": "drawing", "w": 11.5, "d": 11}, {"t": "porch", "w": 12, "d": 11.75}, {"t": "stairs", "w": 3.5, "d": 11.75}],
+            [{"t": "lounge", "w": 20, "d": 11}, {"t": "bed", "w": 16, "d": 14.75}],
+            [{"t": "bed", "w": 20, "d": 11}, {"t": "void", "w": 16, "d": 8}]],
+   "baths": [{"row": 2, "col": 1, "w": 5, "d": 5, "side": "L"}, {"row": 3, "col": 2, "w": 6, "d": 7.25, "side": "R"}, {"row": 4, "col": 1, "w": 6, "d": 6.25, "side": "L"}]},
+ "first_floor": null}

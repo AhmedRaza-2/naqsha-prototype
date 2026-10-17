@@ -1,0 +1,11 @@
+{"id": "db9e668b7998604c", "image": "images/db9e668b7998604c.jpg",
+ "note": "40x60 Ideal Architect ground floor: front lawn beside a car porch, drawing room with bath, stairs hall, patio, big lounge and kitchen, two bedrooms with bath and dress at the back, 2.5 ft side opening",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [40, 60],
+   "rows": [[{"t": "lawn", "w": 19, "d": 13.5}, {"t": "porch", "w": 21, "d": 18.5}],
+            [{"t": "drawing", "w": 18.5, "d": 13.5}, {"t": "stairs", "w": 21.5, "d": 7.5}],
+            [{"t": "lawn", "w": 6.5, "d": 14.5}, {"t": "lounge", "w": 21.5, "d": 14.5}, {"t": "kitchen", "w": 8.5, "d": 14.5}, {"t": "void", "w": 3.5, "d": 14.5}],
+            [{"t": "master", "w": 20, "d": 14}, {"t": "bed", "w": 20, "d": 14}],
+            [{"t": "void", "w": 40, "d": 3}]],
+   "baths": [{"row": 2, "col": 1, "w": 5, "d": 8, "side": "L"}, {"row": 4, "col": 1, "w": 5, "d": 9, "side": "L"}, {"row": 4, "col": 2, "w": 5, "d": 9, "side": "R"}]},
+ "first_floor": null}

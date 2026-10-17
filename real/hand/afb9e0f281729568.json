@@ -1,0 +1,13 @@
+{"id": "afb9e0f281729568", "image": "images/afb9e0f281729568.jpg",
+ "note": "50x90 plot (Glory Architecture): 5 ft passages both sides, car porch and driveway, front lawn, drawing room, entrance lobby with stairs, dining, lounge with open kitchen, master bed and bed with baths at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 90],
+   "rows": [[{"t": "void", "w": 5, "d": 15}, {"t": "void", "w": 15, "d": 15}, {"t": "lawn", "w": 25, "d": 15}, {"t": "void", "w": 5, "d": 15}],
+            [{"t": "void", "w": 5, "d": 15}, {"t": "porch", "w": 15, "d": 18.75}, {"t": "drawing", "w": 21.5, "d": 15}, {"t": "void", "w": 8.5, "d": 15}],
+            [{"t": "void", "w": 5, "d": 11}, {"t": "stairs", "w": 9.5, "d": 10}, {"t": "lobby", "w": 15, "d": 11}, {"t": "dining", "w": 16, "d": 11}, {"t": "void", "w": 4.5, "d": 11}],
+            [{"t": "void", "w": 7.4, "d": 14}, {"t": "lounge", "w": 18, "d": 16.25}, {"t": "kitchen", "w": 15.75, "d": 11.5}, {"t": "void", "w": 8.85, "d": 14}],
+            [{"t": "void", "w": 19.8, "d": 7}, {"t": "lobby", "w": 6.5, "d": 7.5}, {"t": "store", "w": 6.5, "d": 6.75}, {"t": "kitchen", "w": 7, "d": 6.75}, {"t": "void", "w": 10.2, "d": 7}],
+            [{"t": "void", "w": 5, "d": 20}, {"t": "bed", "w": 15.5, "d": 20}, {"t": "master", "w": 21, "d": 20.5}, {"t": "void", "w": 8.5, "d": 20}],
+            [{"t": "void", "w": 50, "d": 5}]],
+   "baths": [{"row": 3, "col": 3, "w": 6.5, "d": 6.5, "side": "L"}, {"row": 6, "col": 2, "w": 7, "d": 8, "side": "R"}, {"row": 6, "col": 3, "w": 9.25, "d": 8, "side": "L"}]},
+ "first_floor": null}

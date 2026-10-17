@@ -1,0 +1,13 @@
+{"id": "fe38a9e6838256b1", "image": "images/fe38a9e6838256b1.jpg",
+ "note": "35x70 (Glory Architecture): paved front with porch on the left and lawn on the right, angled lobby with powder room, drawing room, lounge with curved stairs at its back, dining, small open patio, bed with dress/bath, kitchen, 5.5 ft passages on the left and back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [35, 70],
+   "rows": [[{"t": "porch", "w": 18.5, "d": 12.5}, {"t": "lawn", "w": 16.5, "d": 12}],
+            [{"t": "porch", "w": 16.5, "d": 13.75}, {"t": "lobby", "w": 4.5, "d": 16}, {"t": "drawing", "w": 14, "d": 13}],
+            [{"t": "void", "w": 5.5, "d": 6}, {"t": "stairs", "w": 15, "d": 5.5}, {"t": "passage", "w": 9, "d": 6.75}, {"t": "store", "w": 5.5, "d": 6.75}],
+            [{"t": "void", "w": 5.5, "d": 11.5}, {"t": "lounge", "w": 15, "d": 12}, {"t": "dining", "w": 14.5, "d": 11}],
+            [{"t": "void", "w": 5.5, "d": 17.5}, {"t": "bed", "w": 19, "d": 17.5}, {"t": "kitchen", "w": 10.5, "d": 16}],
+            [{"t": "void", "w": 35, "d": 5.5}]],
+   "baths": [{"row": 2, "col": 2, "w": 4, "d": 6, "side": "R"},
+             {"row": 5, "col": 2, "w": 6, "d": 11, "side": "L"}]},
+ "first_floor": null}

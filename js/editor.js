@@ -74,7 +74,12 @@ function applyTree(p, h, dx, dz) {
 }
 
 /** Wall positions of a plan (rows of rooms or a slicing tree), in feet. */
-function handles(plan) {
+function handles(plan, L) {
+  const doors = ((L && L.openings) || []).filter((o) => o.kind === 'door' && o.key).map((o) => ({ kind: 'door', ...o }));
+  return [...wallHandles(plan), ...doors];
+}
+
+function wallHandles(plan) {
   if (plan.tree) return treeHandles(plan);
   const out = [];
   let z = 0;
@@ -102,6 +107,12 @@ function handles(plan) {
 /** Apply a drag of (dx, dz) feet to handle h on a copy of plan; sizes are kept within sensible limits. */
 function apply(base, h, dx, dz) {
   const p = clone(base);
+  if (h.kind === 'door') {                                       // slide along its wall; saved as a fraction of the wall
+    const [lo, hi] = h.span, half = h.w / 2 + 0.3;
+    const at = Math.max(lo + half, Math.min(hi - half, snap(h.at + (h.o === 'h' ? dx : dz))));
+    (p.doorPos ||= {})[h.key] = hi > lo ? (at - lo) / (hi - lo) : 0.5;
+    return p;
+  }
   if (h.tree) return applyTree(p, h, dx, dz);
   const minW = (r) => Math.max(3, r.bath ? r.bath[0] + 1 : 3);
   const minD = (b) => Math.max(b.rooms.some((r) => !OPEN.has(r.t)) ? 4 : 1, ...b.rooms.map((r) => (r.bath ? r.bath[1] + 2 : 0)));
@@ -126,8 +137,9 @@ function apply(base, h, dx, dz) {
  *   rebuild(plan) -> layout object (rule check, doors, windows) for an edited plan
  *   onChange(layout, live) after every change; live = true while a wall is still being dragged
  *   state = { original, history } kept by the caller per layout, so switching layouts keeps undo and reset
+ *   accept(plan) -> false refuses an edit (the wall stops where it is)
  */
-export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn, state }) {
+export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn, state, accept = () => true }) {
   const st = state || {};
   st.original ||= clone(layout.plan);
   st.history ||= [];
@@ -138,7 +150,11 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
   const sig = { signal: off.signal };
 
   // washroom edges are drawn first so a wall's grip is never hidden under a washroom edge's touch area
-  const overlay = (f) => handles(L.plan).map((h, k) => {
+  const overlay = (f) => handles(L.plan, L).map((h, k) => {
+    if (h.kind === 'door') {
+      const [cx, cy] = h.o === 'h' ? [f.X(h.at), f.Y(h.c)] : [f.X(h.c), f.Y(h.at)];
+      return [false, `<g class="h door ${h.o === 'h' ? 'dh' : 'dv'}" data-k="${k}"><circle class="hit" cx="${cx}" cy="${cy}" r="6"/><circle class="grip" cx="${cx}" cy="${cy}" r="3"/></g>`];
+    }
     const horiz = h.kind === 'row' || h.kind === 'bd';
     const [x1, y1, x2, y2] = horiz ? [f.X(h.x0), f.Y(h.z), f.X(h.x1), f.Y(h.z)] : [f.X(h.x), f.Y(h.z0), f.X(h.x), f.Y(h.z1)];
     const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
@@ -175,6 +191,7 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     if (!drag || !drag.last) return;
     const dx = (drag.last.px - drag.start.px) / drag.s, dz = -(drag.last.py - drag.start.py) / drag.s;   // screen y grows toward the road
     const next = apply(drag.base, drag.h, dx, dz);
+    if (!accept(next)) return;                                   // e.g. a wall that would move the stairs of a first floor stays put
     if (JSON.stringify(next) !== JSON.stringify(L.plan)) { L = rebuild(next); drag.moved = true; render(); onChange(L, true); }
   }
   function end(commit) {
@@ -193,7 +210,7 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     const g = e.target.closest('g.h');
     if (!g || e.button > 0) return;
     e.preventDefault();
-    const h = handles(L.plan)[+g.dataset.k];
+    const h = handles(L.plan, L)[+g.dataset.k];
     drag = { h, start: svgPoint(e), last: null, base: L.plan, s: planFrame(L, OPTS).s, moved: false, raf: 0 };
     host.classList.add('dragging');
   }, sig);

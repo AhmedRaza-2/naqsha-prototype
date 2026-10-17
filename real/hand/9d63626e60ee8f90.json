@@ -1,0 +1,11 @@
+{"id": "9d63626e60ee8f90", "image": "images/9d63626e60ee8f90.jpg",
+ "note": "9 marla 50x50, 2500 sq ft: car porch in the middle, drawing room and a front bedroom with dress and bath, lobby with stairs, TV lounge, kitchen, two bedrooms with baths at the back, patios",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 50],
+   "rows": [[{"t": "lawn", "w": 50, "d": 5}],
+            [{"t": "drawing", "w": 13, "d": 14}, {"t": "porch", "w": 14, "d": 14}, {"t": "bed", "w": 21, "d": 14}],
+            [{"t": "kitchen", "w": 13, "d": 10}, {"t": "stairs", "w": 4, "d": 12}, {"t": "lobby", "w": 9.5, "d": 15.5}, {"t": "lounge", "w": 22, "d": 12}],
+            [{"t": "courtyard", "w": 10, "d": 5}, {"t": "passage", "w": 28, "d": 5}, {"t": "courtyard", "w": 9, "d": 5}],
+            [{"t": "bed", "w": 22.5, "d": 15.5}, {"t": "bed", "w": 23, "d": 14.5}]],
+   "baths": [{"row": 2, "col": 1, "w": 7, "d": 7, "side": "L"}, {"row": 2, "col": 3, "w": 7, "d": 9, "side": "R"}, {"row": 5, "col": 1, "w": 7.5, "d": 10.5, "side": "L"}, {"row": 5, "col": 2, "w": 8, "d": 10, "side": "R"}]},
+ "first_floor": null}

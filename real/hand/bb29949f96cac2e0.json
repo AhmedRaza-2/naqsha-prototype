@@ -1,0 +1,11 @@
+{"id": "bb29949f96cac2e0", "image": "images/bb29949f96cac2e0.jpg",
+ "note": "12 marla 45x75 Lahore (gharplans.pk), 2254 sq ft covered: front lawn and drawing room, double car porch, big TV lounge with stairs and dining, master bed with two baths and bed 2 with bath at the back, kitchen, 7 ft side and back passages",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [45, 75],
+   "rows": [[{"t": "lawn", "w": 21, "d": 18}, {"t": "porch", "w": 24, "d": 19}],
+            [{"t": "drawing", "w": 17.5, "d": 15}, {"t": "lounge", "w": 21.5, "d": 15}, {"t": "void", "w": 6, "d": 15}],
+            [{"t": "courtyard", "w": 6, "d": 10}, {"t": "stairs", "w": 5.5, "d": 10}, {"t": "dining", "w": 6, "d": 10}, {"t": "lounge", "w": 21.5, "d": 10}, {"t": "void", "w": 6, "d": 10}],
+            [{"t": "master", "w": 15.5, "d": 21}, {"t": "bed", "w": 13, "d": 20}, {"t": "kitchen", "w": 9.5, "d": 13}, {"t": "void", "w": 7, "d": 20}],
+            [{"t": "void", "w": 45, "d": 7.5}]],
+   "baths": [{"row": 4, "col": 1, "w": 9, "d": 6.25, "side": "R"}, {"row": 4, "col": 1, "w": 5.5, "d": 6.25, "side": "L"}, {"row": 4, "col": 2, "w": 9, "d": 6.75, "side": "R"}]},
+ "first_floor": null}

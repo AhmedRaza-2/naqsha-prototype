@@ -1,0 +1,12 @@
+{"id": "fa1fc5a66891b1c8", "image": "images/fa1fc5a66891b1c8.jpg",
+ "note": "50x90 (image dimensions; OCR hint says 50x100): two-car porch 18 ft wide, curved drawing room, entrance lobby with spiral stairs and powder room, dining, sitting area with patio, big TV lounge, kitchen, two large bedrooms with baths and dress at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 90],
+   "rows": [[{"t": "porch", "w": 18, "d": 23}, {"t": "lawn", "w": 32, "d": 15}],
+            [{"t": "void", "w": 5.5, "d": 17}, {"t": "stairs", "w": 9.5, "d": 11}, {"t": "lobby", "w": 10.5, "d": 15}, {"t": "drawing", "w": 18.5, "d": 17}, {"t": "void", "w": 6, "d": 17}],
+            [{"t": "void", "w": 5.5, "d": 12.5}, {"t": "dining", "w": 14, "d": 11}, {"t": "lounge", "w": 12.5, "d": 12.5}, {"t": "courtyard", "w": 11.5, "d": 12.5}, {"t": "void", "w": 6.5, "d": 12.5}],
+            [{"t": "void", "w": 5.5, "d": 17}, {"t": "kitchen", "w": 13.5, "d": 12}, {"t": "lounge", "w": 24.5, "d": 17.25}, {"t": "void", "w": 6.5, "d": 17}],
+            [{"t": "void", "w": 5.5, "d": 17}, {"t": "bed", "w": 20.5, "d": 16}, {"t": "bed", "w": 17, "d": 18}, {"t": "void", "w": 7, "d": 18}],
+            [{"t": "void", "w": 50, "d": 5}]],
+   "baths": [{"row": 2, "col": 3, "w": 5, "d": 4.5, "side": "L"}, {"row": 5, "col": 2, "w": 7, "d": 10, "side": "L"}, {"row": 5, "col": 3, "w": 8, "d": 7, "side": "R"}]},
+ "first_floor": null}

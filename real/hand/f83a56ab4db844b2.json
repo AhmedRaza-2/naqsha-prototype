@@ -1,0 +1,11 @@
+{"id": "f83a56ab4db844b2", "image": "images/f83a56ab4db844b2.jpg",
+ "note": "40x80 (41 ft printed across the back): lawn and porch at the front, guest room, double-height entrance with common bath, dining, drawing room, stairs, kitchen, big TV lounge with verandah, two bedrooms at the back with a bath between, side passage",
+ "drawn": "road on the left",
+ "rooms": {"plot": [40, 80],
+   "rows": [[{"t": "lawn", "w": 23, "d": 12}, {"t": "porch", "w": 17, "d": 12}],
+            [{"t": "bed", "w": 11.5, "d": 17.5}, {"t": "passage", "w": 5, "d": 25}, {"t": "dining", "w": 8, "d": 23}, {"t": "drawing", "w": 12, "d": 16}, {"t": "void", "w": 3.5, "d": 16}],
+            [{"t": "stairs", "w": 3.5, "d": 11.5}, {"t": "kitchen", "w": 11, "d": 14.5}, {"t": "lounge", "w": 17, "d": 20}, {"t": "lawn", "w": 5, "d": 4.5}, {"t": "void", "w": 3.5, "d": 20}],
+            [{"t": "master", "w": 14.5, "d": 16}, {"t": "passage", "w": 7, "d": 16}, {"t": "bed", "w": 14.5, "d": 16}, {"t": "void", "w": 4, "d": 16}],
+            [{"t": "void", "w": 40, "d": 5.5}]],
+   "baths": [{"row": 2, "col": 3, "w": 7, "d": 4.5, "side": "L"}, {"row": 4, "col": 1, "w": 6, "d": 5, "side": "L"}, {"row": 4, "col": 2, "w": 6, "d": 11, "side": "R"}]},
+ "first_floor": null}

@@ -1,0 +1,13 @@
+{"id": "8f9946dc8306f8f2", "image": "images/8f9946dc8306f8f2.jpg",
+ "note": "42.5x75 (SV 02) ground floor: two-car porch on the left behind the gate, drawing with front lawn on the right, entrance lobby with powder room, dining, lounge with stairs, one master bedroom with dress bath, kitchen with back verandah, back lawn and spiral stair",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [42.5, 75],
+   "rows": [[{"t": "void", "w": 20.5, "d": 13}, {"t": "lawn", "w": 22, "d": 13}],
+            [{"t": "porch", "w": 20.5, "d": 17}, {"t": "drawing", "w": 22, "d": 15}],
+            [{"t": "void", "w": 7.5, "d": 10}, {"t": "lobby", "w": 18.5, "d": 8}, {"t": "dining", "w": 16.5, "d": 12}],
+            [{"t": "void", "w": 10, "d": 13}, {"t": "lounge", "w": 20, "d": 13}, {"t": "stairs", "w": 11.5, "d": 13}, {"t": "void", "w": 1, "d": 13}],
+            [{"t": "void", "w": 5.5, "d": 14}, {"t": "master", "w": 24, "d": 14}, {"t": "kitchen", "w": 11.5, "d": 14}, {"t": "void", "w": 1.5, "d": 14}],
+            [{"t": "lawn", "w": 42.5, "d": 5}]],
+   "baths": [{"row": 3, "col": 2, "w": 4, "d": 7, "side": "R"},
+             {"row": 5, "col": 2, "w": 6, "d": 14, "side": "L"}]},
+ "first_floor": null}

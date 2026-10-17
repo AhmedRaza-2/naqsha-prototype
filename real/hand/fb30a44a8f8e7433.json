@@ -1,0 +1,12 @@
+{"id": "fb30a44a8f8e7433", "image": "images/fb30a44a8f8e7433.jpg",
+ "note": "35x65 (dimension lines 35 and 65 ft; OCR hint 15x139 is wrong), drawn turned with the road on the right: lawn, drawing room and two-car porch at the front, entrance lobby with powder room and stairs, lounge, dining, courtyard, kitchen and one bedroom with bath at the back, 5 ft passages on the left and back",
+ "drawn": "road on the right",
+ "rooms": {"plot": [35, 65],
+   "rows": [[{"t": "lawn", "w": 15, "d": 10}, {"t": "void", "w": 6, "d": 10}, {"t": "porch", "w": 14, "d": 10}],
+            [{"t": "drawing", "w": 15, "d": 14}, {"t": "lobby", "w": 8, "d": 11.25}, {"t": "stairs", "w": 7, "d": 9}, {"t": "void", "w": 5, "d": 14}],
+            [{"t": "dining", "w": 12, "d": 9}, {"t": "void", "w": 7, "d": 9}, {"t": "lounge", "w": 16, "d": 13.75}],
+            [{"t": "courtyard", "w": 13, "d": 5.3}, {"t": "void", "w": 22, "d": 5.3}],
+            [{"t": "bed", "w": 12.5, "d": 15}, {"t": "passage", "w": 6.5, "d": 13}, {"t": "kitchen", "w": 10, "d": 13}, {"t": "void", "w": 6, "d": 13}],
+            [{"t": "void", "w": 35, "d": 5}]],
+   "baths": [{"row": 2, "col": 2, "w": 3.5, "d": 7, "side": "R"}, {"row": 5, "col": 2, "w": 5.5, "d": 8.7, "side": "L"}]},
+ "first_floor": null}

@@ -1,0 +1,10 @@
+{"id": "889b26d56734b36c", "image": "images/889b26d56734b36c.jpg",
+ "note": "22x45 plot: main gate opens into a hall with stairs, bedroom and dining, common toilet and kitchen off the passage, two bedrooms at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [22, 45],
+   "rows": [[{"t": "lounge", "w": 16, "d": 10}, {"t": "stairs", "w": 6, "d": 10}],
+            [{"t": "bed", "w": 10.25, "d": 14}, {"t": "dining", "w": 11.75, "d": 12}],
+            [{"t": "passage", "w": 15, "d": 8}, {"t": "kitchen", "w": 7, "d": 8}],
+            [{"t": "bed", "w": 10.25, "d": 13.5}, {"t": "bed", "w": 11.75, "d": 13.5}]],
+   "baths": [{"row": 3, "col": 1, "w": 6.75, "d": 6, "side": "L"}]},
+ "first_floor": null}

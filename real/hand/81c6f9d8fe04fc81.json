@@ -1,0 +1,10 @@
+{"id": "81c6f9d8fe04fc81", "image": "images/81c6f9d8fe04fc81.jpg",
+ "note": "35x50 (Naik Architecture, +92): car parking with foyer and passage, stairs at the front left, master bed and living hall, kitchen & dining, one more bedroom with toilet and store, utility strip at the back, 2.5 ft side setbacks",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [35, 50],
+   "rows": [[{"t": "void", "w": 2.5, "d": 11}, {"t": "stairs", "w": 12, "d": 7.5}, {"t": "lobby", "w": 6, "d": 14.5}, {"t": "porch", "w": 12, "d": 14.5}, {"t": "void", "w": 2.5, "d": 11}],
+            [{"t": "void", "w": 2.5, "d": 16}, {"t": "master", "w": 12, "d": 16}, {"t": "lounge", "w": 18, "d": 16}, {"t": "void", "w": 2.5, "d": 16}],
+            [{"t": "void", "w": 2.5, "d": 16}, {"t": "kitchen", "w": 12, "d": 16}, {"t": "bed", "w": 18, "d": 15.5}, {"t": "void", "w": 2.5, "d": 16}],
+            [{"t": "store", "w": 14.5, "d": 4.5}, {"t": "void", "w": 20.5, "d": 1.5}]],
+   "baths": [{"row": 2, "col": 2, "w": 11, "d": 4, "side": "L"}, {"row": 3, "col": 3, "w": 5.5, "d": 7.5, "side": "L"}]},
+ "first_floor": null}

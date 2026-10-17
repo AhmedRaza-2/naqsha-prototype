@@ -1,0 +1,11 @@
+{"id": "c707f8f0a8b6b4c8", "image": "images/c707f8f0a8b6b4c8.jpg",
+ "note": "25x45: parking beside an open front stair, long living with dining behind it, two bedrooms with toilets on the right, open kitchen at the back behind the second bedroom; 1.5 ft side margin",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 45],
+   "rows": [[{"t": "void", "w": 1.5, "d": 12}, {"t": "porch", "w": 11.5, "d": 12}, {"t": "stairs", "w": 12, "d": 8}],
+            [{"t": "void", "w": 1.5, "d": 17}, {"t": "lounge", "w": 11, "d": 17.5}, {"t": "master", "w": 12, "d": 15}],
+            [{"t": "void", "w": 1.5, "d": 10}, {"t": "dining", "w": 11, "d": 10}, {"t": "bed", "w": 12, "d": 10}],
+            [{"t": "void", "w": 12.5, "d": 7}, {"t": "kitchen", "w": 7.5, "d": 7}, {"t": "void", "w": 4, "d": 7}]],
+   "baths": [{"row": 2, "col": 3, "w": 7, "d": 4, "side": "R"},
+             {"row": 3, "col": 3, "w": 4, "d": 7, "side": "R"}]},
+ "first_floor": null}

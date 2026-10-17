@@ -1,0 +1,11 @@
+{"id": "f8ce649e3198e493", "image": "images/f8ce649e3198e493.jpg",
+ "note": "25x60 (5.5 marla): car porch beside a drawing room with its own bath at the front, TV lounge with straight stairs on the right, kitchen with laundry behind, two back bedrooms with washrooms and an open-to-sky gap between them",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 60],
+   "rows": [[{"t": "drawing", "w": 11.5, "d": 21}, {"t": "porch", "w": 13.5, "d": 17}],
+            [{"t": "kitchen", "w": 8, "d": 15}, {"t": "lounge", "w": 13, "d": 15}, {"t": "stairs", "w": 4, "d": 14}],
+            [{"t": "bed", "w": 12.5, "d": 23}, {"t": "bed", "w": 12.5, "d": 23}]],
+   "baths": [{"row": 1, "col": 1, "w": 7, "d": 4.5, "side": "L"},
+             {"row": 3, "col": 1, "w": 7.5, "d": 4.5, "side": "L"},
+             {"row": 3, "col": 2, "w": 7, "d": 4.5, "side": "R"}]},
+ "first_floor": null}

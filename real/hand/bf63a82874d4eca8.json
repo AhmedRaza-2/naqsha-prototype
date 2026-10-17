@@ -1,0 +1,10 @@
+{"id": "bf63a82874d4eca8", "image": "images/bf63a82874d4eca8.jpg",
+ "note": "25x40 plot (2dhouses.com style, 2 bedrooms): porch and small lawn at the front, stairs, bedroom, 19x10 hall, kitchen, master bed with toilet at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 40],
+   "rows": [[{"t": "void", "w": 6.5, "d": 6.5}, {"t": "lawn", "w": 9.5, "d": 6.3}, {"t": "porch", "w": 9, "d": 13.3}],
+            [{"t": "stairs", "w": 6.5, "d": 10.7}, {"t": "bed", "w": 9.5, "d": 10.7}, {"t": "void", "w": 9, "d": 10.7}],
+            [{"t": "lounge", "w": 24, "d": 10.3}, {"t": "void", "w": 1, "d": 10.3}],
+            [{"t": "kitchen", "w": 9, "d": 10.7}, {"t": "master", "w": 15.25, "d": 11}]],
+   "baths": [{"row": 2, "col": 1, "w": 4, "d": 6, "side": "L"}, {"row": 3, "col": 1, "w": 4, "d": 7.5, "side": "L"}, {"row": 4, "col": 2, "w": 4, "d": 7.5, "side": "L"}]},
+ "first_floor": null}

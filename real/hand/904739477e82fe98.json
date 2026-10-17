@@ -1,0 +1,10 @@
+{"id": "904739477e82fe98", "image": "images/904739477e82fe98.jpg",
+ "note": "5 marla Design E single storey, plot 32x42: porch beside front lawn and drawing room, lounge, common bath and laundry, kitchen, one bedroom at the back with bath",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [32, 42],
+   "rows": [[{"t": "porch", "w": 12.5, "d": 8.25}, {"t": "lawn", "w": 19.5, "d": 8.25}],
+            [{"t": "porch", "w": 12.5, "d": 8}, {"t": "drawing", "w": 16, "d": 12}, {"t": "void", "w": 3.5, "d": 12}],
+            [{"t": "lounge", "w": 15.2, "d": 10.75}, {"t": "passage", "w": 7.5, "d": 10.75}, {"t": "store", "w": 4, "d": 4}, {"t": "void", "w": 5.3, "d": 4.2}],
+            [{"t": "bed", "w": 14.5, "d": 13}, {"t": "passage", "w": 7.5, "d": 13}, {"t": "kitchen", "w": 6.5, "d": 12.25}, {"t": "void", "w": 3.5, "d": 6}]],
+   "baths": [{"row": 3, "col": 2, "w": 7, "d": 4.2, "side": "L"}, {"row": 4, "col": 2, "w": 6.25, "d": 5.25, "side": "L"}]},
+ "first_floor": null}

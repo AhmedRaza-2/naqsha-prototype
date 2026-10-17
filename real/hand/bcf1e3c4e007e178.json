@@ -1,0 +1,12 @@
+{"id": "bcf1e3c4e007e178", "image": "images/bcf1e3c4e007e178.jpg",
+ "note": "40x70 plot (thumbnail with a 3D view beside it): lawn and parking/porch at the front, stairs, bed and drawing room either side of a 9 ft passage, 25x12 lounge with toilets at the sides, two beds and a kitchen at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [40, 70],
+   "rows": [[{"t": "lawn", "w": 18, "d": 14.33}, {"t": "porch", "w": 21, "d": 18}, {"t": "void", "w": 1, "d": 16}],
+            [{"t": "stairs", "w": 14, "d": 7}, {"t": "void", "w": 26, "d": 7}],
+            [{"t": "master", "w": 14.5, "d": 14}, {"t": "passage", "w": 10, "d": 14}, {"t": "drawing", "w": 15.5, "d": 14}],
+            [{"t": "void", "w": 6.5, "d": 13}, {"t": "lounge", "w": 27, "d": 13}, {"t": "void", "w": 6.5, "d": 13}],
+            [{"t": "bed", "w": 14.5, "d": 13}, {"t": "kitchen", "w": 10, "d": 13}, {"t": "bed", "w": 15.5, "d": 13}],
+            [{"t": "void", "w": 40, "d": 4}]],
+   "baths": [{"row": 3, "col": 1, "w": 6, "d": 6, "side": "L"}, {"row": 3, "col": 3, "w": 6, "d": 6, "side": "R"}, {"row": 5, "col": 1, "w": 6, "d": 6, "side": "L"}, {"row": 5, "col": 3, "w": 6, "d": 6, "side": "R"}]},
+ "first_floor": null}

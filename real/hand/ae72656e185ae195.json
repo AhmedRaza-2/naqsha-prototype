@@ -1,0 +1,10 @@
+{"id": "ae72656e185ae195", "image": "images/ae72656e185ae195.jpg",
+ "note": "25x45: 5 ft front lawn with 7 ft gate, drawing room beside a bath/WC strip and straight stairs, full-width lobby with open kitchen along the right wall, two bedrooms with wardrobes at the back; a small outside WC at the front-left is left out",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 45],
+   "rows": [[{"t": "void", "w": 4, "d": 5}, {"t": "lawn", "w": 21, "d": 5}],
+            [{"t": "drawing", "w": 12.5, "d": 12}, {"t": "passage", "w": 4.5, "d": 12}, {"t": "stairs", "w": 8, "d": 12}],
+            [{"t": "lounge", "w": 21.5, "d": 11.5}, {"t": "kitchen", "w": 3.5, "d": 11.5}],
+            [{"t": "bed", "w": 13, "d": 12.75}, {"t": "bed", "w": 12, "d": 12.75}]],
+   "baths": [{"row": 2, "col": 2, "w": 3.5, "d": 8, "side": "L"}]},
+ "first_floor": null}

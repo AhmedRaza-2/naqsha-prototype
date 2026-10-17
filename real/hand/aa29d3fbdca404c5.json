@@ -1,0 +1,13 @@
+{"id": "aa29d3fbdca404c5", "image": "images/aa29d3fbdca404c5.jpg",
+ "note": "50x90 plot (mapia.pk): 15 ft front lawn, two-car porch with powder room, drawing and dining on the right, entrance lobby with stairs, big lounge, kitchen with hot kitchens, three beds with baths at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [50, 90],
+   "rows": [[{"t": "void", "w": 20.5, "d": 15}, {"t": "lawn", "w": 29.5, "d": 15.5}],
+            [{"t": "porch", "w": 20.5, "d": 14}, {"t": "lobby", "w": 6.5, "d": 14}, {"t": "drawing", "w": 17, "d": 12.25}, {"t": "void", "w": 6, "d": 13}],
+            [{"t": "void", "w": 5.5, "d": 10}, {"t": "stairs", "w": 10.5, "d": 10}, {"t": "lobby", "w": 10.5, "d": 10.25}, {"t": "dining", "w": 16.5, "d": 10}, {"t": "void", "w": 7, "d": 10}],
+            [{"t": "void", "w": 5.5, "d": 16}, {"t": "lounge", "w": 21, "d": 17}, {"t": "kitchen", "w": 16.5, "d": 15}, {"t": "void", "w": 7, "d": 16}],
+            [{"t": "void", "w": 5.5, "d": 12}, {"t": "master", "w": 14, "d": 17}, {"t": "lobby", "w": 6.25, "d": 10.5}, {"t": "bed", "w": 16.25, "d": 12}, {"t": "void", "w": 8, "d": 12}],
+            [{"t": "void", "w": 5.5, "d": 14}, {"t": "dress", "w": 14, "d": 12}, {"t": "bed", "w": 22.5, "d": 14.75}, {"t": "void", "w": 8, "d": 14}],
+            [{"t": "void", "w": 50, "d": 5.25}]],
+   "baths": [{"row": 2, "col": 2, "w": 4, "d": 6.25, "side": "R"}, {"row": 5, "col": 4, "w": 8, "d": 8, "side": "R"}, {"row": 6, "col": 2, "w": 7, "d": 6.5, "side": "L"}, {"row": 6, "col": 3, "w": 10, "d": 6, "side": "R"}]},
+ "first_floor": null}

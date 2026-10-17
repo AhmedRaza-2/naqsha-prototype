@@ -1,0 +1,11 @@
+{"id": "8e1b7c64d36499e4", "image": "images/8e1b7c64d36499e4.jpg",
+ "note": "20x40 narrow plot: porch with stairs and kitchen beside it, one big living/dining hall, one bedroom at the back with a common toilet off the hall",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [20, 40],
+   "rows": [[{"t": "lawn", "w": 11, "d": 4.5}, {"t": "porch", "w": 9, "d": 4.5}],
+            [{"t": "stairs", "w": 10.5, "d": 6.5}, {"t": "porch", "w": 9.5, "d": 6.5}],
+            [{"t": "kitchen", "w": 10.5, "d": 6.5}, {"t": "porch", "w": 9.5, "d": 6.5}],
+            [{"t": "lounge", "w": 20, "d": 11}],
+            [{"t": "bed", "w": 14, "d": 11}, {"t": "courtyard", "w": 6, "d": 11}]],
+   "baths": [{"row": 4, "col": 1, "w": 5.5, "d": 7.5, "side": "R"}]},
+ "first_floor": null}

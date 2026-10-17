@@ -1,0 +1,11 @@
+{"id": "9c636321e49ddc95", "image": "images/9c636321e49ddc95.jpg",
+ "note": "14 marla 70x55 wide plot: double car porch, drawing & dining with a 6 ft front passage, front lawn, guest bedroom on the front right, lounge and 7 ft passage across the middle, kitchen with light well, three bedrooms with washrooms and stairs along the back, laundry and patio strips at the very back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [70, 55],
+   "rows": [[{"t": "porch", "w": 18, "d": 6}, {"t": "passage", "w": 16, "d": 6}, {"t": "lawn", "w": 36, "d": 5}],
+            [{"t": "porch", "w": 18, "d": 10}, {"t": "drawing", "w": 16, "d": 18}, {"t": "lawn", "w": 18.5, "d": 15}, {"t": "bed", "w": 17.5, "d": 15}],
+            [{"t": "lounge", "w": 18, "d": 16}, {"t": "passage", "w": 37, "d": 7}, {"t": "kitchen", "w": 12, "d": 11.25}, {"t": "courtyard", "w": 3, "d": 11}],
+            [{"t": "master", "w": 22.5, "d": 21}, {"t": "bed", "w": 15.5, "d": 20}, {"t": "stairs", "w": 8.5, "d": 16}, {"t": "bed", "w": 22.5, "d": 21}]],
+   "baths": [{"row": 2, "col": 2, "w": 4.5, "d": 9, "side": "R"}, {"row": 2, "col": 4, "w": 6, "d": 9, "side": "L"},
+             {"row": 4, "col": 1, "w": 7, "d": 11, "side": "L"}, {"row": 4, "col": 2, "w": 9, "d": 6, "side": "L"}, {"row": 4, "col": 4, "w": 7, "d": 11, "side": "R"}]},
+ "first_floor": null}

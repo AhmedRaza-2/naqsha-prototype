@@ -1,0 +1,13 @@
+{"id": "e11f8d98f2e11ec1", "image": "images/e11f8d98f2e11ec1.jpg",
+ "note": "10 marla 35x65 (no printed plot; widths and depths add up to it), Nasrullah House: front lawn and drawing-dining on the left, porch on the right with stairs down behind it, entrance with powder room (labelled bed room 14x13), TV lounge with kitchen, two beds with washrooms at the back, 6x10 open court",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [35, 65],
+   "rows": [[{"t": "lawn", "w": 13.5, "d": 6}, {"t": "porch", "w": 21.5, "d": 19}],
+            [{"t": "drawing", "w": 13, "d": 21}, {"t": "lobby", "w": 7.5, "d": 20}, {"t": "stairs", "w": 14.5, "d": 8.5}],
+            [{"t": "lounge", "w": 21, "d": 16}, {"t": "kitchen", "w": 14, "d": 11}],
+            [{"t": "bed", "w": 14.5, "d": 19}, {"t": "master", "w": 20.5, "d": 17}],
+            [{"t": "passage", "w": 35, "d": 3}]],
+   "baths": [{"row": 2, "col": 2, "w": 3.75, "d": 6.5, "side": "L"},
+             {"row": 4, "col": 1, "w": 8.5, "d": 6.5, "side": "L"},
+             {"row": 4, "col": 2, "w": 6, "d": 8.5, "side": "R"}]},
+ "first_floor": null}

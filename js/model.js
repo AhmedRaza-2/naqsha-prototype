@@ -115,12 +115,21 @@ function decode(ids) {
 const fmt = (v) => String(v);
 
 /** The request text the model was trained on. Models trained before washroom/focus support only know PLOT and BEDS. */
-function requestText({ w, d, beds, baths, focus }, style) {
-  let t = `PLOT ${fmt(w)}x${fmt(d)} BEDS ${beds}`;
+function requestText({ w, d, beds, baths, focus, storeys, floor }, style) {
+  let t = `PLOT ${fmt(w)}x${fmt(d)}`;
+  if (floor) t += ` FLOOR 1 BOX ${[floor.box.x, floor.box.y, floor.box.w, floor.box.d].map(fmt).join(' ')} UP ${[floor.up.x, floor.up.y, floor.up.w, floor.up.d].map(fmt).join(' ')}`;
+  t += ` BEDS ${beds}`;
   if (stoi.has('BATHS') && baths != null) t += ` BATHS ${baths}`;
-  if (stoi.has('FOCUS') && focus) t += ` FOCUS ${focus}`;
+  if (stoi.has('FOCUS') && focus && !floor) t += ` FOCUS ${focus}`;
+  if (storeys === 2 && stoi.has('STOREYS')) t += ' STOREYS 2';
   if (style && stoi.has('STYLE') && stoi.has(style)) t += ` STYLE ${style}`;
   return t;
+}
+
+/** True when the loaded model can draw two-storey houses (ground floors with stairs, first floors over them). */
+export async function knowsStoreys() {
+  await load();
+  return stoi.has('FLOOR') && stoi.has('STOREYS') && stoi.has('terrace');
 }
 
 /** True when the loaded model was trained with layout families (STYLE tags, slicing trees). */
@@ -153,7 +162,7 @@ async function sample(request, styles, { temperature = 0.8, maxNew = 170 } = {},
 
 /** About how many words the model writes for a plan on this plot (measured on v11: 47 on 3 marla, 68 on 6, 120 from
  *  14 marla up), so the progress shown while drafting runs to about 100% instead of stopping half way. */
-const expectedLength = ({ w, d }) => Math.min(125, Math.max(42, 22 + 6.8 * ((w * d) / 225)));
+const expectedLength = ({ w, d, floor }) => Math.min(125, Math.max(42, 22 + 6.8 * ((w * d) / 225))) * (floor ? 0.55 : 1);
 
 async function sampleBatch(rows, temperature, maxNew, expected, progress) {
   const { ort } = await load();

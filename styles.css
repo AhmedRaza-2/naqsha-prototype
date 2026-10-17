@@ -169,6 +169,11 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 .edhost .h { cursor: col-resize; }
 .edhost .h.hz { cursor: row-resize; }
 .edhost .h .hit { stroke: transparent; stroke-width: 14; }
+.edhost .h.door circle.hit { fill: transparent; stroke: none; }
+.edhost .h.door .grip { fill: #d9a441; stroke: #394845; }
+.edhost .h.door:hover .grip { fill: #394845; }
+.edhost .h.dh { cursor: ew-resize; }
+.edhost .h.dv { cursor: ns-resize; }
 .edhost .h .show { stroke: #394845; stroke-width: 2.5; opacity: 0; transition: opacity 0.12s; }
 .edhost .h .grip { fill: #fbf8f1; stroke: #394845; stroke-width: 1.6; }
 .edhost .h.bath .grip, .edhost .h.bath .show { stroke: #6f8f96; }
@@ -184,3 +189,8 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 /* preferences: the washroom choice has the longest labels */
 .prefs .row { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); }
 @media (max-width: 760px) { .prefs .row { grid-template-columns: 1fr; } }
+
+/* two-storey houses: ground floor and first floor side by side */
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.pair figure { margin: 0; text-align: center; }
+.pair figcaption { font-weight: 600; margin-bottom: 6px; }

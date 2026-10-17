@@ -1,0 +1,60 @@
+ff73854cc8a81bc8  image: data/clean/images/ff73854cc8a81bc8.jpg  search group: area_other  printed plot: None  OCR sizes: BED 8x6, STORE 5x6.5, LOUNGE 19x17, KITCHEN 14x7, LOBBY 7x9, DRAWING 16x18
+90e52ae63b6ac4e9  image: data/clean/images/90e52ae63b6ac4e9.jpg  search group: ft_25x40  printed plot: [25, 40]  OCR sizes: BED 10x13, TOILET 4.5x7.5, KITCHEN 8x13, DINING 9x13.5, PORCH 12.5x12
+aa37e21ee59138c9  image: data/clean/images/aa37e21ee59138c9.jpg  search group: 12_marla  printed plot: None  OCR sizes: DRESS 8x6, BED 14x18, DINING 13x14, LOBBY 8x9, DRAWING 16x17.5
+abdbe3f08584c4b8  image: data/clean/images/abdbe3f08584c4b8.jpg  search group: area_karachi  printed plot: None  OCR sizes: DRAWING 13x12.5, BED 10.5x16, BED 14x13.5, BATH 14x10
+ae0efc4df492e092  image: data/clean/images/ae0efc4df492e092.jpg  search group: ft_35x65  printed plot: [35, 65]  OCR sizes: DRESS 3.5x5, BATH 8x5, LOBBY 9x11.5, DRAWING 14x14, PORCH 18x17.5
+a8cbff178d34c0c2  image: data/clean/images/a8cbff178d34c0c2.jpg  search group: ft_50x80  printed plot: [50, 80]  OCR sizes: BED 14x19, BED 13x25.5, DRESS 8x7, LOBBY 8x7, DINING 11x15, BED 11x15, DRESS 6x5, KITCHEN 11x14
+9116b9dbacadc342  image: data/clean/images/9116b9dbacadc342.jpg  search group: 14_marla  printed plot: None  OCR sizes: BED 11x12, BED 12.5x10, BATH 6.5x7.5, KITCHEN 8x10, BED 11x13, PORCH 12.5x15.5, DRAWING 11x13
+c11b31729a6d669d  image: data/clean/images/c11b31729a6d669d.jpg  search group: type_4_bedroom  printed plot: None  OCR sizes: KITCHEN 10x8, BED 11x13, LOBBY 20x10, TOILET 7x5.5, DRAWING 11x12, PORCH 9.5x10, BED 11x12
+afd6d001d9a4ac2f  image: data/clean/images/afd6d001d9a4ac2f.jpg  search group: type_north_facing  printed plot: [43, 106]  OCR sizes: TOILET 9.5x8, BED 10.5x10
+bb97ab58cc7806a1  image: data/clean/images/bb97ab58cc7806a1.jpg  search group: area_other  printed plot: None  OCR sizes: TOILET 5x7, TOILET 5x6, BED 10.5x14, KITCHEN 11.5x16.5, STORE 3.5x3.5
+ba3cc136c4f196c3  image: data/clean/images/ba3cc136c4f196c3.jpg  search group: ft_25x40  printed plot: [25, 40]  OCR sizes: BED 11.5x12.5, KITCHEN 7.5x5, WC 7.5x5, LIVING 11.5x11.5
+80850d7a73b6736d  image: data/clean/images/80850d7a73b6736d.jpg  search group: 12_marla  printed plot: None  OCR sizes: BED 18x12, BED 15x14, DRESS 6x5.5, LOBBY 19.5x13
+ae4ad394f0b3962c  image: data/clean/images/ae4ad394f0b3962c.jpg  search group: area_karachi  printed plot: None  OCR sizes: SERVANT 7.5x6, BED 12.5x12, LOUNGE 13.5x14, KITCHEN 13x9
+fb78205fb581c3a4  image: data/clean/images/fb78205fb581c3a4.jpg  search group: ft_35x65  printed plot: [35, 65]  OCR sizes: BED 14x16, PORCH 18x13, LOUNGE 14x16, DRAWING 14.5x13, DINING 10x11.5
+8a0e0e0e0ffaf1f1  image: data/clean/images/8a0e0e0e0ffaf1f1.jpg  search group: ft_50x80  printed plot: [50, 80]  OCR sizes: BED 12x12.5, PASSAGE 8x5, BED 9x18
+9c636321e49ddc95  image: data/clean/images/9c636321e49ddc95.jpg  search group: 14_marla  printed plot: None  OCR sizes: BED 15x14, BED 14x16, LOUNGE 18x16, LAWN 8x15
+ff483ac6f966a220  image: data/clean/images/ff483ac6f966a220.jpg  search group: type_4_bedroom  printed plot: None  OCR sizes: GARAGE 12x24
+ea3ab13641dab14d  image: data/clean/images/ea3ab13641dab14d.jpg  search group: type_north_facing  printed plot: None  OCR sizes: BED 11x13
+b326cc1c3be3a61c  image: data/clean/images/b326cc1c3be3a61c.jpg  search group: 10_marla  printed plot: None  OCR sizes: BATH 6.5x7, BED 12x14, BATH 7x5
+af90a47bf0c6918b  image: data/clean/images/af90a47bf0c6918b.jpg  search group: ft_20x50  printed plot: [20, 50]  OCR sizes: BED 11x11, DRG 11.5x14, STAIR 6x10
+9a37b791e8c8c196  image: data/clean/images/9a37b791e8c8c196.jpg  search group: ft_30x40  printed plot: [30, 40]  OCR sizes: BED 9.5x11.5, MASTER 10x18, BATH 8x9, DINING 10x20, LIVING 10x20
+f8a08ebac197c1b3  image: data/clean/images/f8a08ebac197c1b3.jpg  search group: ft_40x70  printed plot: [40, 70]  OCR sizes: BED 14x16, KITCHEN 14x13, DINING 14x17
+b8c73ce7638c6138  image: data/clean/images/b8c73ce7638c6138.jpg  search group: ft_32x60  printed plot: [32, 60]  OCR sizes: BED 14x11.5, BED 14x12, KITCHEN 11.5x10
+81c6f9d8fe04fc81  image: data/clean/images/81c6f9d8fe04fc81.jpg  search group: ft_35x70  printed plot: [35, 50]  OCR sizes: LIVING 17x16, PASSAGE 6x8.5
+aa0f1dc17868f2ec  image: data/clean/images/aa0f1dc17868f2ec.jpg  search group: type_duplex  printed plot: None  OCR sizes: none
+afa4d053cc3e2bc2  image: data/clean/images/afa4d053cc3e2bc2.jpg  search group: area_islamabad  printed plot: [50, 50]  OCR sizes: TOILET 5x7.5, BED 16.5x11, BED 11x11, LIVING 16x10.5
+fe9a419c59a4458f  image: data/clean/images/fe9a419c59a4458f.jpg  search group: 6_marla  printed plot: [35, 65]  OCR sizes: BED 12x14, BED 12x15, KITCHEN 12x10, PORCH 12x18
+bef885e185789985  image: data/clean/images/bef885e185789985.jpg  search group: ft_27x50  printed plot: [27, 50]  OCR sizes: WC 8x6, BED 13.5x11
+bdc7b0c3e09ec0d1  image: data/clean/images/bdc7b0c3e09ec0d1.jpg  search group: ft_25x45  printed plot: [25, 45]  OCR sizes: BED 11.5x11, KITCHEN 7.5x9, DRAWING 11.5x11.5
+80ed7f323670660f  image: data/clean/images/80ed7f323670660f.jpg  search group: ft_35x60  printed plot: [90, 100]  OCR sizes: BED 13.5x13, TOILET 5x6, DINING 5.5x9.5, STORE 5.5x8
+91ee31eaf18a0f31  image: data/clean/images/91ee31eaf18a0f31.jpg  search group: 8_marla  printed plot: [27, 80]  OCR sizes: BATH 8x5.5, LOUNGE 25.5x13
+870efc06f9bda091  image: data/clean/images/870efc06f9bda091.jpg  search group: 16_marla  printed plot: None  OCR sizes: DRAWING 16x14
+af84d2c1cc99da72  image: data/clean/images/af84d2c1cc99da72.jpg  search group: ft_25x60  printed plot: [25, 60]  OCR sizes: none
+9f542749139b3ad4  image: data/clean/images/9f542749139b3ad4.jpg  search group: 3_marla  printed plot: None  OCR sizes: DRESS 15x16, BED 16x15, STORE 9x8.5, DINING 20x8, DRAWING 21x13.5
+a430db468ddb87e1  image: data/clean/images/a430db468ddb87e1.jpg  search group: ft_20x40  printed plot: [20, 40]  OCR sizes: BED 6.5x4.5, KITCHEN 10.5x13, BED 11x10
+9fe4749c26792a13  image: data/clean/images/9fe4749c26792a13.jpg  search group: 7_marla  printed plot: None  OCR sizes: LOUNGE 27x16
+ae2de6996d432c98  image: data/clean/images/ae2de6996d432c98.jpg  search group: 9_marla  printed plot: None  OCR sizes: LOUNGE 18x14, STAIR 8x15
+f072a539cb1b05e5  image: data/clean/images/f072a539cb1b05e5.jpg  search group: ft_50x100  printed plot: [50, 100]  OCR sizes: KITCHEN 12x9.5, DRG 13.5x16.5
+c554be095a9a6796  image: data/clean/images/c554be095a9a6796.jpg  search group: ft_30x70  printed plot: [30, 70]  OCR sizes: TOILET 8x7, KITCHEN 8x13
+bfc831e1c296ec91  image: data/clean/images/bfc831e1c296ec91.jpg  search group: ft_36x70  printed plot: [36, 70]  OCR sizes: none
+b898e518d3659a67  image: data/clean/images/b898e518d3659a67.jpg  search group: type_5_bedroom  printed plot: None  OCR sizes: none
+8633ea0cb949bc6e  image: data/clean/images/8633ea0cb949bc6e.jpg  search group: 10_marla  printed plot: None  OCR sizes: DRESS 7x5, BATH 5x7.5
+d027379a1c5b497c  image: data/clean/images/d027379a1c5b497c.jpg  search group: ft_20x50  printed plot: [90, 112]  OCR sizes: BED 9x13, TOILET 3.5x4.5, TOILET 4.5x7
+c0c03f1d37631c9f  image: data/clean/images/c0c03f1d37631c9f.jpg  search group: ft_30x40  printed plot: [30, 40]  OCR sizes: BED 15x11, TOILET 13.5x12, BED 13.5x12, TOILET 8.5x5
+9bd024af4bf107c3  image: data/clean/images/9bd024af4bf107c3.jpg  search group: ft_40x70  printed plot: [40, 70]  OCR sizes: BED 13x12, LOUNGE 18x15.5
+bbc7e4c930c636c4  image: data/clean/images/bbc7e4c930c636c4.jpg  search group: ft_32x60  printed plot: [32, 60]  OCR sizes: PORCH 9x15
+ba7ea04a39cc62cb  image: data/clean/images/ba7ea04a39cc62cb.jpg  search group: ft_35x70  printed plot: [35, 70]  OCR sizes: none
+95f5bb3a8910f185  image: data/clean/images/95f5bb3a8910f185.jpg  search group: type_duplex  printed plot: None  OCR sizes: none
+9ac24eb07fee24c2  image: data/clean/images/9ac24eb07fee24c2.jpg  search group: 10_marla  printed plot: None  OCR sizes: BATH 5x10, BED 14x14
+e25454a68babf469  image: data/clean/images/e25454a68babf469.jpg  search group: ft_20x50  printed plot: [20, 50]  OCR sizes: BED 9x13.5, DRAWING 9.5x20, BED 9x11.5
+aeb0649db0c7c94b  image: data/clean/images/aeb0649db0c7c94b.jpg  search group: ft_30x40  printed plot: [30, 40]  OCR sizes: BATH 7x5, BED 14x11, LIVING 14x17
+b93d90c2b687d2f0  image: data/clean/images/b93d90c2b687d2f0.jpg  search group: ft_40x70  printed plot: [40, 70]  OCR sizes: BED 12x11, KITCHEN 7x7
+bfb486e19299c2b2  image: data/clean/images/bfb486e19299c2b2.jpg  search group: ft_32x60  printed plot: [32, 60]  OCR sizes: LOBBY 14x12
+e3ad46b328562e72  image: data/clean/images/e3ad46b328562e72.jpg  search group: ft_35x70  printed plot: [21, 35]  OCR sizes: none
+db16863aaab5354a  image: data/clean/images/db16863aaab5354a.jpg  search group: 20_marla  printed plot: None  OCR sizes: BED 12x14, LOBBY 6x9, PORCH 18.5x17
+baee05e340f807dc  image: data/clean/images/baee05e340f807dc.jpg  search group: 5_marla  printed plot: [25, 45]  OCR sizes: DRESS 7x4, LOUNGE 4x11
+e868c5959667d992  image: data/clean/images/e868c5959667d992.jpg  search group: ft_30x60  printed plot: [30, 60]  OCR sizes: TOILET 8x5
+80902da2bfdf0ed3  image: data/clean/images/80902da2bfdf0ed3.jpg  search group: area_lahore  printed plot: None  OCR sizes: LIVING 26x12, LIVING 14.5x12
+f83ee66087c99196  image: data/clean/images/f83ee66087c99196.jpg  search group: ft_45x90  printed plot: [45, 90]  OCR sizes: LIVING 38.5x20, LAWN 19.5x13
+bfda4627cec45830  image: data/clean/images/bfda4627cec45830.jpg  search group: urdu  printed plot: None  OCR sizes: LAWN 6x4.5

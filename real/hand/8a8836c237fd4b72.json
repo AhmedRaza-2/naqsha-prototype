@@ -1,0 +1,12 @@
+{"id": "8a8836c237fd4b72", "image": "images/8a8836c237fd4b72.jpg",
+ "note": "25x50 (5 marla): drawing room with its own bath at the front, porch with a curved stair, lounge and kitchen in the middle, two bedrooms with attached baths and an open court at the back",
+ "drawn": "road at the bottom",
+ "rooms": {"plot": [25, 50],
+   "rows": [[{"t": "drawing", "w": 13, "d": 11}, {"t": "porch", "w": 6, "d": 19}, {"t": "stairs", "w": 6, "d": 12}],
+            [{"t": "lounge", "w": 16, "d": 11}, {"t": "kitchen", "w": 7, "d": 10}],
+            [{"t": "bed", "w": 11.5, "d": 12}, {"t": "bed", "w": 11.75, "d": 12}],
+            [{"t": "courtyard", "w": 25, "d": 7}]],
+   "baths": [{"row": 1, "col": 1, "w": 5, "d": 6.5, "side": "L"},
+             {"row": 3, "col": 1, "w": 5, "d": 7, "side": "L"},
+             {"row": 3, "col": 2, "w": 7, "d": 7, "side": "R"}]},
+ "first_floor": null}
