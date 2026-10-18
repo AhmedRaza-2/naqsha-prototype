@@ -136,6 +136,14 @@
       <div class="card colors" id="colors">
         <div class="swrow"><span class="swlabel">Walls</span><div class="sw" id="swwall" role="radiogroup" aria-label="Wall colour"></div></div>
         <div class="swrow"><span class="swlabel">Trim and frames</span><div class="sw" id="swtrim" role="radiogroup" aria-label="Trim colour"></div></div>
+        <div class="swrow"><span class="swlabel">Boundary wall</span>
+          <label class="mini">Style<select id="swallstyle"><option value="plain">Plastered</option><option value="brick">Brick</option><option value="bars">Railings on a low wall</option><option value="none">No wall</option></select></label>
+          <label class="mini">Height<select id="swallh"><option value="3">3 ft</option><option value="4.5" selected>4.5 ft</option><option value="6">6 ft</option><option value="8">8 ft</option></select></label>
+          <label class="mini">Gate<select id="sgate"><option value="slide">Sliding</option><option value="swing">Swing</option></select></label>
+          <label class="mini">Car<select id="scar"><option value="sedan">Sedan</option><option value="hatchback">Hatchback</option><option value="suv">SUV</option><option value="luxury">Luxury SUV</option></select></label>
+          <label class="mini">Car colour<select id="scarc"><option value="white">White</option><option value="silver">Silver</option><option value="black">Black</option><option value="graphite">Graphite</option><option value="maroon">Maroon</option><option value="navy">Navy</option><option value="red">Red</option></select></label>
+        </div>
+        <div class="swrow"><span class="swlabel">Wall colour</span><div class="sw" id="swwallc" role="radiogroup" aria-label="Boundary wall colour"></div></div>
       </div>
       <div class="grid3" id="styles"></div>
       <div class="card pair" id="pair3" hidden></div>
@@ -147,8 +155,22 @@
     <div id="vhost"></div>
     <div class="hud top-left"><div class="room" id="hudroom">-</div><div class="hint" id="hudhint"></div></div>
     <div class="hud top-right">
-      <button class="btn sm" id="vmode">Overview</button>
+      <label class="sel">View
+        <select id="vview" aria-label="Camera view">
+          <option value="walk">Walk (first person)</option>
+          <option value="follow">Follow a visitor</option>
+          <option value="tour">Guided tour</option>
+          <option value="orbit">Overview</option>
+          <option value="top">Top view</option>
+          <option value="street">Street view</option>
+          <option value="showcase">Showcase (turning)</option>
+        </select>
+      </label>
+      <label class="sel" id="vcutl" hidden>Show
+        <select id="vcut" aria-label="Floors shown"><option value="all">Whole house</option><option value="ground">Ground floor</option><option value="first">First floor</option></select>
+      </label>
       <button class="btn sm" id="vfloor" hidden>Go upstairs</button>
+      <button class="btn sm" id="vdoors">Close doors</button>
       <button class="btn sm" id="vcolors" aria-expanded="false">Colours</button>
       <button class="btn sm" id="vroof">Hide roof</button>
       <button class="btn sm" id="vreset">Reset</button>
@@ -158,6 +180,15 @@
       <div class="swrow"><span class="swlabel">Outside walls</span><div class="sw" id="vswwall"></div></div>
       <div class="swrow"><span class="swlabel">Inside walls</span><div class="sw" id="vswint"></div></div>
       <div class="swrow"><span class="swlabel">Trim</span><div class="sw" id="vswtrim"></div></div>
+      <div class="swrow"><span class="swlabel">Living floors</span><div class="sw" id="vswfl"></div></div>
+      <div class="swrow"><span class="swlabel">Bedroom floors</span><div class="sw" id="vswfb"></div></div>
+      <div class="swrow"><span class="swlabel">Boundary wall</span><div class="sw" id="vswwc"></div></div>
+      <div class="swrow"><label class="mini">Wall<select id="vwall"><option value="plain">Plastered</option><option value="brick">Brick</option><option value="bars">Railings</option><option value="none">None</option></select></label>
+        <label class="mini">Height<select id="vwallh"><option value="3">3 ft</option><option value="4.5">4.5 ft</option><option value="6">6 ft</option><option value="8">8 ft</option></select></label>
+        <label class="mini">Gate<select id="vgate"><option value="slide">Sliding</option><option value="swing">Swing</option></select></label>
+        <label class="mini">Car<select id="vcar"><option value="sedan">Sedan</option><option value="hatchback">Hatchback</option><option value="suv">SUV</option><option value="luxury">Luxury</option></select></label>
+        <label class="mini">Car colour<select id="vcarc"><option value="white">White</option><option value="silver">Silver</option><option value="black">Black</option><option value="graphite">Graphite</option><option value="maroon">Maroon</option><option value="navy">Navy</option><option value="red">Red</option></select></label></div>
+      <div class="swrow"><label class="mini wide">Field of view<input type="range" id="vfov" min="40" max="100" value="70"></label></div>
     </div>
   </div>
 

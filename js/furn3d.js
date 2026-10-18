@@ -87,11 +87,15 @@ export async function addFurniture(parent, items) {
   }));
 }
 
-/** Footprints a visitor cannot walk through. */
+const WALL_MOUNTED = new Set(['kupper', 'hood', 'mirror', 'coat']);       // hang at head height: a visitor must not walk into them
+const SMALL = new Set(['chair', 'deskChair']);
+
+/** Footprints a visitor cannot walk through: solid furniture, chairs, and anything hung at head height. */
 export function furnitureColliders(items) {
-  return items.filter((i) => !i.soft && !i.deco && i.k !== 'fan' && i.k !== 'rug')
+  return items.filter((i) => ((!i.soft && !i.deco) || WALL_MOUNTED.has(i.k) || SMALL.has(i.k)) && i.k !== 'fan' && i.k !== 'rug' && i.k !== 'mat')
     .map((i) => {
-      const [ex, ez] = i.fz !== 0 ? [i.w, i.d] : [i.d, i.w];
+      let [ex, ez] = i.fz !== 0 ? [i.w, i.d] : [i.d, i.w];
+      if (SMALL.has(i.k)) { ex = Math.min(ex, 1.2); ez = Math.min(ez, 1.2); }
       return { x0: i.x - ex / 2, x1: i.x + ex / 2, z0: i.z - ez / 2, z1: i.z + ez / 2, k: i.k, room: i.room };
     });
 }

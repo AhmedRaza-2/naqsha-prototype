@@ -235,3 +235,13 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 .hud.palette .swlabel { min-width: 96px; }
 .hud.palette .swatch { width: 28px; height: 28px; }
 .edhost svg text { pointer-events: none; }
+
+/* 3D viewer controls */
+.hud .sel { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--ink-soft); }
+.hud .sel select { height: 36px; border-radius: 999px; padding: 0 12px; font-size: 0.85rem; background: var(--bg); border: 1px solid var(--line); }
+.hud.top-right { flex-wrap: wrap; justify-content: flex-end; max-width: min(100vw - 28px, 760px); }
+.mini { display: inline-flex; flex-direction: column; gap: 2px; font-size: 0.75rem; color: var(--ink-soft); }
+.mini select, .mini input[type="range"] { height: 34px; border-radius: 10px; font-size: 0.85rem; padding: 0 8px; }
+.mini.wide { min-width: 200px; }
+.hud.palette { max-height: calc(100vh - 100px); overflow: auto; }
+.colors .mini { margin-right: 6px; }

@@ -147,14 +147,39 @@ export function boxAndStairs(rects) {
 /** True when the loaded model can draw both floors of a two-storey house. */
 export { knowsStoreys };
 
+/** Share of a first floor's room area that stands over rooms of the ground floor (the rest would hang in the air). */
+export function supportShare(upperRects, groundRects) {
+  const built = (rs) => rs.filter((r) => !OPEN.has(r.t) && r.parent === undefined && r.t !== 'bath');
+  const G = built(groundRects);
+  let tot = 0, sup = 0;
+  for (const r of built(upperRects)) {
+    tot += r.w * r.d;
+    for (const g of G) {
+      const w = Math.min(r.x + r.w, g.x + g.w) - Math.max(r.x, g.x), d = Math.min(r.y + r.d, g.y + g.d) - Math.max(r.y, g.y);
+      if (w > 0 && d > 0) sup += w * d;
+    }
+  }
+  return tot ? sup / tot : 1;
+}
+
 /** First floors over a chosen ground floor: three layouts drafted by the model, each rule-checked (the stairs sit exactly
  *  above the stairs below). Empty list when the ground floor has no stairs or the model gives nothing valid. */
 export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   const fb = boxAndStairs(ground.rects);
   if (!fb) return [];
   const { w, d } = ground.plot;
-  const items = await draftPlans({ w, d, beds: prefs.beds, baths: prefs.baths, floor: fb }, {
+  const run = (minSupport) => draftPlans({ w, d, beds: prefs.beds, baths: prefs.baths, floor: fb }, {
     n: opts.n ?? 12, top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles: [null],
+    keep: (it) => supportShare(it.rects, ground.rects) >= minSupport,
   });
+  // a first floor must stand on the ground floor: rooms hanging over a yard or a car porch are not drawn if an alternative exists
+  let items = await run(0.97);
+  for (const lvl of [0.88, 0.7]) {
+    if (items.length >= 3) break;
+    const more = await run(lvl);
+    const seen = new Set(items.map((i) => i.text));
+    items = [...items, ...more.filter((m) => !seen.has(m.text))].slice(0, 3);
+    if (opts.exclude && items.length) break;                          // Regenerate: take what there is
+  }
   return items.map((it, i) => planToLayout(it, i));
 }

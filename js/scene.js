@@ -4,6 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { STYLES } from './styles.js';
 import { furnish } from './furniture.js';
 import { addFurniture, furnitureColliders } from './furn3d.js';
+import { loadCar } from './car3d.js';
 
 const H = 10; // wall height (ft)
 const EYE = 5.4;
@@ -140,7 +141,9 @@ export function prepareRenderer(renderer) {
  * The house as a scene: walls, floors, roof, facade details, plot, street and (optionally) furniture.
  * L: ground floor layout; U: first floor of a two-storey house (or null). colors: { wall, trim, interior, accent } overrides.
  */
-export function buildScene(renderer, L, styleId, U = null, { colors = {}, furniture = true, context = false } = {}) {
+export const SITE_DEFAULT = { wall: 'plain', wallH: 4.5, wallColor: null, gate: 'slide', car: 'sedan', carColor: 'white', floorLiving: null, floorBed: null };
+export function buildScene(renderer, L, styleId, U = null, { colors = {}, furniture = true, context = false, site = {} } = {}) {
+  site = { ...SITE_DEFAULT, ...site };
   const st = { ...STYLES[styleId], ...Object.fromEntries(Object.entries(colors).filter(([, v]) => v)) };
   const { w: W, d: D } = L.plot;
   const { B, rule } = L;
@@ -180,10 +183,13 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const mGrill = mat('#2a2d30', { roughness: 0.45, metalness: 0.6 });
   const mRoofTile = texMat('roofTile', { roughness: 0.75 }, 3);
   const mConcrete = texMat('concrete', { roughness: 0.95 }, 10);
+  const mBrick = texMat('brick', { roughness: 0.9 }, 4);
+  const mDoorOpen = new Set();
   const world = new THREE.Group(); scene.add(world);
   const roofG = new THREE.Group(); world.add(roofG);
   const colliders = [], upperColliders = [];
   const furnReady = [];                                            // furniture models arrive after the walls: the house is usable at once
+  const doorList = [], storeyG = [], floorMeshes = [];             // swing doors, the group of each storey, floors (for live colour changes)
   let curColl = colliders;                                         // where wall boxes register their collision (the storey being built)
 
   const box = (parent, x0, x1, y0, y1, z0, z1, m, collide, cast = true) => {
@@ -228,29 +234,49 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const gateX = mainDoor.at;
   const gateLo = porch ? Math.max(0.6, Math.min(porch.x, gateX - 2)) : gateX - 4;
   const gateHi = porch ? Math.min(W - 0.6, Math.max(porch.x + porch.w, gateX + 2)) : gateX + 4;
-  const cw = 0.5, ch = 4.5;
+  const cw = 0.5, ch = site.wallH;
+  const wallMat = site.wallColor ? texMat('plaster', { color: site.wallColor, roughness: 0.95 }, 9) : mExt;
   const cwall = (x0, x1, z0, z1) => {
-    box(world, x0, x1, 0, ch, z0, z1, mExt, true);
+    if (site.wall === 'none') return;
+    const along = x1 - x0 > z1 - z0;
+    if (site.wall === 'bars') {                                     // a low plastered base with iron railings above it
+      const base = Math.min(2.2, ch * 0.42);
+      box(world, x0, x1, 0, base, z0, z1, wallMat, true);
+      box(world, x0 - 0.1, x1 + 0.1, base, base + 0.25, z0 - 0.1, z1 + 0.1, mTrim);
+      box(world, x0, x1, ch - 0.15, ch, z0, z1, mGrill, false);
+      box(world, x0, x1, base + 0.25, base + 0.4, z0, z1, mGrill, false);
+      const len = along ? x1 - x0 : z1 - z0;
+      for (let t = 0.3; t < len; t += 0.55) {
+        if (along) box(world, x0 + t - 0.04, x0 + t + 0.04, base + 0.25, ch, z0 + 0.1, z1 - 0.1, mGrill, false);
+        else box(world, x0 + 0.1, x1 - 0.1, base + 0.25, ch, z0 + t - 0.04, z0 + t + 0.04, mGrill, false);
+      }
+      return;
+    }
+    const m = site.wall === 'brick' ? mBrick : wallMat;
+    box(world, x0, x1, 0, ch, z0, z1, m, true);
     box(world, x0 - 0.12, x1 + 0.12, ch, ch + 0.3, z0 - 0.12, z1 + 0.12, mTrim);
-    box(world, x0 - 0.04, x1 + 0.04, 0, 1, z0 - 0.04, z1 + 0.04, mStone, false);
+    if (site.wall !== 'brick') box(world, x0 - 0.04, x1 + 0.04, 0, 1, z0 - 0.04, z1 + 0.04, mStone, false);
   };
   cwall(0, gateLo, -cw / 2, cw / 2);
   cwall(gateHi, W, -cw / 2, cw / 2);
   cwall(0, W, D - cw / 2, D + cw / 2);
   if (rule.side > 0) { cwall(-cw / 2, cw / 2, 0, D); cwall(W - cw / 2, W + cw / 2, 0, D); }
-  [gateLo - 0.4, gateHi + 0.4].forEach((x) => { box(world, x - 0.7, x + 0.7, 0, 6, -0.75, 0.75, mStone, true); box(world, x - 0.85, x + 0.85, 6, 6.4, -0.9, 0.9, mTrim); });
-  {
-    const gw = gateHi - gateLo, right = gateHi + gw <= W - 0.4;
-    const g0 = right ? gateHi + 0.3 : gateLo - gw - 0.3, g1 = g0 + gw, z0 = 0.35, z1 = 0.5;
-    box(world, g0, g1, 0.2, 0.45, z0, z1, mGrill); box(world, g0, g1, 5.0, 5.3, z0, z1, mGrill);
-    for (let x = g0 + 0.25; x < g1; x += 0.45) box(world, x - 0.04, x + 0.04, 0.2, 5.3, z0 + 0.03, z1 - 0.03, mGrill, false);
+  if (site.wall !== 'none') [gateLo - 0.4, gateHi + 0.4].forEach((x) => { box(world, x - 0.7, x + 0.7, 0, Math.max(6, ch + 1.5), -0.75, 0.75, mStone, true); box(world, x - 0.85, x + 0.85, Math.max(6, ch + 1.5), Math.max(6, ch + 1.5) + 0.4, -0.9, 0.9, mTrim); });
+  if (site.wall !== 'none') {                                       // the gate: a sliding leaf parked beside the gateway, or two swing leaves
+    const gw = gateHi - gateLo, gh = Math.max(5.3, ch + 0.8);
+    const leaf = (g0, g1, z0, z1) => {
+      box(world, g0, g1, 0.2, 0.45, z0, z1, mGrill); box(world, g0, g1, gh - 0.3, gh, z0, z1, mGrill);
+      for (let x = g0 + 0.25; x < g1; x += 0.45) box(world, x - 0.04, x + 0.04, 0.2, gh, z0 + 0.03, z1 - 0.03, mGrill, false);
+    };
+    if (site.gate === 'swing') { leaf(gateLo, gateLo + gw / 2 - 0.1, -1.6, -1.45); leaf(gateHi - gw / 2 + 0.1, gateHi, -1.6, -1.45); }
+    else { const right = gateHi + gw <= W - 0.4; const g0 = right ? gateHi + 0.3 : gateLo - gw - 0.3; leaf(g0, g0 + gw, 0.35, 0.5); }
   }
 
   // ---------- walls, floors, furniture: one storey (dy = height of its floor) ----------
   function buildStorey(L, dy, upper) {
     const { B } = L;
     const open = L.open || [];
-    const walls = new THREE.Group(); walls.position.y = dy; world.add(walls);
+    const walls = new THREE.Group(); walls.position.y = dy; world.add(walls); storeyG.push(walls);
     curColl = upper ? upperColliders : colliders;
     const hl = new Map(), vl = new Map();
     const addEdge = (map, c, a, b) => {
@@ -354,16 +380,51 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
           if (!upper && !p.bath) for (let s = o0 + 0.35; s < o1 - 0.1; s += 0.5) along(s - 0.03, s + 0.03, p.sill, p.top, 0.03, mGrill, outSide * (t / 2 + 0.12));   // security grill
           if (!upper && !p.bath) along(o0, o1, p.sill + (p.top - p.sill) / 2 - 0.03, p.sill + (p.top - p.sill) / 2 + 0.03, 0.03, mGrill, outSide * (t / 2 + 0.12));
         }
+      } else if (p.kind === 'door' && p.terrace) {
+        // a sliding glass door onto the terrace: a fixed pane and a pane that slides over it
+        along(o0 - fw, o1 + fw, p.top, p.top + fw, 0.3, mFrame);
+        along(o0 - fw, o0, 0, p.top, 0.3, mFrame); along(o1, o1 + fw, 0, p.top, 0.3, mFrame);
+        along(o0, o1, 0, 0.12, 0.3, mFrame);
+        const half = (p.w - 0.1) / 2, slide = new THREE.Group();
+        const pane = (grp, a0, a1) => { const frame = o === 'h' ? [a1 - a0, p.top - 0.25, 0.08] : [0.08, p.top - 0.25, a1 - a0]; const g = new THREE.Mesh(new THREE.BoxGeometry(...frame), mGlass); g.position.set(o === 'h' ? (a0 + a1) / 2 : 0, (p.top - 0.25) / 2 + 0.12, o === 'h' ? 0 : (a0 + a1) / 2); grp.add(g);
+          const bar = (lo2, hi2, y0, y1) => { const q = o === 'h' ? new THREE.Mesh(new THREE.BoxGeometry(hi2 - lo2, y1 - y0, 0.14), mFrame) : new THREE.Mesh(new THREE.BoxGeometry(0.14, y1 - y0, hi2 - lo2), mFrame); q.position.set(o === 'h' ? (lo2 + hi2) / 2 : 0, (y0 + y1) / 2, o === 'h' ? 0 : (lo2 + hi2) / 2); grp.add(q); };
+          bar(a0, a1, 0.1, 0.25); bar(a0, a1, p.top - 0.2, p.top); bar(a0, a0 + 0.12, 0.1, p.top); bar(a1 - 0.12, a1, 0.1, p.top); };
+        const fixed = new THREE.Group(); walls.add(fixed);
+        if (o === 'h') { fixed.position.set(0, 0, c - 0.1); slide.position.set(0, 0, c + 0.1); } else { fixed.position.set(c - 0.1, 0, 0); slide.position.set(c + 0.1, 0, 0); }
+        pane(fixed, o0, o0 + half + 0.05); pane(slide, o0 + half - 0.05, o1);
+        walls.add(slide);
+        const col = o === 'h' ? { x0: o0, x1: o1, z0: c - 0.25, z1: c + 0.25 } : { x0: c - 0.25, x1: c + 0.25, z0: o0, z1: o1 };
+        const door = { kind: 'slide', slide, axis: o === 'h' ? 'x' : 'z', travel: -(half - 0.1), t: 1, target: 1, open: 1, upper, dy, name: 'Terrace door', x: o === 'h' ? p.at : c, z: o === 'h' ? c : p.at, main: false, col: { ...col, door: null, k: 'door' } };
+        door.col.door = door;
+        slide.userData.door = door; slide.traverse((q) => { q.userData.door = door; });
+        slide.position[door.axis] = door.travel;
+        doorList.push(door);
+        curColl.push(door.col);
       } else if (p.kind === 'door') {
         along(o0 - fw, o1 + fw, p.top, p.top + fw, 0.3, mFrame);
         along(o0 - fw, o0, 0, p.top, 0.3, mFrame);
         along(o1, o1 + fw, 0, p.top, 0.3, mFrame);
-        // the leaf, swung open against the room it belongs to
+        // the leaf: hinged at the doorway, it swings into the room it belongs to (click it, or press F, to open and close)
         const into = outer ? inDir : sideOf(p.room, o, c);
-        const leafLen = p.w - 0.1, th = 0.15, hinge = o0 + 0.08;
+        const leafLen = p.w - 0.1, th = 0.15, hgt = p.top - 0.08;
         const m = p.main ? (st.id === 'modern' ? mSlats : mDoor) : p.room?.startsWith('bath') ? mat('#e9e6df', { roughness: 0.5 }) : mDoor;
-        if (o === 'h') box(walls, hinge, hinge + th, 0.05, p.top - 0.05, into > 0 ? c + t / 2 : c - t / 2 - leafLen, into > 0 ? c + t / 2 + leafLen : c - t / 2, m, false);
-        else box(walls, into > 0 ? c + t / 2 : c - t / 2 - leafLen, into > 0 ? c + t / 2 + leafLen : c - t / 2, 0.05, p.top - 0.05, hinge, hinge + th, m, false);
+        const pivot = new THREE.Group();
+        if (o === 'h') pivot.position.set(o0 + 0.04, 0.04, c); else pivot.position.set(c, 0.04, o0 + 0.04);
+        const leafMesh = new THREE.Mesh(o === 'h' ? new THREE.BoxGeometry(leafLen, hgt, th) : new THREE.BoxGeometry(th, hgt, leafLen), m);
+        if (o === 'h') leafMesh.position.set(leafLen / 2, hgt / 2, 0); else leafMesh.position.set(0, hgt / 2, leafLen / 2);
+        leafMesh.castShadow = leafMesh.receiveShadow = true;
+        const knob = (side) => { const kb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), mGrill); if (o === 'h') kb.position.set(leafLen - 0.25, 3.1, side * (th / 2 + 0.08)); else kb.position.set(side * (th / 2 + 0.08), 3.1, leafLen - 0.25); leafMesh.add(kb); };
+        knob(1); knob(-1);
+        pivot.add(leafMesh);
+        walls.add(pivot);
+        const open = o === 'h' ? (into > 0 ? -Math.PI / 2 : Math.PI / 2) : (into > 0 ? Math.PI / 2 : -Math.PI / 2);
+        const col = o === 'h' ? { x0: o0, x1: o1, z0: c - 0.2, z1: c + 0.2 } : { x0: c - 0.2, x1: c + 0.2, z0: o0, z1: o1 };
+        const door = { kind: 'swing', pivot, open, t: 1, target: 1, upper, dy, mesh: leafMesh, name: p.room, x: o === 'h' ? p.at : c, z: o === 'h' ? c : p.at, main: !!p.main, col: { ...col, door: null, k: 'door' } };
+        door.col.door = door;
+        pivot.rotation.y = open;
+        leafMesh.userData.door = door;
+        doorList.push(door);
+        curColl.push(door.col);
         if (outer) along(o0 - 0.8, o1 + 0.8, p.top + 0.45, p.top + 0.72, 0.9, st.id === 'spanish' ? mRoofTile : mTrim, outSide * (t / 2 + 0.9));
         if (p.main) {                                             // lights beside the entrance
           const lm = mat('#fff3d0', { emissive: '#ffd890', emissiveIntensity: 1.2 });
@@ -379,12 +440,13 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     // ---------- floors ----------
     const floorMat = (kind) => texMat(kind, { roughness: kind.startsWith('marble') ? 0.35 : kind === 'tile' ? 0.4 : 0.7, envMapIntensity: kind.startsWith('marble') ? 0.8 : 0.4 }, kind === 'tile' ? 2.5 : 4);
     const fm = {};
-    const floorKind = (r) => (r.type.endsWith('bath') || r.type === 'kitchen' ? 'tile' : r.type === 'bed' ? st.floorBed : st.floorLiving);
+    const floorKind = (r) => (r.type.endsWith('bath') || r.type === 'kitchen' ? 'tile' : r.type === 'bed' ? (site.floorBed || st.floorBed) : (site.floorLiving || st.floorLiving));
     const order = [...L.rooms.filter((r) => !r.parent), ...L.rooms.filter((r) => r.parent)];
     order.forEach((r) => {
       if (upper && r.type === 'stairs') return;                    // the stairwell: open down to the stairs below
       const k = floorKind(r);
-      plane(r.x, r.x + r.w, r.z, r.z + r.d, r.parent ? 0.05 : 0.03, fm[k] ||= floorMat(k), walls);
+      const fl = plane(r.x, r.x + r.w, r.z, r.z + r.d, r.parent ? 0.05 : 0.03, fm[k] ||= floorMat(k), walls);
+      if (!r.type.endsWith('bath') && r.type !== 'kitchen') { fl.userData.floorFor = r.type === 'bed' ? 'bed' : 'living'; floorMeshes.push({ mesh: fl, w: r.w, d: r.d }); }
     });
     // a ceiling under every slab (the roof's underside), so rooms look finished from inside
     for (const r of L.rooms) if (!r.parent) { const cp = plane(r.x, r.x + r.w, r.z, r.z + r.d, H - 0.02, mat('#f6f4ef', { roughness: 0.95, emissive: '#3b3934' }), walls); cp.rotation.x = Math.PI / 2; }
@@ -400,6 +462,8 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const piecesG = buildStorey(L, 0, false);
   const piecesU = U ? buildStorey(U, STOREY, true) : [];
   curColl = colliders;
+  const midG = new THREE.Group(); world.add(midG);                    // the floor slab between the storeys
+  const stairsG = new THREE.Group(); world.add(stairsG);              // the flight and its handrail
   const stairsRoom = L.rooms.find((r) => r.type === 'stairs');
   const upStairs = U && U.rooms.find((r) => r.type === 'stairs');
 
@@ -439,8 +503,8 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     if (st.id === 'classic') {
       box(parent, B.x - 1, B.x + B.w + 1, y + SLAB + ph, y + 0.4 + ph + SLAB, B.z - 1, B.z + B.d + 1, mTrim);
       const c0 = 0.9, ct = 0.6, cx0 = B.x - c0, cx1 = B.x + B.w + c0, cz0 = B.z - c0, cz1 = B.z + B.d + c0;
-      box(world, cx0, cx1, y - 0.7, y, cz0, cz0 + ct, mTrim); box(world, cx0, cx1, y - 0.7, y, cz1 - ct, cz1, mTrim);
-      box(world, cx0, cx0 + ct, y - 0.7, y, cz0, cz1, mTrim); box(world, cx1 - ct, cx1, y - 0.7, y, cz0, cz1, mTrim);
+      box(parent, cx0, cx1, y - 0.7, y, cz0, cz0 + ct, mTrim); box(parent, cx0, cx1, y - 0.7, y, cz1 - ct, cz1, mTrim);
+      box(parent, cx0, cx0 + ct, y - 0.7, y, cz0, cz1, mTrim); box(parent, cx1 - ct, cx1, y - 0.7, y, cz0, cz1, mTrim);
     }
     if (top) {
       box(parent, B.x + B.w - 5, B.x + B.w - 2, y + SLAB, y + SLAB + 2.8, B.z + B.d - 4, B.z + B.d - 1.5, mat('#2f3f4a', { roughness: 0.5 }));   // water tank
@@ -450,27 +514,105 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   };
   if (!U) roofOf(B, H, roofG, 2.6, null, true);
   else {
-    roofOf(B, H, world, 3, stairsRoom, false, U.rooms.filter((r) => !r.parent));   // the ground floor's roof is the upstairs floor, and its open part the terrace
+    roofOf(B, H, midG, 3, stairsRoom, false, U.rooms.filter((r) => !r.parent));   // the ground floor's roof is the upstairs floor, and its open part the terrace
     roofOf(U.B, STOREY + H, roofG, 2.6, null, true);
     // a guard wall round the terrace edge keeps walkers on the slab
     upperColliders.push({ x0: B.x - 2, x1: B.x - 0.4, z0: B.z - 2, z1: B.z + B.d + 2 }, { x0: B.x + B.w + 0.4, x1: B.x + B.w + 2, z0: B.z - 2, z1: B.z + B.d + 2 },
       { x0: B.x - 2, x1: B.x + B.w + 2, z0: B.z - 2, z1: B.z - 0.4 }, { x0: B.x - 2, x1: B.x + B.w + 2, z0: B.z + B.d + 0.4, z1: B.z + B.d + 2 });
-    if (stairsRoom) {                                             // the flight: steps climbing along the longer side of the stairs room
-      const alongX = stairsRoom.w > stairsRoom.d, len = alongX ? stairsRoom.w : stairsRoom.d, n = 16, run = len / n;
-      const mStep = st.floorLiving.startsWith('marble') ? texMat(st.floorLiving, { roughness: 0.35 }, 4) : mTrim;
-      for (let i = 0; i < n; i++) {
-        const top = ((i + 1) / n) * STOREY;
-        if (alongX) box(world, stairsRoom.x + i * run, stairsRoom.x + (i + 1) * run, 0, top, stairsRoom.z + 0.2, stairsRoom.z + stairsRoom.d - 0.2, mStep);
-        else box(world, stairsRoom.x + 0.2, stairsRoom.x + stairsRoom.w - 0.2, 0, top, stairsRoom.z + i * run, stairsRoom.z + (i + 1) * run, mStep);
-      }
-    }
+    // a handrail round the terrace edge keeps walkers on the slab
   }
 
-  // ---------- porch ----------
+  // ---------- the stairs ----------
+  // A straight flight along the stairs room's longer side. It starts beside the ground-floor door and ends beside the
+  // first-floor door (a flat landing the width of each door, or none when the door is in the end wall), so a visitor
+  // walking in at one door steps out of the other at exactly the floor's height.
+  let stairs = null;
+  if (U && stairsRoom && upStairs) {
+    const sr = stairsRoom, alongX = sr.w > sr.d, len = alongX ? sr.w : sr.d, wid = alongX ? sr.d : sr.w, lo = alongX ? sr.x : sr.z;
+    const doorOf = (lay, rm) => lay.openings.find((o) => o.kind === 'door' && !o.terrace && (o.room === rm.id || o.to === rm.id));
+    const spanOf = (d) => {
+      if (!d) return null;
+      const longWall = alongX ? d.o === 'h' : d.o === 'v';
+      if (longWall) return [Math.max(0, d.at - d.w / 2 - lo), Math.min(len, d.at + d.w / 2 - lo)];
+      return Math.abs(d.c - lo) < 0.3 ? [0, 0] : [len, len];
+    };
+    const gd = doorOf(L, sr), ud = doorOf(U, upStairs);
+    const gS = spanOf(gd) || [0, 0], uS = spanOf(ud) || [len, len];
+    const A = { dir: 1, s0: gS[1], s1: uS[0] }, Bk = { dir: -1, s0: len - gS[0], s1: len - uS[1] };
+    let pick = A.s1 - A.s0 >= Bk.s1 - Bk.s0 ? A : Bk;
+    let { dir, s0, s1 } = pick;
+    s0 = Math.max(0, Math.min(s0, len - 3.5)); s1 = Math.max(s0 + 3.5, Math.min(s1, len));
+    if (len < 4) { s0 = 0; s1 = len; }
+    const n = 16, tr = (s1 - s0) / n;
+    const hOf = (u) => {                                          // height of the walking surface at u (feet from the room's low end)
+      const uu = dir > 0 ? u : len - u;
+      if (uu <= s0) return 0;
+      if (uu >= s1) return STOREY;
+      return (Math.min(n - 1, Math.floor((uu - s0) / tr)) + 1) / n * STOREY;
+    };
+    const mStep = st.floorLiving.startsWith('marble') ? texMat(st.floorLiving, { roughness: 0.35 }, 4) : mTrim;
+    const span = (u0, u1) => (dir > 0 ? [u0, u1] : [len - u1, len - u0]);
+    const put = (u0, u1, y0, y1, m) => {
+      const [a0, a1] = span(u0, u1);
+      if (alongX) box(stairsG, sr.x + a0, sr.x + a1, y0, y1, sr.z + 0.05, sr.z + sr.d - 0.05, m, false);
+      else box(stairsG, sr.x + 0.05, sr.x + sr.w - 0.05, y0, y1, sr.z + a0, sr.z + a1, m, false);
+    };
+    for (let i = 0; i < n; i++) put(s0 + i * tr, s0 + (i + 1) * tr, 0, ((i + 1) / n) * STOREY, mStep);
+    if (s1 < len - 0.05) put(s1, len, STOREY - 0.5, STOREY, mStep);                    // the landing at the head of the flight
+    // a handrail on the side wall, rising with the steps (balusters under it)
+    const off = 0.28, fixed = alongX ? sr.z + off : sr.x + off, rise = STOREY, run = s1 - s0;
+    const p0 = new THREE.Vector3(), p1 = new THREE.Vector3();
+    const at = (u, y) => { const [a0] = span(u, u); return alongX ? new THREE.Vector3(sr.x + a0, y, fixed) : new THREE.Vector3(fixed, y, sr.z + a0); };
+    p0.copy(at(s0, 3.0)); p1.copy(at(s1, rise + 3.0));
+    const vec = p1.clone().sub(p0), blen = vec.length();
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(blen, 0.14, 0.14), mFrame);
+    bar.position.copy(p0.clone().add(p1).multiplyScalar(0.5));
+    bar.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), vec.clone().normalize());
+    bar.castShadow = true; stairsG.add(bar);
+    for (let i = 0; i < n; i += 2) {
+      const u = s0 + (i + 0.5) * tr, top = ((i + 1) / n) * STOREY, ph = 3.0 + (u - s0) / run * rise;
+      const q = at(u, (top + ph) / 2);
+      const bal = new THREE.Mesh(new THREE.BoxGeometry(0.07, ph - top, 0.07), mFrame); bal.position.copy(q); stairsG.add(bal);
+    }
+    const push = (lay, rm, d) => {                                // a spot just beyond a door, in the room on its other side
+      if (!d) return { x: sr.x + sr.w / 2, z: sr.z + sr.d / 2 };
+      const away = d.o === 'h' ? (sr.z + sr.d / 2 > d.c ? -1 : 1) : (sr.x + sr.w / 2 > d.c ? -1 : 1);
+      return d.o === 'h' ? { x: d.at, z: d.c + away * 2.4 } : { x: d.c + away * 2.4, z: d.at };
+    };
+    stairs = { room: sr, alongX, lo, len, wid, dir, s0, s1, n, h: hOf, entry: [push(L, sr, gd), push(U, upStairs, ud)] };
+  }
+
+  // ---------- porch, portico and carport ----------
   const pd = Math.min(rule.front - 1, 7);
-  if (!innerPorch) {                                             // veranda canopy across the front (the car porch is under the main roof)
-    box(world, B.x - 0.4, B.x + B.w + 0.4, 9.3, 9.8, B.z - pd, B.z + 0.4, st.id === 'spanish' ? mRoofTile : mTrim);
-    if (st.id === 'spanish') box(world, B.x - 0.4, B.x + B.w + 0.4, 9.8, 10.1, B.z - pd, B.z - pd + 0.5, mat('#8e3f22'));
+  const doorXc = mainDoor.o === 'h' ? mainDoor.at : mainDoor.c;
+  const pilCol = st.pillar === 'column' ? mTrim : st.pillar === 'arch' ? mExt : mTrim;
+  const pillar = (px, pz, ph) => {
+    if (st.pillar === 'box') box(world, px - 0.35, px + 0.35, 0, ph, pz - 0.35, pz + 0.35, mTrim, true);
+    else {
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.5, ph, 24), pilCol);
+      cyl.position.set(px, ph / 2, pz); cyl.castShadow = cyl.receiveShadow = true; world.add(cyl);
+      colliders.push({ x0: px - 0.5, x1: px + 0.5, z0: pz - 0.5, z1: pz + 0.5, k: 'pillar' });
+      box(world, px - 0.75, px + 0.75, ph - 0.4, ph, pz - 0.75, pz + 0.75, st.pillar === 'column' ? mTrim : mAccent);
+      box(world, px - 0.75, px + 0.75, 0, 0.5, pz - 0.75, pz + 0.75, st.pillar === 'column' ? mTrim : mAccent);
+    }
+  };
+  const slab = (x0, x1, z0, z1, y) => {                          // a flat roof with a fascia, tiled on the Mediterranean style
+    box(world, x0, x1, y, y + 0.5, z0, z1, st.id === 'spanish' ? mRoofTile : mConcrete);
+    box(world, x0 - 0.1, x1 + 0.1, y - 0.15, y + 0.65, z0 - 0.1, z0 + 0.15, mTrim);
+  };
+  const carportAtFront = porch && !innerPorch;
+  if (carportAtFront) {                                          // the car porch has its own roof and slim pillars; the house front stays visible
+    const z0 = porch.z, z1 = Math.min(porch.z + porch.d, B.z + 0.4);
+    slab(porch.x, porch.x + porch.w, z0, z1, 9.3);
+    pillar(porch.x + 0.6, z0 + 0.6, 9.3); pillar(porch.x + porch.w - 0.6, z0 + 0.6, 9.3);
+    if (z1 - z0 > 14) { pillar(porch.x + 0.6, (z0 + z1) / 2, 9.3); pillar(porch.x + porch.w - 0.6, (z0 + z1) / 2, 9.3); }
+  }
+  const doorUnderCarport = carportAtFront && doorXc >= porch.x - 0.5 && doorXc <= porch.x + porch.w + 0.5;
+  if (!innerPorch && !doorUnderCarport) {                         // a portico over the front door
+    const pw = Math.max(7, mainDoor.w + 4.5), pdp = Math.min(Math.max(pd, 3), 5);
+    const x0 = Math.max(B.x, doorXc - pw / 2), x1 = Math.min(B.x + B.w, doorXc + pw / 2);
+    slab(x0, x1, B.z - pdp, B.z + 0.4, 9.3);
+    pillar(x0 + 0.6, B.z - pdp + 0.6, 9.3); pillar(x1 - 0.6, B.z - pdp + 0.6, 9.3);
   }
   if (st.deco === 'wood') {                                      // timber cladding round the entrance
     const dx0 = mainDoor.at - mainDoor.w / 2 - 0.2, dx1 = mainDoor.at + mainDoor.w / 2 + 0.2;
@@ -480,21 +622,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   }
   // front steps up to the entrance
   box(world, mainDoor.at - 2.4, mainDoor.at + 2.4, 0, 0.35, B.z - 1.6, B.z - 0.35, mStone, false);
-  // a front veranda with pillars, or with a car porch, one pillar at the porch's open front corner (the roof covers it)
-  const nP = Math.max(2, Math.round(B.w / 12) + 1);
-  const pillars = innerPorch
-    ? [[innerPorch.x + innerPorch.w / 2 < mainDoor.at ? innerPorch.x + 0.5 : innerPorch.x + innerPorch.w - 0.5, innerPorch.z + 0.5]]
-    : Array.from({ length: nP }, (_, i) => [B.x + 0.9 + (i * (B.w - 1.8)) / (nP - 1), B.z - pd + 0.7]);
-  for (const [px, pz] of pillars) {
-    if (st.pillar === 'box') box(world, px - 0.35, px + 0.35, 0, 9.3, pz - 0.35, pz + 0.35, mTrim, true);
-    else {
-      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 9.3, 24), st.pillar === 'column' ? mTrim : mExt);
-      cyl.position.set(px, 4.65, pz); cyl.castShadow = cyl.receiveShadow = true; world.add(cyl);
-      colliders.push({ x0: px - 0.5, x1: px + 0.5, z0: pz - 0.5, z1: pz + 0.5, k: 'pillar' });
-      box(world, px - 0.8, px + 0.8, 8.9, 9.3, pz - 0.8, pz + 0.8, st.pillar === 'column' ? mTrim : mAccent);
-      box(world, px - 0.8, px + 0.8, 0, 0.5, pz - 0.8, pz + 0.8, st.pillar === 'column' ? mTrim : mAccent);
-    }
-  }
+  if (innerPorch) pillar(innerPorch.x + innerPorch.w / 2 < doorXc ? innerPorch.x + 0.5 : innerPorch.x + innerPorch.w - 0.5, innerPorch.z + 0.5, 9.3);
   // paved walkway to the door
   plane(mainDoor.at - 2, mainDoor.at + 2, 0, B.z, 0.025, mPave);
 
@@ -558,23 +686,13 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     const open0 = doorReach([]);
     const pick = cands.find((c) => fits(c) && (!open0 || doorReach([boxOf(c)])));
     if (pick) {
-      const car = new THREE.Group();
-      const paint = mat('#9a2f2f', { roughness: 0.25, metalness: 0.55, envMapIntensity: 1.2 }), black = mat('#1a1a1a', { roughness: 0.6 });
-      const cb = (cx, cy, cz, w, h, d, m) => bx(car, cx, cy, cz, w, h, d, m);
-      cb(0, 1.55, 0, 14, 1.6, 5.8, paint); cb(-0.6, 2.95, 0, 7.4, 1.25, 5.2, paint);
-      cb(-0.6, 2.95, 0, 7.6, 1.0, 5.3, mGlass); cb(6.9, 1.4, 0, 0.3, 0.6, 5.0, mat('#e8e8e8', { emissive: '#666' })); cb(-6.9, 1.6, 0, 0.3, 0.5, 5.0, mat('#a01818', { emissive: '#400' }));
-      cb(0, 0.9, 0, 14.2, 0.35, 5.9, black);
-      [[-4.5, 2.8], [4.5, 2.8], [-4.5, -2.8], [4.5, -2.8]].forEach(([x, z]) => {
-        const wh = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.8, 20), black);
-        wh.rotation.x = Math.PI / 2; wh.position.set(x, 1.1, z); wh.castShadow = true; car.add(wh);
-        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.85, 16), mat('#b9bfc4', { metalness: 0.7, roughness: 0.3 }));
-        hub.rotation.x = Math.PI / 2; hub.position.set(x, 1.1, z); car.add(hub);
-      });
-      car.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-      car.rotation.y = pick.along ? -Math.PI / 2 : 0;                // along: nose toward the house, back toward the gate
-      car.position.set(pick.x, 0, pick.z);
+      const carG = new THREE.Group();
+      carG.rotation.y = pick.along ? Math.PI : -Math.PI / 2;       // along: nose toward the house, back toward the gate; else along the lawn
+      carG.position.set(pick.x, 0, pick.z);
+      world.add(carG);
       colliders.push({ ...boxOf(pick), k: 'car' });
-      world.add(car);
+      const kind = site.car || (W >= 40 ? 'suv' : 'sedan');
+      furnReady.push(loadCar(kind, site.carColor).then((m) => { if (m) carG.add(m); }));
     }
   }
   // street lamps
@@ -591,39 +709,26 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     box(world, W + 1.2, W + 42, 0, 11, 14, D - 8, nm); box(world, W + 1.2, W + 42, 11, 11.4, 14, D - 8, mat('#c9c4b9'));
   }
 
-  // upstairs, the stairwell is an open shaft: a landing 3.5 ft deep beside the door stays walkable, the rest is railed off
-  let landing = null;
-  if (upStairs) {
-    const sr = upStairs, LAND = 3.5;
-    const dr = (U.openings || []).find((o) => o.kind === 'door' && (o.room === sr.id || o.to === sr.id));
-    let side = 'S';                                                // S = far end (larger z), N = road end, W / E = left / right
-    if (dr) side = dr.o === 'h' ? (Math.abs(dr.c - sr.z) < 0.05 ? 'N' : 'S') : (Math.abs(dr.c - sr.x) < 0.05 ? 'W' : 'E');
-    const lz = side === 'N' ? [sr.z, sr.z + Math.min(LAND, sr.d)] : side === 'S' ? [sr.z + sr.d - Math.min(LAND, sr.d), sr.z + sr.d] : [sr.z, sr.z + sr.d];
-    const lx = side === 'W' ? [sr.x, sr.x + Math.min(LAND, sr.w)] : side === 'E' ? [sr.x + sr.w - Math.min(LAND, sr.w), sr.x + sr.w] : [sr.x, sr.x + sr.w];
-    landing = { x: (lx[0] + lx[1]) / 2, z: (lz[0] + lz[1]) / 2 };
-    const rail = (x0, x1, z0, z1) => {
-      if (x1 - x0 < 0.2 || z1 - z0 < 0.2) return;
-      upperColliders.push({ x0, x1, z0, z1 });
-      box(world, x0, x1, STOREY + 2.9, STOREY + 3.1, z0, z1, mFrame);                       // a handrail on slim balusters
-      const len = Math.max(x1 - x0, z1 - z0), alongX = x1 - x0 > z1 - z0;
-      for (let s = 0.3; s < len; s += 0.6) {
-        if (alongX) box(world, x0 + s - 0.04, x0 + s + 0.04, STOREY, STOREY + 2.9, z0, z1, mFrame, false);
-        else box(world, x0, x1, STOREY, STOREY + 2.9, z0 + s - 0.04, z0 + s + 0.04, mFrame, false);
-      }
-    };
-    const t = 0.25;
-    if (side === 'N' || side === 'S') rail(sr.x, sr.x + sr.w, side === 'N' ? lz[1] - t : lz[0], side === 'N' ? lz[1] : lz[0] + t);   // across the shaft at the landing's edge
-    else rail(side === 'W' ? lx[1] - t : lx[0], side === 'W' ? lx[1] : lx[0] + t, sr.z, sr.z + sr.d);
-  }
-
   const mats = { mExt, mInt, mTrim, mAccent };
+  const floorCache = {};
+  function setFloors(f = {}) {                                      // living-room and bedroom floors, live
+    for (const key of ['living', 'bed']) {
+      const kind = f[key];
+      if (!kind) continue;
+      const m = (floorCache[kind] ||= texMat(kind, { roughness: kind.startsWith('marble') || kind === 'granite' ? 0.35 : 0.7 }, 4));
+      for (const fm of floorMeshes) if (fm.mesh.userData.floorFor === key) {
+        const t = m.map.clone(); t.needsUpdate = true; t.repeat.set(fm.w / 4, fm.d / 4);
+        const m2 = m.clone(); m2.map = t; fm.mesh.material = m2;
+      }
+    }
+  }
   function setColors(c = {}) {
     if (c.wall) mExt.color.set(c.wall);
     if (c.interior) mInt.color.set(c.interior);
     if (c.trim) mTrim.color.set(c.trim);
     if (c.accent) mAccent.color.set(c.accent);
   }
-  return { scene, sun, world, roofG, colliders, upperColliders, landing, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, mats, setColors, furnReady, pieces: { ground: piecesG, upper: piecesU } };
+  return { scene, sun, world, roofG, midG, stairsG, storeyG, doors: doorList, colliders, upperColliders, stairs, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, innerPorch, mats, setColors, setFloors, furnReady, site, pieces: { ground: piecesG, upper: piecesU } };
 }
 
 function disposeScene(scene) {
@@ -635,13 +740,13 @@ function disposeScene(scene) {
 // ---------- a photo of the house from the street, for the design cards and the plan sheet ----------
 let shotRenderer = null;
 /** Renders the front of the house as an image (data URL). Same scene as the walkthrough, without furniture. */
-export function renderFront(L, styleId, U = null, { colors = {}, width = 960, height = 620, view = 'street' } = {}) {
+export function renderFront(L, styleId, U = null, { colors = {}, width = 960, height = 620, view = 'street', site = {} } = {}) {
   if (!shotRenderer) {
     shotRenderer = prepareRenderer(new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }));
     shotRenderer.setPixelRatio(1);
   }
   shotRenderer.setSize(width, height, false);
-  const S = buildScene(shotRenderer, L, styleId, U, { colors, furniture: false, context: true });
+  const S = buildScene(shotRenderer, L, styleId, U, { colors, furniture: false, context: true, site });
   const { w: W } = L.plot, B = L.B;
   const topH = (U ? STOREY + H : H) + SLAB + 3;
   const cam = new THREE.PerspectiveCamera(30, width / height, 1, 2000);
@@ -658,156 +763,4 @@ export function renderFront(L, styleId, U = null, { colors = {}, width = 960, he
   return url;
 }
 
-/** U: the first-floor layout of a two-storey house (built above the ground floor, stairs between). */
-export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}) {
-  const { w: W, d: D } = L.plot;
-  const { B } = L;
-
-  const renderer = prepareRenderer(new THREE.WebGLRenderer({ antialias: true }));
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  host.appendChild(renderer.domElement);
-  renderer.domElement.style.touchAction = 'none';
-
-  const S = buildScene(renderer, L, styleId, U, { colors, furniture: true });
-  const { scene, roofG, colliders, upperColliders, landing, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch } = S;
-  const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 2000);
-  camera.rotation.order = 'YXZ';
-
-  // room lights: a few lamps follow the visitor to the nearest rooms (many lights would slow every frame)
-  const pool = Array.from({ length: 6 }, () => { const p = new THREE.PointLight('#ffe9c8', 30, 26, 2); scene.add(p); return p; });
-  const placeLights = () => {
-    const f = state.floor, here = f ? U : L;
-    const rooms = here.rooms.filter((r) => !r.parent).map((r) => ({ r, d: Math.hypot(r.x + r.w / 2 - camera.position.x, r.z + r.d / 2 - camera.position.z) })).sort((a, b) => a.d - b.d);
-    pool.forEach((p, i) => {
-      const it = rooms[i];
-      p.visible = !!it && state.mode === 'walk';
-      if (it) p.position.set(it.r.x + it.r.w / 2, f * STOREY + 8.4, it.r.z + it.r.d / 2);
-    });
-  };
-
-  // ---------- controls ----------
-  // the visitor starts just inside the gate, in line with the front door, or beside it if the car is parked there
-  const R = 0.42;
-  const hit = (x, z) => colliders.some((c) => x > c.x0 - R && x < c.x1 + R && z > c.z0 - R && z < c.z1 + R);
-  const start = (() => {
-    for (let k = 0; k <= 40; k++) for (const sg of [1, -1]) {
-      const x = gateX + sg * k * 0.5;
-      if (x > gateLo + R && x < gateHi - R && !hit(x, 2.5)) return x;
-    }
-    return gateX;
-  })();
-  const state = { mode: 'walk', yaw: Math.PI, pitch: 0, pos: new THREE.Vector3(start, EYE, 2.5), keys: new Set(), floor: 0 };
-  if (/[?&]debug3d/.test(location.search)) window.__walk = { state, colliders, upperColliders, R, roomAt: (x, z) => roomAt(x, z), rooms: L.rooms, upRooms: U ? U.rooms : null, mainDoor: L.openings.find((o) => o.main), openings: L.openings, B, landing };   // for tests
-  const orbit = new OrbitControls(camera, renderer.domElement);
-  orbit.enabled = false;
-  orbit.target.set(W / 2, 0, D / 2);
-
-  function setMode(mode) {
-    state.mode = mode;
-    orbit.enabled = mode === 'orbit';
-    if (mode === 'orbit') {
-      camera.position.set(W / 2 + Math.max(W, D) * 0.35, Math.max(W, D) * 0.95, -D * 0.35);
-      orbit.target.set(W / 2, 0, D / 2);
-      orbit.update();
-      roofG.visible = false;
-    } else {
-      roofG.visible = true;
-    }
-    placeLights();
-    hooks.onMode?.(mode, roofG.visible);
-  }
-  function setRoof(v) { roofG.visible = v; }
-  function resetWalk() { state.floor = 0; state.pos.set(start, EYE, 2.5); state.yaw = Math.PI; state.pitch = 0; hooks.onFloor?.(0); }
-  /** Climb to the first floor (or come back down): the visitor stands at the foot or head of the stairs. */
-  function setFloor(f) {
-    if (!U || f === state.floor) return;
-    const at = (f ? upStairs : stairsRoom) || stairsRoom;
-    state.floor = f;
-    state.pos.set(f && landing ? landing.x : at.x + at.w / 2, EYE + f * STOREY, f && landing ? landing.z : at.z + at.d / 2);
-    if (state.mode === 'orbit') setMode('walk');
-    placeLights();
-    hooks.onFloor?.(f);
-  }
-
-  let drag = null;
-  const el = renderer.domElement;
-  const onDown = (e) => { if (state.mode === 'walk') { drag = { x: e.clientX, y: e.clientY }; el.setPointerCapture?.(e.pointerId); } };
-  const onMove = (e) => {
-    if (!drag || state.mode !== 'walk') return;
-    state.yaw -= (e.clientX - drag.x) * 0.0045;
-    state.pitch = Math.max(-1.2, Math.min(1.2, state.pitch - (e.clientY - drag.y) * 0.0045));
-    drag = { x: e.clientX, y: e.clientY };
-  };
-  const onUp = () => { drag = null; };
-  el.addEventListener('pointerdown', onDown);
-  el.addEventListener('pointermove', onMove);
-  window.addEventListener('pointerup', onUp);
-  const kd = (e) => { if (e.target.tagName === 'INPUT') return; state.keys.add(e.key.toLowerCase()); if (e.key.startsWith('Arrow')) e.preventDefault(); };
-  const ku = (e) => state.keys.delete(e.key.toLowerCase());
-  window.addEventListener('keydown', kd);
-  window.addEventListener('keyup', ku);
-
-  const blocked = (x, z, r) => (state.floor ? upperColliders : colliders).some((c) => x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r);
-  function roomAt(x, z) {
-    const here = state.floor ? U : L;
-    const hit = here.rooms.filter((r) => x >= r.x && x <= r.x + r.w && z >= r.z && z <= r.z + r.d);
-    if (state.floor) {
-      const terrace = (U.open || []).find((p) => x >= p.x && x <= p.x + p.w && z >= p.z && z <= p.z + p.d);
-      return (hit.find((r) => r.parent) || hit[0])?.name || (terrace ? 'Terrace' : x >= B.x && x <= B.x + B.w && z >= B.z && z <= B.z + B.d ? 'Terrace' : 'Outside');
-    }
-    const space = open.find((p) => x >= p.x && x <= p.x + p.w && z >= p.z && z <= p.z + p.d);
-    return (hit.find((r) => r.parent) || hit[0])?.name || space?.name || (z < 0 ? 'Road' : z < B.z ? (porch ? 'Lawn' : 'Porch & lawn') : 'Outside');
-  }
-
-  function resize() {
-    const w = host.clientWidth, h = host.clientHeight;
-    renderer.setSize(w, h);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  }
-  const ro = new ResizeObserver(resize);
-  ro.observe(host);
-  resize();
-
-  let raf, last = performance.now(), lastRoom = '', lightT = 0;
-  function loop(now) {
-    raf = requestAnimationFrame(loop);
-    const dt = Math.min(0.05, (now - last) / 1000);
-    last = now;
-    if (state.mode === 'walk') {
-      const k = state.keys;
-      const run = k.has('shift') ? 2 : 1;
-      const turn = ((k.has('arrowleft') || k.has('q')) ? 1 : 0) - ((k.has('arrowright') || k.has('e')) ? 1 : 0);
-      state.yaw += turn * 1.8 * dt;
-      const fwd = ((k.has('w') || k.has('arrowup')) ? 1 : 0) - ((k.has('s') || k.has('arrowdown')) ? 1 : 0);
-      const str = (k.has('d') ? 1 : 0) - (k.has('a') ? 1 : 0);
-      const sp = 7 * run * dt;
-      const fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw), rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw);
-      const dx = (fx * fwd + rx * str) * sp, dz = (fz * fwd + rz * str) * sp;
-      if (!blocked(state.pos.x + dx, state.pos.z, R)) state.pos.x += dx;
-      if (!blocked(state.pos.x, state.pos.z + dz, R)) state.pos.z += dz;
-      camera.position.copy(state.pos);
-      camera.rotation.set(state.pitch, state.yaw, 0);
-      const rn = roomAt(state.pos.x, state.pos.z);
-      if (rn !== lastRoom) { lastRoom = rn; hooks.onRoom?.(rn); }
-      if ((lightT += dt) > 0.3) { lightT = 0; placeLights(); }
-    } else orbit.update();
-    renderer.render(scene, camera);
-  }
-  setMode('walk');
-  raf = requestAnimationFrame(loop);
-  if (/[?&]debug3d/.test(location.search)) window.__walk = { state, colliders, upperColliders, roomAt };   // for tests
-  Promise.all(S.furnReady).then(() => hooks.onReady?.());
-
-  return {
-    setMode, setRoof, resetWalk, setFloor, setColors: S.setColors,
-    get floor() { return state.floor; },
-    get roofVisible() { return roofG.visible; },
-    get mode() { return state.mode; },
-    dispose() {
-      cancelAnimationFrame(raf); ro.disconnect();
-      window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); window.removeEventListener('pointerup', onUp);
-      orbit.dispose(); disposeScene(scene); renderer.dispose(); renderer.domElement.remove();
-    },
-  };
-}
+export { STOREY, H, EYE, SLAB, prepareRenderer as prepare, disposeScene };

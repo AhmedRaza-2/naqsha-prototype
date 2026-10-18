@@ -1,7 +1,8 @@
 import { PRESETS, MARLA, ruleFor } from './layout.js';
 import { planSVG } from './svg.js';
 import { STYLES, STYLE_IDS } from './styles.js';
-import { createViewer, renderFront } from './scene.js';
+import { renderFront, SITE_DEFAULT } from './scene.js';
+import { createViewer } from './viewer.js';
 import { modelLayouts, upperLayouts, planToLayout, knowsStoreys, FAMILY } from './modelplans.js';
 import { check, score, serialize } from './bands.js';
 import { check as treeCheck, serialize as treeSerialize } from './tree.js';
@@ -10,6 +11,7 @@ import { onModelState, preloadModel } from './model.js';
 
 const $ = (id) => document.getElementById(id);
 const S = { seen: new Set(), seenUp: new Set(), plot: null, beds: 3, layouts: [], sel: null, upperLayouts: [], up: null, style: null, viewer: null };
+if (/[?&]debug3d/.test(location.search)) window.__S = S;                  // for tests
 
 const SECTIONS = { 1: 's1', 2: 's2', 2.5: 'su', 3: 's3' };                  // 2.5: the first floor of a two-storey house
 function show(n) {
@@ -428,7 +430,11 @@ $('uto3').onclick = () => { renderStyles(); show(3); };
 const WALLS = [[null, 'Style colour'], ['#f3f1ec', 'White'], ['#eadfca', 'Cream'], ['#e2cfa9', 'Sand'], ['#cfcfca', 'Light grey'], ['#c9d1bf', 'Sage'], ['#d9a98a', 'Terracotta']];
 const TRIMS = [[null, 'Style colour'], ['#2b2f33', 'Charcoal'], ['#fbf8f0', 'White'], ['#6b4a32', 'Walnut'], ['#8a8f93', 'Steel']];
 const INTERIORS = [[null, 'Style colour'], ['#f8f6f1', 'Off-white'], ['#efe6d6', 'Warm beige'], ['#e3e8e4', 'Mint grey'], ['#ece2dc', 'Blush']];
+const WALLC = [[null, 'Same as the house'], ['#f3f1ec', 'White'], ['#eadfca', 'Cream'], ['#d9a98a', 'Terracotta'], ['#9aa59a', 'Sage grey'], ['#6b6f73', 'Slate'], ['#b8956a', 'Sand stone']];
+const FLOORS_L = [[null, 'Style floor'], ['marble', 'White marble'], ['marble-warm', 'Warm marble'], ['terracotta', 'Terracotta'], ['wood', 'Light wood'], ['wood-dark', 'Dark wood']];
+const FLOORS_B = [[null, 'Style floor'], ['wood', 'Light wood'], ['wood-dark', 'Dark wood'], ['marble', 'White marble'], ['marble-warm', 'Warm marble'], ['terracotta', 'Terracotta']];
 S.colors = { wall: null, trim: null };
+S.site = { ...SITE_DEFAULT };
 function swatches(host, list, cur, onPick) {
   host.innerHTML = list.map(([c, name]) => `<button type="button" role="radio" aria-checked="${c === cur}" title="${name}" aria-label="${name}" data-c="${c || ''}" class="swatch${c ? '' : ' auto'}"${c ? ` style="--c:${c}"` : ''}></button>`).join('');
   host.querySelectorAll('button').forEach((b) => (b.onclick = () => {
@@ -446,7 +452,7 @@ function drawStyleCards() {
     img.parentElement.classList.add('loading');
     setTimeout(() => {
       if (ticket !== renderTicket) return;
-      try { img.src = renderFront(S.sel, id, S.up, { colors: S.colors, width: 900, height: 600 }); }
+      try { img.src = renderFront(S.sel, id, S.up, { colors: S.colors, width: 900, height: 600, site: S.site }); }
       catch (err) { console.warn('Could not render the front of the house.', err); }
       img.parentElement.classList.remove('loading');
     }, 30 + i * 60);
@@ -473,6 +479,9 @@ function renderStyles() {
   });
   swatches($('swwall'), WALLS, S.colors.wall, (c) => { S.colors.wall = c; drawStyleCards(); });
   swatches($('swtrim'), TRIMS, S.colors.trim, (c) => { S.colors.trim = c; drawStyleCards(); });
+  swatches($('swwallc'), WALLC, S.site.wallColor, (c) => { S.site.wallColor = c; drawStyleCards(); });
+  const siteSel = [['swallstyle', 'wall'], ['swallh', 'wallH', Number], ['sgate', 'gate'], ['scar', 'car'], ['scarc', 'carColor']];
+  for (const [id, key, cast] of siteSel) { $(id).value = String(S.site[key]); $(id).onchange = () => { S.site[key] = cast ? cast($(id).value) : $(id).value; drawStyleCards(); }; }
   drawStyleCards();
 }
 
@@ -480,7 +489,7 @@ function renderStyles() {
 function planSheet(styleId) {
   const parts = [{ svg: planSVG(S.sel, { furniture: true }), cap: S.up ? 'Ground floor' : 'Floor plan' }];
   if (S.up) parts.push({ svg: planSVG(S.up, { furniture: true }), cap: 'First floor' });
-  const front = renderFront(S.sel, styleId, S.up, { colors: S.colors, width: 1200, height: 800 });
+  const front = renderFront(S.sel, styleId, S.up, { colors: S.colors, width: 1200, height: 800, site: S.site });
   const size = (svg) => svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/).slice(1).map(Number);
   const H = 520, gap = 30, top = 70;
   let x = gap, body = '';
@@ -518,30 +527,63 @@ function downloadSheet() {
 $('dl').onclick = downloadSheet;
 
 // ---------- step 4 ----------
-$('to4').onclick = () => {
+const VIEW_HINT = {
+  walk: 'Drag to look. W/A/S/D or arrows to move, Shift to run, scroll to zoom. Click a door or press F to open and close it.',
+  follow: 'You are the visitor: W/A/S/D to walk, drag to turn the camera. Click a door or press F to open and close it.',
+  tour: 'A guided tour: the visitor walks through every room. Pick another view to take over.',
+  orbit: 'Drag to orbit, scroll to zoom, right-drag to pan.',
+  top: 'Looking straight down. Scroll to zoom, right-drag to pan.',
+  street: 'The street view. Drag to look around the house.',
+  showcase: 'The house turns slowly. Drag to take over.',
+};
+function openViewer() {
   $('viewer').hidden = false;
   document.body.style.overflow = 'hidden';
   $('vfloor').hidden = !S.up;
   $('vfloor').textContent = 'Go upstairs';
+  $('vview').value = 'walk';
+  $('vdoors').textContent = 'Close doors';
+  let doorsOpen = true;
   S.viewer = createViewer($('vhost'), S.sel, S.style, {
     onRoom: (n) => ($('hudroom').textContent = n),
     onFloor: (f) => ($('vfloor').textContent = f ? 'Go downstairs' : 'Go upstairs'),
-    onMode: (mode, roof) => {
-      $('vmode').textContent = mode === 'walk' ? 'Overview' : 'Walk inside';
-      $('vroof').textContent = roof ? 'Hide roof' : 'Show roof';
-      $('vreset').hidden = mode !== 'walk';
-      $('hudhint').textContent = mode === 'walk'
-        ? 'Drag to look. W/A/S/D or arrows to move, Q/E to turn, Shift to run.'
-        : 'Drag to orbit, scroll to zoom, right-drag to pan.';
+    onTour: (on) => { if (!on && S.viewer && S.viewer.mode === 'tour') { $('vview').value = 'follow'; S.viewer.setMode('follow'); } },
+    onRoomStop: (n) => ($('hudroom').textContent = n),
+    onNearDoor: (d) => {
+      const base = VIEW_HINT[S.viewer ? S.viewer.mode : 'walk'];
+      $('hudhint').textContent = d && S.viewer && ['walk', 'follow'].includes(S.viewer.mode) ? `${d.open ? 'Press F to close' : 'Press F to open'} the door. ${base}` : base;
     },
-  }, S.up, S.colors);
-  $('vpalette').hidden = true; $('vcolors').setAttribute('aria-expanded', 'false');
-  swatches($('vswwall'), WALLS.slice(1), S.colors.wall, (c) => S.viewer.setColors({ wall: c }));
-  swatches($('vswint'), INTERIORS.slice(1), null, (c) => S.viewer.setColors({ interior: c }));
-  swatches($('vswtrim'), TRIMS.slice(1), S.colors.trim, (c) => S.viewer.setColors({ trim: c }));
-};
+    onMode: (mode, roof) => {
+      $('vview').value = mode;
+      $('vroof').textContent = roof ? 'Hide roof' : 'Show roof';
+      $('vreset').hidden = !['walk', 'follow', 'tour'].includes(mode);
+      $('vcutl').hidden = !(S.up && ['orbit', 'top', 'street', 'showcase'].includes(mode));
+      $('vdoors').hidden = !['walk', 'follow', 'tour'].includes(mode);
+      $('hudhint').textContent = VIEW_HINT[mode] || '';
+    },
+  }, S.up, S.colors, S.site);
+  $('vpalette').hidden = true;
+  $('vcolors').setAttribute('aria-expanded', 'false');
+  const v = S.viewer;
+  swatches($('vswwall'), WALLS.slice(1), S.colors.wall, (c) => v.setColors({ wall: c }));
+  swatches($('vswint'), INTERIORS.slice(1), null, (c) => v.setColors({ interior: c }));
+  swatches($('vswtrim'), TRIMS.slice(1), S.colors.trim, (c) => v.setColors({ trim: c }));
+  swatches($('vswfl'), FLOORS_L.slice(1), S.site.floorLiving, (c) => c && v.setFloors({ living: c }));
+  swatches($('vswfb'), FLOORS_B.slice(1), S.site.floorBed, (c) => c && v.setFloors({ bed: c }));
+  swatches($('vswwc'), WALLC, S.site.wallColor, (c) => v.setSite({ wallColor: c }));
+  for (const [id, key, cast] of [['vwall', 'wall'], ['vwallh', 'wallH', Number], ['vgate', 'gate'], ['vcar', 'car'], ['vcarc', 'carColor']]) {
+    $(id).value = String(S.site[key]);
+    $(id).onchange = () => { const val = cast ? cast($(id).value) : $(id).value; S.site[key] = val; v.setSite({ [key]: val }); };
+  }
+  $('vfov').value = 70;
+  $('vfov').oninput = () => v.setFov(+$('vfov').value);
+  $('vview').onchange = () => { const m = $('vview').value; if (m === 'tour') v.startTour(); else v.setMode(m); };
+  $('vcut').value = 'all';
+  $('vcut').onchange = () => v.setCutaway($('vcut').value);
+  $('vdoors').onclick = () => { doorsOpen = !doorsOpen; v.setAllDoors(doorsOpen); $('vdoors').textContent = doorsOpen ? 'Close doors' : 'Open doors'; };
+}
+$('to4').onclick = openViewer;
 $('vcolors').onclick = () => { const p = $('vpalette'); p.hidden = !p.hidden; $('vcolors').setAttribute('aria-expanded', String(!p.hidden)); };
-$('vmode').onclick = () => S.viewer.setMode(S.viewer.mode === 'orbit' ? 'walk' : 'orbit');
 $('vroof').onclick = () => { const v = S.viewer; v.setRoof(!v.roofVisible); $('vroof').textContent = v.roofVisible ? 'Hide roof' : 'Show roof'; };
 $('vreset').onclick = () => S.viewer.resetWalk();
 $('vfloor').onclick = () => S.viewer.setFloor(S.viewer.floor ? 0 : 1);

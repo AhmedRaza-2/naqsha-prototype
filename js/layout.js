@@ -91,6 +91,31 @@ export function finalize(L) {
     const prefs = r.type === 'bed'
       ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge', 'passage'] : ['lounge', 'dining', 'lobby', 'passage', 'drawing', 'kitchen'])
       : (PREF[r.type] || ['lounge', 'passage', 'lobby', 'dining']);
+    if (r.type === 'stairs') {                                      // the flight needs its doors at the two ends: ground floor at the low end, first floor at the high end
+      const alongX = r.w > r.d, lo = alongX ? r.x : r.z, hi = lo + (alongX ? r.w : r.d), order = L.upper ? ['lounge', 'passage', 'bed', 'dining', 'study', 'store', 'lobby'] : ['lobby', 'lounge', 'passage', 'drawing', 'dining', 'kitchen', 'bed'];
+      const w = 3; let best = null;
+      for (const q of mains) {
+        if (q === r) continue;
+        const s0 = shared(r, q);
+        if (!s0) continue;
+        const [a1, b1] = doorSpan(r, s0.o, s0.c, s0.lo, s0.hi), [a2, b2] = doorSpan(q, s0.o, s0.c, a1, b1);
+        if (b2 - a2 < 2.4) continue;
+        const longWall = alongX ? s0.o === 'h' : s0.o === 'v';
+        let at, dist;
+        if (longWall) { const target = L.upper ? hi - w / 2 - 0.2 : lo + w / 2 + 0.2; at = Math.max(a2 + w / 2, Math.min(b2 - w / 2, target)); if (b2 - a2 < w) at = (a2 + b2) / 2; dist = Math.abs(at - target); }
+        else { at = (a2 + b2) / 2; const endWall = alongX ? s0.c : s0.c; dist = Math.abs(endWall - (L.upper ? hi : lo)) < 0.3 ? 0 : 60; }
+        const rank = order.indexOf(q.type) < 0 ? 9 : order.indexOf(q.type);
+        const key = dist * 10 + rank;
+        if (!best || key < best.key) best = { q, s: { ...s0, lo: a2, hi: b2 }, at, key, w: Math.min(w, Math.max(2.2, b2 - a2 - 0.2)) };
+      }
+      if (best) {
+        const k = `${r.id}|${best.q.id}`;
+        const pl = pos[k] != null ? place(k, best.s.lo, best.s.hi, best.w) : { at: best.at, key: k };
+        openings.push({ o: best.s.o, c: best.s.c, at: pl.at, span: [best.s.lo, best.s.hi], key: k, w: best.w, kind: 'door', sill: 0, top: 7, room: r.id, to: best.q.id });
+        links.push([r.id, best.q.id]);
+        continue;
+      }
+    }
     let pick = null, narrow = null, any = null;
     for (const t of L.upper ? [...prefs, 'stairs'] : prefs) {
       for (const q of mains.filter((m) => m.type === t)) {
@@ -131,6 +156,24 @@ export function finalize(L) {
     const pl = place(`${b.id}|${p.id}`, b.z, b.z + b.d, 2.5);
     openings.push({ o: 'v', c: right ? b.x : b.x + b.w, at: pl.at, span: [b.z, b.z + b.d], key: pl.key, w: 2.5, kind: 'door', sill: 0, top: 7, room: b.id, to: p.id });
     links.push([b.id, p.id]);
+  }
+
+  // a door onto each terrace of a first floor: a sliding glass door from the room that shares the longest wall with it
+  const terraceDoors = [];
+  if (L.upper) {
+    for (const t of (L.open || []).filter((p) => p.type === 'terrace')) {
+      const cands = mains.filter((m) => !['stairs', 'passage', 'store', 'servant'].includes(m.type)).map((m) => ({ m, s: shared(m, { x: t.x, z: t.z, w: t.w, d: t.d }) }))
+        .filter((c) => c.s && c.s.hi - c.s.lo >= 3.2)
+        .sort((a, b) => ((b.m.type === 'lounge') - (a.m.type === 'lounge')) || ((b.m.type === 'bed') - (a.m.type === 'bed')) || ((b.s.hi - b.s.lo) - (a.s.hi - a.s.lo)));
+      const c = cands[0];
+      if (!c) continue;
+      const [a1, b1] = doorSpan(c.m, c.s.o, c.s.c, c.s.lo, c.s.hi);
+      if (b1 - a1 < 3.2) continue;
+      const w = Math.min(5, b1 - a1 - 0.6), key = `terrace|${c.m.id}`, pl = place(key, a1, b1, w);
+      const op = { o: c.s.o, c: c.s.c, at: pl.at, span: [a1, b1], key, w, kind: 'door', terrace: true, sill: 0, top: 7.4, room: c.m.id, to: 'terrace' };
+      openings.push(op); terraceDoors.push(op);
+      links.push([c.m.id, 'terrace']);
+    }
   }
 
   // windows on exterior walls
@@ -176,6 +219,12 @@ export function finalize(L) {
         }
       });
     });
+  }
+  for (const td of terraceDoors) {                                  // a window where the terrace door is would be inside it
+    for (let i = openings.length - 1; i >= 0; i--) {
+      const o = openings[i];
+      if (o.kind === 'window' && o.o === td.o && Math.abs(o.c - td.c) < 0.02 && Math.abs(o.at - td.at) < td.w / 2 + o.w / 2 + 0.3) openings.splice(i, 1);
+    }
   }
   L.openings = openings;
   L.links = links;
