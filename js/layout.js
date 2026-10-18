@@ -161,7 +161,7 @@ export function finalize(L) {
   // a door onto each terrace of a first floor: a sliding glass door from the room that shares the longest wall with it
   const terraceDoors = [];
   if (L.upper) {
-    for (const t of (L.open || []).filter((p) => p.type === 'terrace')) {
+    for (const t of (L.open || []).filter((p) => p.type === 'terrace' || p.type === 'balcony')) {
       const cands = mains.filter((m) => !['stairs', 'passage', 'store', 'servant'].includes(m.type)).map((m) => ({ m, s: shared(m, { x: t.x, z: t.z, w: t.w, d: t.d }) }))
         .filter((c) => c.s && c.s.hi - c.s.lo >= 3.2)
         .sort((a, b) => ((b.m.type === 'lounge') - (a.m.type === 'lounge')) || ((b.m.type === 'bed') - (a.m.type === 'bed')) || ((b.s.hi - b.s.lo) - (a.s.hi - a.s.lo)));

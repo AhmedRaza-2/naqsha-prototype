@@ -4,6 +4,8 @@ import { OPEN, MARLA_SQFT, toRects, outsideDoors } from './bands.js';
 import { toRects as treeRects } from './tree.js';
 import { finalize, ruleFor } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
+import { tidyRects } from './tidy.js';
+import { balconyRoom } from './plantweak.js';
 import { draftPlans, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -42,7 +44,9 @@ const OK_TEXT = {
 export function planToLayout(item, index) {
   const { plan } = item;
   const { w: W, d: D } = plan.plot;
-  const rects = item.rects || (plan.tree ? treeRects(plan) : toRects(plan));
+  const rects0 = item.rects || (plan.tree ? treeRects(plan) : toRects(plan));
+  const T = plan.tidy ? tidyRects(rects0, plan) : null;            // small plots: no entrance room; the model's own plan stays as it is
+  const rects = T ? T.rects : rects0;
   const mains = rects.filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
   const x0 = Math.min(...mains.map((r) => r.x)), x1 = Math.max(...mains.map((r) => r.x + r.w));
   const y0 = Math.min(...mains.map((r) => r.y)), y1 = Math.max(...mains.map((r) => r.y + r.d));
@@ -69,6 +73,7 @@ export function planToLayout(item, index) {
     rooms.push(room);
     byRect.set(r.i, room);
   }
+  if (T) for (const [from, to] of T.alias) byRect.set(from, byRect.get(to));      // a merged room answers to the room that took its place
   for (const b of rects.filter((r) => r.t === 'bath')) {
     const parent = byRect.get(b.parent);
     if (!parent) continue;
@@ -84,9 +89,19 @@ export function planToLayout(item, index) {
   const open = rects.filter((r) => r.t === 'porch' || r.t === 'terrace' || (r.t === 'courtyard' && inside(r)))
     .map((r) => ({ type: r.t, name: r.t === 'porch' ? 'Car Porch' : r.t === 'terrace' ? 'Terrace' : 'Light Well', x: r.x, z: r.y, w: r.w, d: r.d }));
 
+  if (plan.balcony && plan.floor) {                                // a balcony in front of the first floor: only this part of the plan changes
+    const br = balconyRoom(rects);
+    if (br) open.push({ type: 'balcony', name: 'Balcony', x: br.x + 1, z: br.y - 4, w: Math.max(4, br.w - 2), d: 4 });
+  }
   // doors to outside: the same rule the checker uses
-  const rmains = rects.filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
-  const od = outsideDoors(rects, rmains, y0);
+  const rmains = rects0.filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
+  const od = outsideDoors(rects0, rmains, y0);
+  if (T && od.main) {                                                // the entrance moved with a swapped room: its front door goes where the entrance now is
+    const g = T.gone.find((x) => x.i === od.main.i);
+    if (g && od.wall && od.wall[0] === 'h') od.wall = ['h', od.wall[1], g.rect.x, g.rect.x + g.rect.w];
+  }
+  const mergedInto = od.main && byRect.get(od.main.i);
+  if (mergedInto) od.guests = od.guests.filter(([r]) => byRect.get(r.i) !== mergedInto);   // one front door per room
   const doorsOut = {
     main: od.main && od.wall && byRect.get(od.main.i) ? { room: byRect.get(od.main.i).id, wall: od.wall } : null,
     guests: od.guests.filter(([r]) => byRect.get(r.i)).map(([r, wall]) => ({ room: byRect.get(r.i).id, wall })),
@@ -96,7 +111,7 @@ export function planToLayout(item, index) {
   const upper = !!plan.floor;                                   // a first floor: no road entrance, the stairs are its way in
   const L = {
     id: `${upper ? 'U' : 'M'}${letter}`, label: upper ? `First floor ${letter}` : `Layout ${letter}`, tag: upper ? 'First floor' : 'Naqsha model', source: 'model', text: item.text,
-    plot: { w: W, d: D }, rule: ruleFor(W, D), B, rooms, open, doorsOut, beds: plan.beds, narrow: B.w < 26, plan, rects, upper,
+    plot: { w: W, d: D }, rule: plan.rule ? { ...ruleFor(W, D), ...plan.rule } : ruleFor(W, D), hidden: T ? T.walls : [], B, rooms, open, doorsOut, beds: plan.beds, narrow: B.w < 26, plan, rects, upper,
   };
   finalize(L);                                                  // doors, windows and links for the 2D plan and the 3D walkthrough
   // the planner's own checker does not know light wells; show the checker the model was trained against instead
@@ -120,7 +135,15 @@ export function familiesFor(plot, beds) {
 }
 
 export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
-  const { porch = 'any', family = 'any', ...request } = prefs;
+  const { porch = 'any', family = 'any', setbacks = null, entrance = 'auto', stairs = 'auto', ...request } = prefs;
+  const marla = (plot.w * plot.d) / MARLA_SQFT;
+  // the visitor's own front / back / side open space (only the ones they filled in), judged by the rule checker instead of the standard
+  if (setbacks && Object.keys(setbacks).length) request.rule = Object.fromEntries(Object.entries(setbacks).filter(([, v]) => Number.isFinite(v)));
+  // small plots: no entrance room (the front door opens into the drawing room); single-storey houses may drop the roof stairs
+  const tidy = {};
+  if (entrance === 'never' || (entrance === 'auto' && marla < 10)) tidy.entrance = true;
+  if (stairs === 'none' || (stairs === 'auto' && marla <= 6 && request.storeys !== 2)) tidy.stairs = false;
+  if (Object.keys(tidy).length) request.tidy = tidy;
   const wantPorch = porch === 'any' ? null : porch === 'yes';
   // a model trained on layout families drafts each family that fits, so the three layouts differ in arrangement
   const styles = (await knowsStyles()) ? (family !== 'any' ? [family] : familiesFor(plot, request.beds)) : [null];

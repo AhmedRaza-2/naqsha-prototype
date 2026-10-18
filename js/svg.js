@@ -31,7 +31,7 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
   o += `<rect x="${X(B.x)}" y="${Y(B.z + B.d)}" width="${B.w * s}" height="${B.d * s}" fill="none" stroke="#999" stroke-dasharray="3 3" stroke-width=".8"/>`;
   // car porch and light wells inside the house outline: open to the sky or roofed, but not rooms
   for (const p of open) {
-    o += `<rect x="${X(p.x)}" y="${Y(p.z + p.d)}" width="${p.w * s}" height="${p.d * s}" fill="${p.type === 'porch' ? YARD : p.type === 'terrace' ? '#d8ecc8' : '#dbe5d8'}" stroke="#8a7f78" stroke-dasharray="4 3" stroke-width=".9"/>`;
+    o += `<rect x="${X(p.x)}" y="${Y(p.z + p.d)}" width="${p.w * s}" height="${p.d * s}" fill="${p.type === 'porch' ? YARD : p.type === 'terrace' ? '#d8ecc8' : p.type === 'balcony' ? '#e6dfc9' : '#dbe5d8'}" stroke="#8a7f78" stroke-dasharray="4 3" stroke-width=".9"/>`;
   }
   const order = [...L.rooms.filter((r) => !r.parent), ...L.rooms.filter((r) => r.parent)];
   for (const r of order) {
@@ -79,7 +79,7 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
     }
     for (const p of open) {
       const cx = X(p.x + p.w / 2), cy = Y(p.z + p.d / 2), maxPx = p.w * s - 4;
-      const nm = p.type === 'porch' ? 'Car porch' : p.type === 'terrace' ? 'Terrace' : 'Light well', size = `${fmtFt(p.w)}' x ${fmtFt(p.d)}'`;
+      const nm = p.type === 'porch' ? 'Car porch' : p.type === 'terrace' ? 'Terrace' : p.type === 'balcony' ? 'Balcony' : 'Light well', size = `${fmtFt(p.w)}' x ${fmtFt(p.d)}'`;
       o += `<text x="${cx}" y="${cy}" font-size="${fit(nm, 8.5, maxPx)}" text-anchor="middle" fill="#6f6b5e" font-weight="600" ${halo}>${nm}</text>`;
       o += `<text x="${cx}" y="${cy + 10}" font-size="${fit(size, 7.2, maxPx)}" text-anchor="middle" fill="#6f6b5e" ${halo}>${size}</text>`;
     }

@@ -271,7 +271,7 @@ export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
   if (plan.focus != null && !FOCUS_VALUES.includes(plan.focus)) { add('err', 'focus value', String(plan.focus)); errs++; }
   if (errs) return out;
 
-  const rule = ruleFor(W, D);
+  const rule = plan.rule ? { ...ruleFor(W, D), ...plan.rule } : ruleFor(W, D);          // plan.rule: the visitor's own front / rear / side open space
   const mains = rects.filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
   const byi = new Map(rects.map((r) => [r.i, r]));
   const x0 = Math.min(...mains.map((r) => r.x)), x1 = Math.max(...mains.map((r) => r.x + r.w));

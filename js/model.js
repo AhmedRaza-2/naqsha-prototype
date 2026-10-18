@@ -229,7 +229,11 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
     if (seen.has(text)) continue;
     seen.add(text);
     try {
-      const { plan, checks, rects } = parseAny(text, request.beds);
+      const parsed = parseAny(text, request.beds);
+      const { plan, rects } = parsed;
+      if (request.rule) plan.rule = request.rule;                           // the visitor's own open space: judged against that, not the standard
+      if (request.tidy) plan.tidy = request.tidy;
+      const checks = request.rule ? (plan.tree ? treeCheck(plan, request.beds) : rowCheck(plan, request.beds)) : parsed.checks;
       if (checks.some((c) => c.level === 'err')) continue;
       const item = { text, plan, rects, checks, score: score(checks), style: style && familyOf(plan, rects) };
       if (keep(item)) good.push(item);

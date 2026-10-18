@@ -245,3 +245,14 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 .mini.wide { min-width: 200px; }
 .hud.palette { max-height: calc(100vh - 100px); overflow: auto; }
 .colors .mini { margin-right: 6px; }
+
+/* what the sentence reader understood */
+.said { display: flex; flex-wrap: wrap; gap: 6px; min-height: 0; }
+.chip-said, .chip-note { font-size: 0.82rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-alt); color: var(--ink); }
+.chip-said b { font-weight: 600; margin-right: 4px; }
+.chip-note { border-style: dashed; color: var(--ink-soft); }
+.inspo { width: 56px; height: 42px; object-fit: cover; border-radius: 6px; vertical-align: middle; border: 1px solid var(--line); margin-right: 6px; }
+.dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line); vertical-align: middle; margin: 0 4px 0 2px; }
+#fnote { align-self: center; }
+.mini select { min-width: 112px; }
+.mini select#vwall, .mini select#vgate, .mini select#vcar, .mini select#vcarc, .mini select#vwallh { min-width: 96px; }

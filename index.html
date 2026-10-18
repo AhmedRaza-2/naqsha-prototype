@@ -29,8 +29,9 @@
       <p class="lead">Enter your plot size, pick a layout, choose a facade style, then walk through the house in 3D.</p>
       <div class="card form">
         <label class="field wide">Describe your plot (English or Roman Urdu)
-          <input id="nl" placeholder="e.g. 10 marla 3 bedroom ghar  or  30x60 4 bed">
+          <input id="nl" placeholder="e.g. 10 marla double storey 4 bed car porch, front 12 ft, no stairs" autocomplete="off">
         </label>
+        <div class="said" id="nlsaid" aria-live="polite"></div>
         <div class="presets" id="presets"></div>
         <div class="row">
           <label class="field">Width (ft)<input id="pw" type="number" min="18" max="120" value="25"></label>
@@ -81,7 +82,18 @@
               </select>
             </label>
           </div>
-          <p class="fine" id="prefnote"></p>
+          <div class="row">
+            <label class="field">Front open space (ft)<input id="psbf" type="number" min="0" max="40" step="0.5" placeholder="standard" inputmode="decimal"></label>
+            <label class="field">Back open space (ft)<input id="psbb" type="number" min="0" max="40" step="0.5" placeholder="standard" inputmode="decimal"></label>
+            <label class="field">Side open space (ft)<input id="psbs" type="number" min="0" max="20" step="0.5" placeholder="standard" inputmode="decimal"></label>
+            <label class="field">Entrance room
+              <select id="pentr"><option value="auto" selected>Automatic (separate from 10 marla)</option><option value="never">No separate entrance</option><option value="keep">Keep an entrance room</option></select>
+            </label>
+            <label class="field">Roof stairs
+              <select id="pstairs"><option value="auto" selected>Automatic (inside from 6 marla)</option><option value="inside">Keep stairs inside</option><option value="none">No stairs</option></select>
+            </label>
+          </div>
+          <p class="fine" id="prefnote">Leave the open space blank for the standard setbacks of the plot. Whatever you type is what the plan is built to, so no yard is left empty beyond it.</p>
         </details>
         <div class="info" id="plotinfo"></div>
         <p class="formerr" id="formerr" role="alert" hidden></p>
@@ -144,6 +156,24 @@
           <label class="mini">Car colour<select id="scarc"><option value="white">White</option><option value="silver">Silver</option><option value="black">Black</option><option value="graphite">Graphite</option><option value="maroon">Maroon</option><option value="navy">Navy</option><option value="red">Red</option></select></label>
         </div>
         <div class="swrow"><span class="swlabel">Wall colour</span><div class="sw" id="swwallc" role="radiogroup" aria-label="Boundary wall colour"></div></div>
+      </div>
+      <div class="card colors" id="facade">
+        <div class="swrow"><span class="swlabel">Accent (doors, shutters)</span><div class="sw" id="swacc" role="radiogroup" aria-label="Accent colour"></div></div>
+        <div class="swrow"><span class="swlabel">Facade</span>
+          <label class="mini">Roof<select id="froof"><option value="flat">Flat with parapet</option><option value="hip">Sloped tiles</option></select></label>
+          <label class="mini">Windows<select id="fwin"><option value="standard">Standard</option><option value="tall">Tall</option><option value="wide">Wide</option></select></label>
+          <label class="mini">Shutters<select id="fshut"><option value="0">None</option><option value="1">Wooden shutters</option></select></label>
+          <label class="mini">Front<select id="fclad"><option value="none">Plain</option><option value="stone">Stone base</option><option value="brick">Brick</option><option value="slats">Timber slats</option></select></label>
+        </div>
+        <div class="swrow"><span class="swlabel">Changes the plan</span>
+          <label class="mini">Car porch<select id="fporch"><option value="keep">As drafted</option><option value="yes">Open car porch</option><option value="no">No car porch</option></select></label>
+          <label class="mini" id="fbalcl" hidden>Balcony<select id="fbalc"><option value="0">None</option><option value="1">Front balcony</option></select></label>
+          <span class="fine" id="fnote" aria-live="polite"></span>
+        </div>
+        <div class="swrow"><span class="swlabel">Your inspiration</span>
+          <input type="file" id="finsp" accept="image/*" aria-label="A photo of a house you like">
+          <span class="fine" id="finspout">A photo of a house you like gives the colours and the closest style. A photo of a floor plan cannot be read here: describe the layout in words instead, for example "bedroom wing".</span>
+        </div>
       </div>
       <div class="grid3" id="styles"></div>
       <div class="card pair" id="pair3" hidden></div>

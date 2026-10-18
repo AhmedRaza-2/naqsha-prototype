@@ -4,6 +4,7 @@
 // leaving the stairs below, the bedroom count) is never kept. Plain local search, no model call.
 import { wallHandles, applyEdit } from './editor.js';
 import { score, OPEN } from './bands.js';
+import { ruleFor } from './layout.js';
 
 const STEPS = [0.5, 1, 1.5, 2, 3, 4];
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -77,9 +78,21 @@ const sizeClass = (w, d) => { const m = (w * d) / 225; return m <= 6 ? 'small' :
 const TYPE = { bed: 'bed', master: 'bed', lounge: 'lounge', kitchen: 'kitchen', drawing: 'drawing' };
 
 /** How far the plan's main rooms are from real sizes: 0 when every room is at least its real median (and not far above). */
-export function sizeGap(rects, plot) {
+export function sizeGap(rects, plot, own = null) {
   const T = REAL_MEDIAN[sizeClass(plot.w, plot.d)];
   let gap = 0;
+  // unused yard: open space beyond what the rules (or the visitor) ask for is better spent on rooms. Large plots keep their
+  // garden by design, so this only applies up to 12 marla, or whenever the visitor gave their own setbacks.
+  if (own || plot.w * plot.d <= 12 * 225) {
+    const mains = rects.filter((r) => !OPEN.has(r.t) && r.parent == null && r.t !== 'bath');
+    if (mains.length) {
+      const rl = own ? { ...ruleFor(plot.w, plot.d), ...own } : ruleFor(plot.w, plot.d);
+      const x0 = Math.min(...mains.map((r) => r.x)), x1 = Math.max(...mains.map((r) => r.x + r.w));
+      const y0 = Math.min(...mains.map((r) => r.y)), y1 = Math.max(...mains.map((r) => r.y + r.d));
+      const slack = (v) => Math.max(0, v - 0.5);
+      gap += 0.12 * (slack(y0 - rl.front) + slack(plot.d - y1 - rl.rear) + slack(x0 - rl.side) + slack(plot.w - x1 - rl.side));
+    }
+  }
   for (const r of rects) {
     if (r.t === 'passage' || r.t === 'lobby') {                    // circulation should not soak up the spare space
       const narrow = Math.min(r.w, r.d);
@@ -104,7 +117,7 @@ export function refine(plan, checkFn, toRects, { budgetMs = 250, maxMoves = 30, 
   let best = plan, bestChecks = checkFn(plan);
   if (bestChecks.some((c) => c.level === 'err')) return null;
   const keepScore = score(bestChecks);
-  const gap0 = sizeGap(toRects(plan), plan.plot);
+  const gap0 = sizeGap(toRects(plan), plan.plot, plan.rule || null);
   let bestGap = gap0, moves = 0;
   if (gap0 < 0.05) return null;
   const t0 = now();
@@ -118,7 +131,7 @@ export function refine(plan, checkFn, toRects, { budgetMs = 250, maxMoves = 30, 
         const hz = h.kind === 'row' || h.kind === 'bd';
         const cand = applyEdit(best, h, hz ? 0 : d, hz ? d : 0);
         if (key(cand) === base || (same && !same(cand))) continue;
-        const g = sizeGap(toRects(cand), cand.plot);
+        const g = sizeGap(toRects(cand), cand.plot, cand.rule || null);
         if (g >= bestGap - 0.01 || (found && g >= found.g)) continue;
         const cs = checkFn(cand);
         if (cs.some((c) => c.level === 'err') || score(cs) < keepScore - 1e-9) continue;

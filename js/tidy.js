@@ -48,21 +48,6 @@ export function mergeAway(rects, type, prefer, lockStairs = false) {
       if (cur.some((b) => b.t === 'bath' && b.parent === f.n.i && touches(b, f.o, f.c, f.lo, f.hi))) continue;
       if (!best || rank < best.rank) best = { ...f, rank };
     }
-    if (!best) {
-      // no preferred room next to it: swap places with a narrow room beside it (the stairs, a passage) that has one on its other side
-      for (const f of fullNeighbours(target, mains)) {
-        if (!['stairs', 'passage', 'store'].includes(f.n.t) || f.o !== 'v' || (lockStairs && f.n.t === 'stairs')) continue;
-        if (cur.some((b) => b.t === 'bath' && b.parent === f.n.i)) continue;
-        const left = f.n.x < target.x, other = fullNeighbours(f.n, mains).find((g) => g.n !== target && g.o === 'v' && (left ? g.n.x + g.n.w <= f.n.x + 0.011 : g.n.x >= f.n.x + f.n.w - 0.011) && prefer.includes(g.n.t)
-          && !cur.some((b) => b.t === 'bath' && b.parent === g.n.i && touches(b, g.o, g.c, g.lo, g.hi)));
-        if (!other) continue;
-        // the two rooms trade places along the row: [other][f.n][target] -> [other][target][f.n]
-        const x0 = Math.min(f.n.x, target.x), w0 = f.n.w, w1 = target.w;
-        if (left) { target.x = x0; f.n.x = x0 + w1; } else { f.n.x = x0; target.x = x0 + w0; }
-        best = fullNeighbours(target, cur.filter((r) => !OPEN.has(r.t) && r.parent === undefined && r.t !== 'bath')).find((g) => g.n === other.n);
-        if (best) { best.rank = 0; break; }
-      }
-    }
     if (!best) break;
     const n = best.n;
     const x0 = Math.min(n.x, target.x), y0 = Math.min(n.y, target.y), x1 = Math.max(n.x + n.w, target.x + target.w), y1 = Math.max(n.y + n.d, target.y + target.d);

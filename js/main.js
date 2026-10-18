@@ -3,6 +3,9 @@ import { planSVG } from './svg.js';
 import { STYLES, STYLE_IDS } from './styles.js';
 import { renderFront, SITE_DEFAULT } from './scene.js';
 import { createViewer } from './viewer.js';
+import { parseRequest } from './nlp.js';
+import { setPorch, setBalcony, hasPorch, balconyRoom } from './plantweak.js';
+import { readInspiration } from './inspire.js';
 import { modelLayouts, upperLayouts, planToLayout, knowsStoreys, FAMILY } from './modelplans.js';
 import { check, score, serialize } from './bands.js';
 import { check as treeCheck, serialize as treeSerialize } from './tree.js';
@@ -30,6 +33,7 @@ function readPlot() {
   const w = +$('pw').value, d = +$('pd').value;
   const marla = (w * d) / MARLA;
   const r = ruleFor(w, d);
+  $('psbf').placeholder = `standard ${r.front}`; $('psbb').placeholder = `standard ${r.rear}`; $('psbs').placeholder = `standard ${r.side}`;
   $('plotinfo').textContent = `${w} x ${d} ft = ${(w * d).toLocaleString()} sq ft = ${marla.toFixed(1)} marla. Buildable area about ${(w - 2 * r.side)} x ${(d - r.front - r.rear)} ft after setbacks.`;
   document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', +c.dataset.w === w && +c.dataset.d === d));
   // every choice stays open; each is labelled by how well it suits this plot
@@ -54,23 +58,33 @@ PRESETS.forEach((p) => {
 });
 ['pw', 'pd'].forEach((id) => $(id).addEventListener('input', readPlot));
 
-// tiny natural-language parser: "10 marla 3 bed", "30x60 4 bedroom", "1 kanal"
-$('nl').addEventListener('input', () => {
-  const t = $('nl').value.toLowerCase();
-  let m;
-  if ((m = t.match(/(\d+)\s*[x*]\s*(\d+)/))) { $('pw').value = m[1]; $('pd').value = m[2]; }
-  else if ((m = t.match(/(\d+(?:\.\d+)?)\s*kanal/))) { const a = +m[1] * 20 * MARLA; const w = Math.round(Math.sqrt(a * 0.55)); $('pw').value = w; $('pd').value = Math.round(a / w); }
-  else if ((m = t.match(/(\d+(?:\.\d+)?)\s*marla/))) {
-    const hit = PRESETS.find((p) => Math.abs((p.w * p.d) / MARLA - +m[1]) < 0.6);
-    if (hit) { $('pw').value = hit.w; $('pd').value = hit.d; }
-    else { const a = +m[1] * MARLA; const w = Math.round(Math.sqrt(a * 0.55)); $('pw').value = w; $('pd').value = Math.round(a / w); }
+// the sentence reader (nlp.js): "10 marla double storey 4 bed car porch, front 12 ft" fills the form; what it understood is shown below
+const NL_CHIPS = $('nlsaid');
+function applyParsed(r) {
+  if (r.plot) { $('pw').value = r.plot.w; $('pd').value = r.plot.d; }
+  if (r.floors && $('floorsrow').style.display !== 'none') { $('pfloors').value = String(r.floors); syncFloors(); }
+  if (r.upBeds && $('floorsrow').style.display !== 'none') { $('pup').value = String(Math.min(4, r.upBeds)); syncFloors(); }
+  if (r.beds) { $('pb').value = String(Math.min(6, Math.max(1, r.beds))); userBeds = true; }
+  if (r.baths) { syncBaths(r.baths); $('prefs').open = true; }
+  if (r.bathsAttachedOnly) { syncBaths(+$('pb').value); $('prefs').open = true; }
+  if (r.focus) { $('pfocus').value = r.focus; $('prefs').open = true; }
+  if (r.porch) { $('pporch').value = r.porch; $('prefs').open = true; }
+  if (r.family) { $('pfamily').value = r.family; $('prefs').open = true; }
+  if (r.setbacks) {
+    for (const [k, id] of [['front', 'psbf'], ['rear', 'psbb'], ['side', 'psbs']]) if (r.setbacks[k] != null) $(id).value = String(r.setbacks[k]);
+    $('prefs').open = true;
   }
-  if ((m = t.match(/(\d)\s*(?:bed|kamr|room|bhk)/))) { $('pb').value = Math.min(6, Math.max(1, +m[1])); userBeds = true; }
-  if ((m = t.match(/(\d)\s*(?:bath|washroom|wc|toilet)/))) { syncBaths(+m[1]); $('prefs').open = true; }
-  if (/big\w*\s+(?:hall|lounge|tv)/.test(t)) { $('pfocus').value = 'lounge'; $('prefs').open = true; }
-  else if (/big\w*\s+(?:bed|room)/.test(t)) { $('pfocus').value = 'bedrooms'; $('prefs').open = true; }
-  else if (/big\w*\s+kitchen/.test(t)) { $('pfocus').value = 'kitchen'; $('prefs').open = true; }
+  if (r.stairs) { $('pstairs').value = r.stairs; $('prefs').open = true; }
+  S.wantStyle = r.style || null;
+  if (r.colors && r.colors.wall) S.colors.wall = r.colors.wall;
+}
+$('nl').addEventListener('input', () => {
+  const r = parseRequest($('nl').value);
+  applyParsed(r);
   readPlot();
+  const chips = r.understood.map((u) => `<span class="chip-said"><b>${u.label}</b> ${u.value}</span>`).join('');
+  const notes = r.notes.length ? `<span class="chip-note">Noted, but the planner cannot place these yet: ${r.notes.join(', ')}.</span>` : '';
+  NL_CHIPS.innerHTML = chips + notes;
 });
 
 // ---------- preferences: washrooms and bigger rooms ----------
@@ -237,7 +251,10 @@ $('gen').onclick = async () => {
   $('formerr').textContent = problem;
   if (problem) return;
   S.beds = +$('pb').value;
+  const sbv = (id) => { const v = $(id).value.trim(); return v === '' ? undefined : Math.max(0, +v); };
+  const setbacks = Object.fromEntries(Object.entries({ front: sbv('psbf'), rear: sbv('psbb'), side: sbv('psbs') }).filter(([, v]) => Number.isFinite(v)));
   S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, family: $('pfamily').value,
+    setbacks: Object.keys(setbacks).length ? setbacks : null, entrance: $('pentr').value, stairs: $('pstairs').value,
     storeys: floors(), upBeds: +$('pup').value, upBaths: +$('pupbaths').value };
   S.seen = new Set(); S.upperLayouts = []; S.up = null;
   $('uerr').hidden = true;
@@ -433,7 +450,8 @@ const INTERIORS = [[null, 'Style colour'], ['#f8f6f1', 'Off-white'], ['#efe6d6',
 const WALLC = [[null, 'Same as the house'], ['#f3f1ec', 'White'], ['#eadfca', 'Cream'], ['#d9a98a', 'Terracotta'], ['#9aa59a', 'Sage grey'], ['#6b6f73', 'Slate'], ['#b8956a', 'Sand stone']];
 const FLOORS_L = [[null, 'Style floor'], ['marble', 'White marble'], ['marble-warm', 'Warm marble'], ['terracotta', 'Terracotta'], ['wood', 'Light wood'], ['wood-dark', 'Dark wood']];
 const FLOORS_B = [[null, 'Style floor'], ['wood', 'Light wood'], ['wood-dark', 'Dark wood'], ['marble', 'White marble'], ['marble-warm', 'Warm marble'], ['terracotta', 'Terracotta']];
-S.colors = { wall: null, trim: null };
+const ACCENTS = [[null, 'Style colour'], ['#a8744c', 'Teak'], ['#6b4a32', 'Walnut'], ['#2f5d50', 'Deep green'], ['#8c2f2f', 'Brick red'], ['#c49a4a', 'Brass'], ['#2b2f33', 'Charcoal']];
+S.colors = { wall: null, trim: null, accent: null };
 S.site = { ...SITE_DEFAULT };
 function swatches(host, list, cur, onPick) {
   host.innerHTML = list.map(([c, name]) => `<button type="button" role="radio" aria-checked="${c === cur}" title="${name}" aria-label="${name}" data-c="${c || ''}" class="swatch${c ? '' : ' auto'}"${c ? ` style="--c:${c}"` : ''}></button>`).join('');
@@ -458,6 +476,71 @@ function drawStyleCards() {
     }, 30 + i * 60);
   });
 }
+// the colour rows of step 3; a colour taken from the visitor's photo is added to the row it belongs to
+function drawSwatches() {
+  const withPhoto = (list, key) => (S.inspo && S.inspo[key] ? [...list, [S.inspo[key], 'From your photo']] : list);
+  swatches($('swwall'), withPhoto(WALLS, 'wall'), S.colors.wall, (c) => { S.colors.wall = c; drawStyleCards(); });
+  swatches($('swtrim'), withPhoto(TRIMS, 'trim'), S.colors.trim, (c) => { S.colors.trim = c; drawStyleCards(); });
+  swatches($('swacc'), withPhoto(ACCENTS, 'accent'), S.colors.accent, (c) => { S.colors.accent = c; drawStyleCards(); });
+}
+
+/** A changed copy of the chosen layout: the plan is checked again and the layout drawn from it. */
+function relayout(plan, idx) {
+  const checks = plan.tree ? treeCheck(plan, plan.beds) : check(plan, plan.beds);
+  return planToLayout({ text: plan.tree ? treeSerialize(plan) : serialize(plan), plan, checks, score: score(checks) }, idx);
+}
+
+function bindFacade() {
+  const set = (key, v) => { S.site[key] = v; drawStyleCards(); };
+  $('froof').value = S.site.roof; $('froof').onchange = () => set('roof', $('froof').value);
+  $('fwin').value = S.site.windows; $('fwin').onchange = () => set('windows', $('fwin').value);
+  $('fshut').value = S.site.shutters ? '1' : '0'; $('fshut').onchange = () => set('shutters', $('fshut').value === '1');
+  $('fclad').value = S.site.cladding; $('fclad').onchange = () => set('cladding', $('fclad').value);
+  const note = (t) => { $('fnote').textContent = t; };
+  note('');
+  // the car porch: the ground floor changes in that one part, the rest of the plan stays as it is
+  const idx = S.layouts.findIndex((l) => l.id === S.sel.id);
+  S.porchBase ||= {};
+  const base = (S.porchBase[S.sel.id] ||= JSON.parse(JSON.stringify(S.sel.plan)));
+  $('fporch').value = 'keep';
+  $('fporch').onchange = () => {
+    const mode = $('fporch').value;
+    const next = mode === 'keep' ? JSON.parse(JSON.stringify(base)) : setPorch(base, mode);
+    if (!next) { note(mode === 'yes' ? 'There is no lawn strip wide enough in front for a car porch on this layout.' : 'This layout has no car porch to remove.'); $('fporch').value = 'keep'; return; }
+    S.layouts[idx] = S.sel = relayout(next, idx);
+    note(mode === 'keep' ? '' : 'Only the car porch changed; the rooms are as they were.');
+    drawStyleCards();
+    if ($('pair3') && !$('pair3').hidden) drawPair($('pair3'));
+  };
+  // a balcony in front of the first floor (two floors only)
+  const canBalcony = !!S.up && !!balconyRoom(S.up.rects);
+  $('fbalcl').hidden = !canBalcony;
+  $('fbalc').value = S.up && S.up.plan.balcony ? '1' : '0';
+  $('fbalc').onchange = () => {
+    const next = setBalcony(S.up.plan, $('fbalc').value === '1');
+    const i2 = S.upperLayouts.findIndex((l) => l.id === S.up.id);
+    const L2 = relayout(next, i2 < 0 ? 0 : i2);
+    L2.tag = S.up.tag;
+    S.upperLayouts[i2 < 0 ? 0 : i2] = S.up = L2;
+    note($('fbalc').value === '1' ? 'A balcony and its door were added in front of the first floor; the rooms are as they were.' : '');
+    drawStyleCards();
+    drawPair($('pair3'));
+  };
+  // a photo of a house the visitor likes: its colours and the closest style
+  $('finsp').onchange = async () => {
+    const f = $('finsp').files[0];
+    $('finspout').textContent = 'Reading the picture...';
+    const pal = await readInspiration(f);
+    if (!pal) { $('finspout').textContent = 'That file is not a picture I can read. Try a JPG or PNG.'; return; }
+    S.inspo = pal;
+    S.colors.wall = pal.wall; S.colors.trim = pal.trim; if (pal.accent) S.colors.accent = pal.accent;
+    drawSwatches();
+    $('finspout').innerHTML = `<img class="inspo" src="${pal.url}" alt="Your picture" width="56" height="42"> Colours taken: walls <i class="dot" style="background:${pal.wall}"></i> trim <i class="dot" style="background:${pal.trim}"></i>${pal.accent ? ` accent <i class="dot" style="background:${pal.accent}"></i>` : ''}. Closest style: ${STYLES[pal.style].name}.`;
+    drawStyleCards();
+    const i = STYLE_IDS.indexOf(pal.style);
+    if (i >= 0) $('styles').children[i].click();
+  };
+}
 function renderStyles() {
   $('s3back').dataset.go = S.prefs.storeys === 2 ? '2.5' : '2';
   $('pair3').hidden = !S.up;
@@ -477,12 +560,13 @@ function renderStyles() {
     };
     host.appendChild(el);
   });
-  swatches($('swwall'), WALLS, S.colors.wall, (c) => { S.colors.wall = c; drawStyleCards(); });
-  swatches($('swtrim'), TRIMS, S.colors.trim, (c) => { S.colors.trim = c; drawStyleCards(); });
+  drawSwatches();
+  bindFacade();
   swatches($('swwallc'), WALLC, S.site.wallColor, (c) => { S.site.wallColor = c; drawStyleCards(); });
   const siteSel = [['swallstyle', 'wall'], ['swallh', 'wallH', Number], ['sgate', 'gate'], ['scar', 'car'], ['scarc', 'carColor']];
   for (const [id, key, cast] of siteSel) { $(id).value = String(S.site[key]); $(id).onchange = () => { S.site[key] = cast ? cast($(id).value) : $(id).value; drawStyleCards(); }; }
   drawStyleCards();
+  if (S.wantStyle && STYLES[S.wantStyle]) { const i = STYLE_IDS.indexOf(S.wantStyle); if (i >= 0) host.children[i].click(); }   // the style the visitor asked for in words
 }
 
 /** One sheet with the plan of every floor and the front of the house, saved as a PNG (nothing leaves the browser). */

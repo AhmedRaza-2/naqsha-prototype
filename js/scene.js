@@ -141,7 +141,8 @@ export function prepareRenderer(renderer) {
  * The house as a scene: walls, floors, roof, facade details, plot, street and (optionally) furniture.
  * L: ground floor layout; U: first floor of a two-storey house (or null). colors: { wall, trim, interior, accent } overrides.
  */
-export const SITE_DEFAULT = { wall: 'plain', wallH: 4.5, wallColor: null, gate: 'slide', car: 'sedan', carColor: 'white', floorLiving: null, floorBed: null };
+export const SITE_DEFAULT = { wall: 'plain', wallH: 4.5, wallColor: null, gate: 'slide', car: 'sedan', carColor: 'white', floorLiving: null, floorBed: null,
+  roof: 'flat', windows: 'standard', shutters: false, cladding: 'none' };          // the last four are facade options (render only)
 export function buildScene(renderer, L, styleId, U = null, { colors = {}, furniture = true, context = false, site = {} } = {}) {
   site = { ...SITE_DEFAULT, ...site };
   const st = { ...STYLES[styleId], ...Object.fromEntries(Object.entries(colors).filter(([, v]) => v)) };
@@ -278,6 +279,14 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     const open = L.open || [];
     const walls = new THREE.Group(); walls.position.y = dy; world.add(walls); storeyG.push(walls);
     curColl = upper ? upperColliders : colliders;
+    const OPS = L.openings.map((p) => {
+      if (p.kind !== 'window' || p.bath || site.windows === 'standard') return p;
+      const room = p.span ? p.span[1] - p.span[0] : p.w + 2;
+      if (site.windows === 'tall') return { ...p, sill: 0.7, top: 7.8, w: Math.min(p.w, Math.max(2.5, room - 1)) };
+      if (site.windows === 'wide') return { ...p, w: Math.min(p.w * 1.4, Math.max(p.w, room - 1.2)), sill: 3.4, top: 6.7 };
+      return p;
+    });
+    const plinthH = site.cladding === 'stone' ? 3.8 : 1.4;
     const hl = new Map(), vl = new Map();
     const addEdge = (map, c, a, b) => {
       const k = Math.round(c * 100);
@@ -326,19 +335,21 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     const wallRun = (o, c, a, b, outer, inDir, capA, capB) => {
       const t = outer ? 0.75 : 0.4;
       const outFace = c - inDir * t / 2;                         // the outside face of an outer wall
+      const frontWall = o === 'h' && eq(c, B.z) && !upper;
+      const outerMat = frontWall && site.cladding === 'brick' ? mBrick : frontWall && site.cladding === 'slats' ? mSlats : mExt;
       const piece = (s0, s1, y0, y1, collide) => {
         if (s1 - s0 < 0.01) return;
         if (o === 'h') {
-          box(walls, s0, s1, y0, y1, c - t / 2, c + t / 2, outer ? mExt : mInt, collide);
+          box(walls, s0, s1, y0, y1, c - t / 2, c + t / 2, outer ? outerMat : mInt, collide);
           if (outer) box(walls, s0, s1, y0, y1, inDir > 0 ? c + t / 2 : c - t / 2 - 0.04, inDir > 0 ? c + t / 2 + 0.04 : c - t / 2, mInt, false, false);
-          if (outer && !upper && y0 === 0) box(walls, s0, s1, 0, Math.min(1.4, y1), inDir > 0 ? outFace - 0.07 : outFace, inDir > 0 ? outFace : outFace + 0.07, mStone, false, false);
+          if (outer && !upper && y0 === 0) box(walls, s0, s1, 0, Math.min(plinthH, y1), inDir > 0 ? outFace - 0.07 : outFace, inDir > 0 ? outFace : outFace + 0.07, mStone, false, false);
         } else {
           box(walls, c - t / 2, c + t / 2, y0, y1, s0, s1, outer ? mExt : mInt, collide);
           if (outer) box(walls, inDir > 0 ? c + t / 2 : c - t / 2 - 0.04, inDir > 0 ? c + t / 2 + 0.04 : c - t / 2, y0, y1, s0, s1, mInt, false, false);
-          if (outer && !upper && y0 === 0) box(walls, inDir > 0 ? outFace - 0.07 : outFace, inDir > 0 ? outFace : outFace + 0.07, 0, Math.min(1.4, y1), s0, s1, mStone, false, false);
+          if (outer && !upper && y0 === 0) box(walls, inDir > 0 ? outFace - 0.07 : outFace, inDir > 0 ? outFace : outFace + 0.07, 0, Math.min(plinthH, y1), s0, s1, mStone, false, false);
         }
       };
-      const ops = L.openings.filter((p) => p.o === o && eq(p.c, c) && p.at - p.w / 2 >= a - 0.02 && p.at + p.w / 2 <= b + 0.02).sort((p, q) => p.at - q.at);
+      const ops = OPS.filter((p) => p.o === o && eq(p.c, c) && p.at - p.w / 2 >= a - 0.02 && p.at + p.w / 2 <= b + 0.02).sort((p, q) => p.at - q.at);
       let cur = a;
       const solid = (s0, s1) => piece(s0 === a && capA ? s0 - t / 2 : s0, s1 === b && capB ? s1 + t / 2 : s1, 0, H, true);
       for (const p of ops) {
@@ -376,6 +387,11 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
           if (st.id === 'classic') {                               // moulded surround
             along(o0 - 0.55, o0 - 0.2, p.sill, p.top + 0.35, 0.12, mTrim, outSide * (t / 2 + 0.06));
             along(o1 + 0.2, o1 + 0.55, p.sill, p.top + 0.35, 0.12, mTrim, outSide * (t / 2 + 0.06));
+          }
+          if (site.shutters && !p.bath) for (const sd of [-1, 1]) {                                         // wooden louvred shutters either side
+            const a0 = sd < 0 ? o0 - 0.62 : o1 + 0.06, a1 = sd < 0 ? o0 - 0.06 : o1 + 0.62;
+            along(a0, a1, p.sill, p.top, 0.05, mAccent, outSide * (t / 2 + 0.07));
+            for (let y = p.sill + 0.25; y < p.top - 0.1; y += 0.3) along(a0 + 0.05, a1 - 0.05, y, y + 0.05, 0.08, mTrim, outSide * (t / 2 + 0.13));
           }
           if (!upper && !p.bath) for (let s = o0 + 0.35; s < o1 - 0.1; s += 0.5) along(s - 0.03, s + 0.03, p.sill, p.top, 0.03, mGrill, outSide * (t / 2 + 0.12));   // security grill
           if (!upper && !p.bath) along(o0, o1, p.sill + (p.top - p.sill) / 2 - 0.03, p.sill + (p.top - p.sill) / 2 + 0.03, 0.03, mGrill, outSide * (t / 2 + 0.12));
@@ -472,6 +488,22 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const ov = 0.45;
   const pm = st.id === 'spanish' ? mExt : st.id === 'modern' ? mTrim : mExt;
   // cover: rooms of the storey above; the parapet runs only where the roof edge is open (the terrace), not under its walls
+  const hipRoof = (parent, bx0, bx1, bz0, bz1, y, rise) => {         // a four-sided roof, the ridge along the longer side
+    const w = bx1 - bx0, dd = bz1 - bz0, along = w >= dd, inset = Math.min(w, dd) / 2 - 0.01, xc = (bx0 + bx1) / 2, zc = (bz0 + bz1) / 2;
+    const A = [bx0, y, bz0], Bv = [bx1, y, bz0], C = [bx1, y, bz1], Dv = [bx0, y, bz1];
+    const r1 = along ? [bx0 + inset, y + rise, zc] : [xc, y + rise, bz0 + inset], r2 = along ? [bx1 - inset, y + rise, zc] : [xc, y + rise, bz1 - inset];
+    const faces = along ? [[A, Bv, r2, r1], [C, Dv, r1, r2], [Dv, A, r1], [Bv, C, r2]] : [[Dv, A, r1, r2], [Bv, C, r2, r1], [A, Bv, r1], [C, Dv, r2]];
+    const pos = [], uvs = [];
+    const vert = (v) => { pos.push(...v); uvs.push((v[0] + v[2]) / 5, v[1] / 3); };
+    for (const f of faces) {
+      if (f.length === 4) { for (const k of [0, 1, 2, 0, 2, 3]) vert(f[k]); } else for (const v of f) vert(v);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); g.computeVertexNormals();
+    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: makeTex('roofTile'), roughness: 0.8, side: THREE.DoubleSide }));
+    mesh.castShadow = mesh.receiveShadow = true; parent.add(mesh);
+    box(parent, bx0 - 0.1, bx1 + 0.1, y - 0.1, y + 0.1, bz0 - 0.1, bz1 + 0.1, mTrim, false);          // the eave board
+  };
   const roofOf = (B, y, parent, ph, hole, top, cover = null) => {   // y: top of the walls
     const x0 = B.x - ov, x1 = B.x + B.w + ov, z0 = B.z - ov, z1 = B.z + B.d + ov, pt = 0.6, m = mConcrete;
     const near = (a, b) => Math.abs(a - b) < 0.06;
@@ -490,6 +522,10 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       box(parent, x0, hx0, y, y + SLAB, hz0, hz1, m); box(parent, hx1, x1, y, y + SLAB, hz0, hz1, m);
     } else box(parent, x0, x1, y, y + SLAB, z0, z1, m);
     box(parent, x0 - 0.15, x1 + 0.15, y - 0.05, y + SLAB + 0.05, z0 - 0.15, z0, mTrim);     // slab edge band (front)
+    if (top && site.roof === 'hip') {                                                            // a sloped tiled roof over the walls, with eaves, instead of the parapet
+      hipRoof(parent, B.x - 1.6, B.x + B.w + 1.6, B.z - 1.6, B.z + B.d + 1.6, y + SLAB, Math.min(B.w, B.d) * 0.27 + 1.2);
+      return;
+    }
     const capM = st.id === 'spanish' ? mRoofTile : mTrim;                                       // coping on the parapet
     const y0 = y + SLAB, y1 = y + SLAB + ph, c1 = y1 + 0.22;
     for (const [a, b] of freeSpans('h', B.z, x0, x1)) { box(parent, a, b, y0, y1, z0, z0 + pt, pm); box(parent, a - 0.1, b + 0.1, y1, c1, z0 - 0.1, z0 + pt + 0.1, capM); }
@@ -580,6 +616,24 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       return d.o === 'h' ? { x: d.at, z: d.c + away * 2.4 } : { x: d.c + away * 2.4, z: d.at };
     };
     stairs = { room: sr, alongX, lo, len, wid, dir, s0, s1, n, h: hOf, entry: [push(L, sr, gd), push(U, upStairs, ud)] };
+  }
+
+  // ---------- balcony of the first floor (an open space of type balcony in front of the box) ----------
+  for (const bl of (U ? (U.open || []).filter((q) => q.type === 'balcony') : [])) {
+    const bz0 = bl.z, bz1 = bl.z + bl.d, bx0 = bl.x, bx1 = bl.x + bl.w;
+    box(world, bx0, bx1, STOREY - 0.6, STOREY, bz0, bz1 + 0.4, mConcrete);                       // the slab, reaching back into the wall
+    box(world, bx0 - 0.1, bx1 + 0.1, STOREY - 0.75, STOREY - 0.55, bz0 - 0.1, bz0 + 0.1, mTrim);
+    const rail = (ax0, ax1, az0, az1) => {                                                       // a handrail on slim balusters, solid to the walker
+      box(world, ax0, ax1, STOREY + 3.0, STOREY + 3.15, az0, az1, mFrame);
+      const lenR = Math.max(ax1 - ax0, az1 - az0), alongR = ax1 - ax0 > az1 - az0;
+      for (let t2 = 0.15; t2 < lenR; t2 += 0.5) {
+        if (alongR) box(world, ax0 + t2 - 0.03, ax0 + t2 + 0.03, STOREY, STOREY + 3.0, az0, az1, mFrame, false);
+        else box(world, ax0, ax1, STOREY, STOREY + 3.0, az0 + t2 - 0.03, az0 + t2 + 0.03, mFrame, false);
+      }
+      upperColliders.push({ x0: ax0, x1: ax1 || ax0 + 0.15, z0: az0, z1: az1, k: 'rail' });
+    };
+    rail(bx0, bx1, bz0, bz0 + 0.15); rail(bx0, bx0 + 0.15, bz0, bz1); rail(bx1 - 0.15, bx1, bz0, bz1);
+    box(world, bx0, bx1, STOREY, STOREY + 0.03, bz0, bz1, mat('#c9c4b9'), false, false);
   }
 
   // ---------- porch, portico and carport ----------

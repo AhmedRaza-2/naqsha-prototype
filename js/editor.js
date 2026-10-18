@@ -92,7 +92,10 @@ function leafAt(plan, i) {
 /** Wall positions of a plan (rows of rooms or a slicing tree), in feet. */
 function handles(plan, L) {
   const doors = ((L && L.openings) || []).filter((o) => (o.kind === 'door' || o.kind === 'window') && o.key).map((o) => ({ ...o, kind: 'door', win: o.kind === 'window' }));
-  return [...wallHandles(plan), ...doors];
+  const hide = (L && L.hidden) || [];                               // walls that no longer exist in the drawing (a merged entrance room)
+  const gone = (h) => hide.some((w) => (h.kind === 'col' && w.o === 'v' && Math.abs(h.x - w.c) < 0.02 && h.z0 < w.hi + 0.01 && h.z1 > w.lo - 0.01)
+    || (h.kind === 'row' && w.o === 'h' && Math.abs(h.z - w.c) < 0.02 && h.x0 < w.hi + 0.01 && h.x1 > w.lo - 0.01));
+  return [...wallHandles(plan).filter((h) => !gone(h)), ...doors];
 }
 
 function wallHandles(plan, all = false) {          // all: also the edges of setback strips (for the automatic polish)
