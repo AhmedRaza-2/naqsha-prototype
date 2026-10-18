@@ -12,7 +12,7 @@ const out = join(here, '..', 'public', 'app');
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 for (const f of ['index.html', 'styles.css']) cpSync(join(root, f), join(out, f));
-for (const d of ['js', 'models', 'vendor', 'fonts']) {
+for (const d of ['js', 'models', 'vendor', 'fonts', 'assets']) {
   if (existsSync(join(root, d))) cpSync(join(root, d), join(out, d), { recursive: true, filter: (p) => !p.endsWith('.fp32.onnx') });
 }
 // the planner downloads layout.onnx?v=<version>; the stamp is the file's own hash (as ml/export_onnx.py writes it), so a

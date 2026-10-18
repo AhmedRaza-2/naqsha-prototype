@@ -7,6 +7,7 @@
   <link rel="preload" href="fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
   <meta name="theme-color" content="#fbf8f1">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23394845'/%3E%3Cpath d='M9 23V9h14M9 16h8v7' fill='none' stroke='%23FBF8F1' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <script type="importmap">
     { "imports": {
       "three": "./vendor/three/three.module.min.js",
@@ -96,15 +97,14 @@
       <div class="grid3" id="layouts"></div>
       <section class="card editor" id="editor" hidden>
         <div class="editor-head">
-          <div><h3>Adjust the layout</h3><p class="fine">Drag any wall to resize the rooms on both sides, a washroom's edge to resize it, or a gold dot to slide a door along its wall. Sizes snap to half a foot and the rule check updates as you go.</p></div>
-          <div class="editor-actions"><button class="btn" id="edundo" disabled>Undo</button><button class="btn" id="edreset" disabled>Reset</button></div>
+          <div><h3>Adjust the layout</h3><p class="fine">Drag a wall to resize the rooms on both sides, a gold dot to slide a door, a blue dot to slide a window. Drag furniture to move it; click a piece to turn or remove it, or click an empty floor to change what the room is. Sizes snap to half a foot and the rule check updates as you go.</p></div>
+          <div class="editor-actions"><button class="btn" id="edfurn">Hide furniture</button><button class="btn" id="edundo" disabled>Undo</button><button class="btn" id="edreset" disabled>Reset</button></div>
         </div>
         <div id="edhost" class="edhost"></div>
       </section>
       <div class="split">
         <div class="card"><h3>Rule check <span id="chkscore"></span></h3><ul class="checks" id="checks"></ul></div>
-        <div class="card"><h3>Indicative cost</h3><div id="cost"></div>
-          <p class="fine">Covered area x rough 2026 Pakistan construction rates, single storey. For orientation only.</p></div>
+        <div class="card"><h3>Areas</h3><div id="areas"></div></div>
       </div>
       <p class="formerr" id="uerr" role="alert" hidden></p>
       <div class="nav"><button class="btn" data-go="1">Back</button><button class="btn primary" id="to3" disabled>Use this layout</button></div>
@@ -118,25 +118,28 @@
       <div class="grid3" id="ulayouts"></div>
       <section class="card editor" id="ueditor" hidden>
         <div class="editor-head">
-          <div><h3>Adjust the first floor</h3><p class="fine">Drag any wall to resize the rooms on both sides, or a gold dot to slide a door. Walls beside the stairs stop where the stairs below end, so the two floors stay joined. The rule check updates as you go.</p></div>
-          <div class="editor-actions"><button class="btn" id="uedundo" disabled>Undo</button><button class="btn" id="uedreset" disabled>Reset</button></div>
+          <div><h3>Adjust the first floor</h3><p class="fine">Drag a wall to resize the rooms on both sides, a gold dot to slide a door, a blue dot to slide a window. Drag furniture to move it; click a piece to turn or remove it, or click an empty floor to change what the room is. Walls beside the stairs stop where the stairs below end, so the two floors stay joined.</p></div>
+          <div class="editor-actions"><button class="btn" id="uedfurn">Hide furniture</button><button class="btn" id="uedundo" disabled>Undo</button><button class="btn" id="uedreset" disabled>Reset</button></div>
         </div>
         <div id="uedhost" class="edhost"></div>
       </section>
       <div class="split">
         <div class="card"><h3>Rule check <span id="uchkscore"></span></h3><ul class="checks" id="uchecks"></ul></div>
-        <div class="card"><h3>Indicative cost, both floors</h3><div id="ucost"></div>
-          <p class="fine">Covered area of both floors x rough 2026 Pakistan construction rates. For orientation only.</p></div>
+        <div class="card"><h3>Areas, both floors</h3><div id="uareas"></div></div>
       </div>
       <div class="nav"><button class="btn" data-go="2">Back</button><button class="btn primary" id="uto3" disabled>Use this first floor</button></div>
     </section>
 
     <section id="s3" class="step" hidden>
       <h2>Choose a design</h2>
-      <p class="lead">Front elevation for your selected layout.</p>
-      <div class="card pair" id="pair3" hidden></div>
+      <p class="lead">Your house from the street in three styles, rendered in 3D from your plan. Pick the wall and trim colours, then choose a style.</p>
+      <div class="card colors" id="colors">
+        <div class="swrow"><span class="swlabel">Walls</span><div class="sw" id="swwall" role="radiogroup" aria-label="Wall colour"></div></div>
+        <div class="swrow"><span class="swlabel">Trim and frames</span><div class="sw" id="swtrim" role="radiogroup" aria-label="Trim colour"></div></div>
+      </div>
       <div class="grid3" id="styles"></div>
-      <div class="nav"><button class="btn" data-go="2" id="s3back">Back</button><button class="btn primary" id="to4" disabled>Enter 3D walkthrough</button></div>
+      <div class="card pair" id="pair3" hidden></div>
+      <div class="nav"><button class="btn" data-go="2" id="s3back">Back</button><button class="btn" id="dl">Download plan sheet (PNG)</button><button class="btn primary" id="to4" disabled>Enter 3D walkthrough</button></div>
     </section>
   </main>
 
@@ -146,9 +149,15 @@
     <div class="hud top-right">
       <button class="btn sm" id="vmode">Overview</button>
       <button class="btn sm" id="vfloor" hidden>Go upstairs</button>
+      <button class="btn sm" id="vcolors" aria-expanded="false">Colours</button>
       <button class="btn sm" id="vroof">Hide roof</button>
       <button class="btn sm" id="vreset">Reset</button>
       <button class="btn sm" id="vback">Exit</button>
+    </div>
+    <div class="hud palette" id="vpalette" hidden>
+      <div class="swrow"><span class="swlabel">Outside walls</span><div class="sw" id="vswwall"></div></div>
+      <div class="swrow"><span class="swlabel">Inside walls</span><div class="sw" id="vswint"></div></div>
+      <div class="swrow"><span class="swlabel">Trim</span><div class="sw" id="vswtrim"></div></div>
     </div>
   </div>
 

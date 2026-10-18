@@ -15,7 +15,7 @@ export function planFrame(L, { maxW = 320, maxH = 470 } = {}) {
 }
 
 /** overlay(frame) -> extra SVG markup drawn on top (the editor's drag handles). */
-export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = null } = {}) {
+export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = null, furniture = false } = {}) {
   const { w: W, d: D } = L.plot;
   const frame = planFrame(L, { maxW, maxH });
   const { s, X, Y, vw, vh } = frame;
@@ -37,6 +37,7 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
   for (const r of order) {
     o += `<rect x="${X(r.x)}" y="${Y(r.z + r.d)}" width="${r.w * s}" height="${r.d * s}" fill="${FILL[r.type]}" stroke="${INK}" stroke-width="${r.parent ? 1.1 : 1.8}"/>`;
   }
+  if (furniture && L.furniture) o += furnitureSVG(L.furniture, frame);
   for (const op of L.openings) {
     const half = (op.w / 2) * s;
     if (op.kind === 'window') {
@@ -59,7 +60,7 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
   }
   if (labels) {
     const fmtFt = (v) => { const h = Math.round(v * 2) / 2; return Number.isInteger(h) ? h : h.toFixed(1); };   // full room size to the half foot; an attached bath sits inside its room
-    const halo = 'paint-order="stroke" stroke="${PAPER}" stroke-width="2.4" stroke-linejoin="round"';
+    const halo = `paint-order="stroke" stroke="${PAPER}" stroke-width="2.4" stroke-linejoin="round"`;
     const fit = (txt, fs, maxPx) => Math.max(5.2, Math.min(fs, maxPx / (txt.length * 0.56)));   // shrink text that would not fit its room
     for (const r of L.rooms) {
       const cx = X(r.x + r.w / 2), cy = Y(r.z + r.d / 2);
@@ -150,4 +151,64 @@ export function elevationSVG(L, st, U = null) {
   o += `<rect x="${X(0)}" y="${Y(3.6)}" width="${W * s}" height="${3.6 * s}" fill="${st.wall}" stroke="#00000033"/><rect x="${gx}" y="${Y(3.6)}" width="${gw}" height="${3.6 * s}" fill="#9aa08f"/>`;
   o += `<rect x="${gx - 4}" y="${Y(4.5)}" width="6" height="${4.5 * s}" fill="${st.trim}"/><rect x="${gx + gw - 2}" y="${Y(4.5)}" width="6" height="${4.5 * s}" fill="${st.trim}"/>`;
   return o + '</svg>';
+}
+
+// ---------------------------------------------------------------- furniture in plan, drawn the way architects draw it
+const F_INK = '#5b514c', F_FILL = '#fffdf8';
+/** Plan symbols for furniture.js pieces. Each piece is drawn in its own frame (front toward +z), then turned and placed. */
+export function furnitureSVG(items, { s, X, Y }) {
+  let o = '<g class="furn">';
+  const under = (i) => (i.k === 'rug' || i.k === 'mat' ? 0 : 1);       // rugs first, so the pieces standing on them stay on top
+  for (const it of [...items].sort((a, b) => under(a) - under(b))) {
+    if (it.k === 'fan' || it.k === 'lampTable' || it.k === 'kupper' || it.k === 'hood' || it.k === 'laptop') continue;
+    const w = it.w * s, d = it.d * s;
+    // the piece's own frame: x across its front (-w/2..w/2), y from its back (-d/2) to its front (d/2), front toward screen-down when facing the road
+    const ang = Math.atan2(it.fx, it.fz) * 180 / Math.PI;             // screen y runs toward the road: local front (0,-1) -> (fx, -fz)
+    const cx = X(it.x), cy = Y(it.z);
+    let g = '';
+    const r = (x, y, ww, hh, extra = '') => `<rect x="${x}" y="${y}" width="${ww}" height="${hh}" ${extra}/>`;
+    const st = `fill="${F_FILL}" stroke="${F_INK}" stroke-width=".6"`;
+    // in the local frame used below, the back of the piece is at y = +d/2 and its front at -d/2 (the frame is turned so -y points the way it faces)
+    const B = d / 2, Fr = -d / 2;
+    switch (it.k) {
+      case 'bedKing': case 'bedQueen': case 'bedSingle': {
+        g += r(-w / 2, Fr, w, d, st);
+        const pw = it.k === 'bedSingle' ? w - 4 : w / 2 - 3;
+        if (it.k === 'bedSingle') g += r(-pw / 2, B - 2 - 0.9 * s, pw, 0.9 * s, `${st} rx="1.5"`);
+        else { g += r(-w / 2 + 2, B - 2 - 0.9 * s, pw, 0.9 * s, `${st} rx="1.5"`); g += r(1, B - 2 - 0.9 * s, pw, 0.9 * s, `${st} rx="1.5"`); }
+        g += `<path d="M${-w / 2} ${B - 1.6 * s} L${w / 2} ${B - 1.6 * s}" stroke="${F_INK}" stroke-width=".5"/>`;
+        g += `<path d="M${-w / 2} ${Fr + d * 0.38} L${w / 2} ${Fr + d * 0.3}" stroke="${F_INK}" stroke-width=".45" fill="none"/>`;
+        break;
+      }
+      case 'sofa3': case 'sofa2': case 'armchair': {
+        g += r(-w / 2, Fr, w, d, `${st} rx="2"`);
+        g += r(-w / 2, B - 0.7 * s, w, 0.7 * s, `fill="#efe9de" stroke="${F_INK}" stroke-width=".5"`);
+        g += r(-w / 2, Fr, 0.6 * s, d, `fill="#efe9de" stroke="${F_INK}" stroke-width=".5"`) + r(w / 2 - 0.6 * s, Fr, 0.6 * s, d, `fill="#efe9de" stroke="${F_INK}" stroke-width=".5"`);
+        const n = it.k === 'sofa3' ? 3 : it.k === 'sofa2' ? 2 : 1, cw = (w - 1.2 * s) / n;
+        for (let i = 1; i < n; i++) g += `<line x1="${-w / 2 + 0.6 * s + i * cw}" x2="${-w / 2 + 0.6 * s + i * cw}" y1="${Fr}" y2="${B - 0.7 * s}" stroke="${F_INK}" stroke-width=".4"/>`;
+        break;
+      }
+      case 'tableRound': g += `<circle cx="0" cy="0" r="${w / 2}" ${st}/>`; break;
+      case 'chair': case 'deskChair': g += r(-w / 2 + 1, Fr + 1, w - 2, d - 2, `${st} rx="1.5"`) + r(-w / 2 + 1, B - 0.35 * s - 1, w - 2, 0.35 * s, `fill="${F_INK}"`); break;
+      case 'stove': g += r(-w / 2, Fr, w, d, st); for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g += `<circle cx="${a * w / 4}" cy="${b * d / 4}" r="${Math.min(w, d) / 7}" fill="none" stroke="${F_INK}" stroke-width=".5"/>`; break;
+      case 'sink': g += r(-w / 2, Fr, w, d, st) + r(-w / 2 + 0.4 * s, Fr + 0.4 * s, w - 0.8 * s, d - 0.9 * s, `fill="#e3ecef" stroke="${F_INK}" stroke-width=".5" rx="2"`); break;
+      case 'fridge': g += r(-w / 2, Fr, w, d, st) + `<text x="0" y="2" font-size="${Math.min(w, d) * 0.32}" text-anchor="middle" fill="${F_INK}">F</text>`; break;
+      case 'kcounter': case 'sideboard': case 'tvUnit': case 'bedside': case 'sideTable': case 'coffeeTable': case 'desk':
+      case 'tableDining6': case 'tableDining4': case 'bookcase': g += r(-w / 2, Fr, w, d, st); break;
+      case 'wardrobe': case 'wardrobeSmall': g += r(-w / 2, Fr, w, d, st) + `<path d="M${-w / 2} ${Fr} L${w / 2} ${B} M${w / 2} ${Fr} L${-w / 2} ${B}" stroke="${F_INK}" stroke-width=".35"/>`; break;
+      case 'toilet': g += r(-w / 2, B - 0.55 * s, w, 0.55 * s, st) + `<ellipse cx="0" cy="${(Fr + B - 0.55 * s) / 2}" rx="${w / 2 - 0.5}" ry="${(d - 0.55 * s) / 2}" ${st}/>`; break;
+      case 'basin': g += `<path d="M${-w / 2} ${B} L${w / 2} ${B} L${w / 2} ${Fr + d * 0.4} Q0 ${Fr - d * 0.15} ${-w / 2} ${Fr + d * 0.4} Z" ${st}/>`; break;
+      case 'shower': g += r(-w / 2, Fr, w, d, `fill="#eef4f5" stroke="${F_INK}" stroke-width=".6"`) + `<path d="M${-w / 2} ${Fr} L${w / 2} ${B} M${w / 2} ${Fr} L${-w / 2} ${B}" stroke="${F_INK}" stroke-width=".35"/><circle cx="0" cy="0" r="1.2" fill="${F_INK}"/>`; break;
+      case 'bathtub': g += r(-w / 2, Fr, w, d, `${st} rx="2"`) + r(-w / 2 + 1.2, Fr + 1.2, w - 2.4, d - 2.4, `fill="#eef4f5" stroke="${F_INK}" stroke-width=".4" rx="${w / 3}"`); break;
+      case 'plant': case 'pot': g += `<circle cx="0" cy="0" r="${w / 2}" fill="#dfe9d6" stroke="#6b8a5a" stroke-width=".6"/><circle cx="0" cy="0" r="${w / 5}" fill="#6b8a5a"/>`; break;
+      case 'floorLamp': g += `<circle cx="0" cy="0" r="${w / 2}" fill="#fff6dc" stroke="${F_INK}" stroke-width=".5"/>`; break;
+      case 'rug': case 'mat': g += r(-w / 2, Fr, w, d, `fill="#efe2cf" fill-opacity=".55" stroke="#b9a68c" stroke-width=".5" stroke-dasharray="2 1.5"`); break;
+      case 'tv': g += r(-w / 2, -0.15 * s, w, 0.3 * s, `fill="${F_INK}"`); break;
+      case 'coat': g += r(-w / 2, Fr, w, d, `fill="${F_INK}"`); break;
+      default: g += r(-w / 2, Fr, w, d, st);
+    }
+    const cls = it.clash ? ' clash' : '';
+    o += `<g class="fp${cls}" data-key="${it.key || ''}" transform="translate(${cx} ${cy}) rotate(${ang})">${g}${it.clash ? `<rect x="${-w / 2 - 1}" y="${-d / 2 - 1}" width="${w + 2}" height="${d + 2}" fill="none" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="3 2"/>` : ''}</g>`;
+  }
+  return o + '</g>';
 }

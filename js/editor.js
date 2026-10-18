@@ -73,9 +73,25 @@ function applyTree(p, h, dx, dz) {
   return p;
 }
 
+const NAMES = { bedKing: 'Double bed', bedQueen: 'Double bed', bedSingle: 'Single bed', bedside: 'Bedside table', wardrobe: 'Wardrobe', wardrobeSmall: 'Wardrobe', tvUnit: 'TV unit', sofa3: 'Sofa', sofa2: 'Sofa', armchair: 'Armchair', coffeeTable: 'Coffee table', sideTable: 'Side table', tableDining6: 'Dining table', tableDining4: 'Dining table', tableRound: 'Table', chair: 'Chair', sideboard: 'Sideboard', desk: 'Desk', deskChair: 'Desk chair', bookcase: 'Shelves', kcounter: 'Counter', sink: 'Sink', stove: 'Cooker', fridge: 'Fridge', toilet: 'Toilet', basin: 'Basin', shower: 'Shower', bathtub: 'Bathtub', plant: 'Plant', floorLamp: 'Floor lamp', coat: 'Coat rack', rug: 'Rug', mat: 'Prayer mat', pot: 'Plant' };
+
+// ---------------------------------------------------------------- changing what a room is
+const RETYPE = { bed: 'Bedroom', master: 'Master bedroom', study: 'Study', store: 'Store', dress: 'Dressing room', servant: 'Servant room', prayer: 'Prayer room',
+  dining: 'Dining', lounge: 'Lounge', drawing: 'Drawing room', kitchen: 'Kitchen', other: 'Other room' };
+const FIXED_TYPES = new Set(['stairs', 'passage', 'lobby', 'bath', 'gbath', ...OPEN, ...FIXED]);   // these stay as drawn: they hold the plan together
+
+/** The i-th room of the plan (same order as the rects the layout is built from), or null. */
+function leafAt(plan, i) {
+  if (!plan.tree) return plan.bands.flatMap((b) => b.rooms)[i] || null;
+  const out = [];
+  const walk = (n) => { if (n.k === 'room') { if (n.t !== 'bath') out.push(n); } else n.kids.forEach(walk); };
+  walk(plan.tree);
+  return out[i] || null;
+}
+
 /** Wall positions of a plan (rows of rooms or a slicing tree), in feet. */
 function handles(plan, L) {
-  const doors = ((L && L.openings) || []).filter((o) => o.kind === 'door' && o.key).map((o) => ({ kind: 'door', ...o }));
+  const doors = ((L && L.openings) || []).filter((o) => (o.kind === 'door' || o.kind === 'window') && o.key).map((o) => ({ ...o, kind: 'door', win: o.kind === 'window' }));
   return [...wallHandles(plan), ...doors];
 }
 
@@ -107,6 +123,13 @@ function wallHandles(plan) {
 /** Apply a drag of (dx, dz) feet to handle h on a copy of plan; sizes are kept within sensible limits. */
 function apply(base, h, dx, dz) {
   const p = clone(base);
+  if (h.kind === 'furn') {                                       // a piece of furniture: moved by whole half feet, kept as an offset from where it was put
+    const fp = (p.furnPos ||= {}), o = { ...(fp[h.key] || {}) };
+    o.dx = Math.round(((h.base.dx || 0) + snap(dx)) * 100) / 100;
+    o.dz = Math.round(((h.base.dz || 0) + snap(dz)) * 100) / 100;
+    fp[h.key] = o;
+    return p;
+  }
   if (h.kind === 'door') {                                       // slide along its wall; saved as a fraction of the wall
     const [lo, hi] = h.span, half = h.w / 2 + 0.3;
     const at = Math.max(lo + half, Math.min(hi - half, snap(h.at + (h.o === 'h' ? dx : dz))));
@@ -139,7 +162,7 @@ function apply(base, h, dx, dz) {
  *   state = { original, history } kept by the caller per layout, so switching layouts keeps undo and reset
  *   accept(plan) -> false refuses an edit (the wall stops where it is)
  */
-export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn, state, accept = () => true }) {
+export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn, furnBtn, state, accept = () => true }) {
   const st = state || {};
   st.original ||= clone(layout.plan);
   st.history ||= [];
@@ -153,7 +176,7 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
   const overlay = (f) => handles(L.plan, L).map((h, k) => {
     if (h.kind === 'door') {
       const [cx, cy] = h.o === 'h' ? [f.X(h.at), f.Y(h.c)] : [f.X(h.c), f.Y(h.at)];
-      return [false, `<g class="h door ${h.o === 'h' ? 'dh' : 'dv'}" data-k="${k}"><circle class="hit" cx="${cx}" cy="${cy}" r="6"/><circle class="grip" cx="${cx}" cy="${cy}" r="3"/></g>`];
+      return [false, `<g class="h door${h.win ? ' win' : ''} ${h.o === 'h' ? 'dh' : 'dv'}" data-k="${k}"><circle class="hit" cx="${cx}" cy="${cy}" r="6"/><circle class="grip" cx="${cx}" cy="${cy}" r="3"/></g>`];
     }
     const horiz = h.kind === 'row' || h.kind === 'bd';
     const [x1, y1, x2, y2] = horiz ? [f.X(h.x0), f.Y(h.z), f.X(h.x1), f.Y(h.z)] : [f.X(h.x), f.Y(h.z0), f.X(h.x), f.Y(h.z1)];
@@ -166,7 +189,8 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
   }).sort((a, b) => b[0] - a[0]).map((x) => x[1]).join('');
 
   function render() {
-    host.innerHTML = planSVG(L, { ...OPTS, overlay });
+    pick = null;
+    host.innerHTML = planSVG(L, { ...OPTS, overlay, furniture: st.showFurniture !== false });
     undoBtn.disabled = !history.length;
     resetBtn.disabled = JSON.stringify(L.plan) === JSON.stringify(original);
   }
@@ -199,12 +223,93 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     if (drag.raf) cancelAnimationFrame(drag.raf);
     if (commit) update();                                        // a quick flick may not have reached a frame yet
     else if (drag.moved) { L = rebuild(drag.base); drag.moved = false; render(); }   // cancelled: put it back
+    if (commit && drag.h.kind === 'furn' && !drag.moved) {       // a click, not a drag
+      const { key } = drag.h, c = drag.client;
+      host.classList.remove('dragging'); drag = null;
+      openFurn(key, c.x, c.y);
+      return;
+    }
     if (drag.moved) history.push(drag.base);
     host.classList.remove('dragging');
     drag = null;
     render();
     onChange(L, false);
   }
+
+  // click a room (without dragging) to change what it is
+  let pick = null;
+  const closePick = () => { pick?.remove(); pick = null; };
+  function openPick(e) {
+    const svg = host.querySelector('svg');
+    if (!svg) return;
+    const { px, py } = svgPoint(e), f = planFrame(L, OPTS);
+    const x = (px - f.m) / f.s, z = L.plot.d - (py - f.m) / f.s;
+    const hit = (L.rects || []).filter((r) => r.t !== 'bath' && x >= r.x && x <= r.x + r.w && z >= r.y && z <= r.y + r.d)
+      .sort((a, b) => a.w * a.d - b.w * b.d)[0];
+    closePick();
+    if (!hit || FIXED_TYPES.has(hit.t)) return;
+    const leaf = leafAt(L.plan, hit.i);
+    if (!leaf || leaf.t !== hit.t) return;
+    pick = document.createElement('div');
+    pick.className = 'retype';
+    const box = host.getBoundingClientRect();
+    pick.style.left = Math.min(box.width - 190, Math.max(0, e.clientX - box.left - 20)) + 'px';
+    pick.style.top = Math.max(0, e.clientY - box.top + 10) + 'px';
+    pick.innerHTML = `<label>This room is a<select>${Object.entries(RETYPE).map(([k, v]) => `<option value="${k}"${k === hit.t ? ' selected' : ''}>${v}</option>`).join('')}</select></label><span class="msg" role="status"></span>`;
+    host.append(pick);
+    const sel = pick.querySelector('select'), msg = pick.querySelector('.msg');
+    sel.focus();
+    sel.onchange = () => {
+      const next = clone(L.plan);
+      leafAt(next, hit.i).t = sel.value;
+      if (!accept(next)) { msg.textContent = 'That would break a rule this floor must keep (such as the number of bedrooms).'; sel.value = hit.t; return; }
+      closePick();
+      set(next, true);
+    };
+  }
+  // click a piece of furniture to turn it, take it out or put it back where it was
+  function openFurn(key, cx, cy) {
+    closePick();
+    const it = (L.furniture || []).find((i) => i.key === key);
+    if (!it) return;
+    pick = document.createElement('div');
+    pick.className = 'retype furnpick';
+    const box = host.getBoundingClientRect();
+    pick.style.left = Math.min(box.width - 190, Math.max(0, cx - box.left - 20)) + 'px';
+    pick.style.top = Math.max(0, cy - box.top + 10) + 'px';
+    const moved = !!(L.plan.furnPos && L.plan.furnPos[key]);
+    pick.innerHTML = `<b>${NAMES[it.k] || 'Piece'}</b><div class="row"><button type="button" data-a="turn">Turn</button><button type="button" data-a="hide">Remove</button>${moved ? '<button type="button" data-a="reset">Put back</button>' : ''}</div>${it.clash ? '<span class="msg">It sits on another piece or in a doorway. Drag it somewhere free.</span>' : '<span class="msg muted">Drag it to move it.</span>'}`;
+    host.append(pick);
+    pick.querySelectorAll('button').forEach((b) => b.onclick = () => {
+      const next = clone(L.plan), fp = (next.furnPos ||= {}), o = { ...(fp[key] || {}) };
+      if (b.dataset.a === 'turn') { o.rot = ((o.rot || 0) + 1) % 4; fp[key] = o; }
+      else if (b.dataset.a === 'hide') { o.hide = true; fp[key] = o; }
+      else delete fp[key];
+      if (!Object.keys(fp).length) delete next.furnPos;
+      closePick();
+      set(next, true);
+    });
+  }
+  host.style.position = 'relative';
+  let down = null;
+  host.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.retype')) return;
+    if (e.target.closest('g.fp') && !e.target.closest('g.h')) {               // grab a piece of furniture
+      const key = e.target.closest('g.fp').dataset.key;
+      if (!key || e.button > 0) return;
+      e.preventDefault(); closePick();
+      const base = (L.plan.furnPos && L.plan.furnPos[key]) || {};
+      drag = { h: { kind: 'furn', key, base }, start: svgPoint(e), last: null, base: L.plan, s: planFrame(L, OPTS).s, moved: false, raf: 0, client: { x: e.clientX, y: e.clientY } };
+      host.classList.add('dragging');
+      return;
+    }
+    if (!e.target.closest('g.h') && e.button <= 0) down = { x: e.clientX, y: e.clientY }; else closePick();
+  }, sig);
+  host.addEventListener('pointerup', (e) => {
+    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5 && !e.target.closest('.retype')) openPick(e);
+    down = null;
+  }, sig);
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePick(); }, sig);
 
   host.addEventListener('pointerdown', (e) => {
     const g = e.target.closest('g.h');
@@ -222,6 +327,11 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
   window.addEventListener('pointerup', () => end(true), sig);
   window.addEventListener('pointercancel', () => end(false), sig);   // system gesture, second finger: undo the drag
 
+  if (furnBtn) {
+    const label = () => (furnBtn.textContent = st.showFurniture === false ? 'Show furniture' : 'Hide furniture');
+    label();
+    furnBtn.onclick = () => { st.showFurniture = st.showFurniture === false; label(); render(); };
+  }
   undoBtn.onclick = () => { if (history.length) set(history.pop(), false); };
   resetBtn.onclick = () => set(clone(original), true);
   render();

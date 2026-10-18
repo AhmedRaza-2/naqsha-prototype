@@ -3,6 +3,7 @@
 import { OPEN, MARLA_SQFT, toRects, outsideDoors } from './bands.js';
 import { toRects as treeRects } from './tree.js';
 import { finalize, ruleFor } from './layout.js';
+import { furnish, applyOverrides } from './furniture.js';
 import { draftPlans, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -102,6 +103,7 @@ export function planToLayout(item, index) {
   L.checks = item.checks.map((c) => ({ level: c.level === 'ok' ? 'ok' : 'warn', title: TITLE[c.name] || c.name, detail: c.level === 'ok' ? OK_TEXT[c.name] || '' : `Not met${c.detail ? `: ${c.detail}` : ''}.` }));
   L.score = L.checks.filter((c) => c.level === 'ok').length;
   L.covered = mains.reduce((s, r) => s + r.w * r.d, 0);
+  L.furniture = applyOverrides(furnish(L), L, plan.furnPos);    // furniture for the plan and the walkthrough, with the user's own moves
   return L;
 }
 

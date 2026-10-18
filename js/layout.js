@@ -126,25 +126,28 @@ export function finalize(L) {
       { o: 'v', c: r.x, lo: r.z, hi: r.z + r.d, on: rule.side > 0 && Math.abs(r.x - bounds.x0) < 0.01, left: true },
       { o: 'v', c: r.x + r.w, lo: r.z, hi: r.z + r.d, on: rule.side > 0 && Math.abs(r.x + r.w - bounds.x1) < 0.01 },
     ];
-    for (const e of edges) {
-      if ((r.type === 'lobby' && e.front) || doorWalls.has(`${r.id}|${e.o}|${e.c}`)) continue;   // a door to outside is on this wall
+    edges.forEach((e, ei) => {
+      if ((r.type === 'lobby' && e.front) || doorWalls.has(`${r.id}|${e.o}|${e.c}`)) return;   // a door to outside is on this wall
       const spans = e.on ? [[e.lo, e.hi]] : openSpans(e);
-      if (!spans.length) continue;
+      if (!spans.length) return;
       let cut = null;
       if (a) {
         if (e.o === 'h' && (Math.abs(a.z - e.c) < 0.01 || Math.abs(a.z + a.d - e.c) < 0.01)) cut = [a.x - 1, a.x + a.w + 1];
         if (e.o === 'v' && (Math.abs(a.x - e.c) < 0.01 || Math.abs(a.x + a.w - e.c) < 0.01)) cut = [a.z - 1, a.z + a.d + 1];
       }
       const w = isBath ? 2 : r.type === 'kitchen' ? 3.5 : r.type === 'lobby' ? 3 : r.type === 'bed' ? 4.5 : 5;
-      for (const [lo, hi] of spans.flatMap(([s0, s1]) => subtract(s0, s1, cut))) {
-        if (hi - lo < w + 1.5) continue;
+      spans.flatMap(([s0, s1]) => subtract(s0, s1, cut)).forEach(([lo, hi], si) => {
+        if (hi - lo < w + 1.5) return;
         const n = Math.max(1, Math.floor((hi - lo) / 10));
         for (let i = 0; i < n; i++) {
-          openings.push({ o: e.o, c: e.c, at: lo + ((i + 0.5) * (hi - lo)) / n, w, kind: 'window', sill: isBath ? 5 : r.type === 'kitchen' ? 3.5 : 3, top: 7, room: r.id, bath: isBath });
+          // a window the user slid along its wall keeps its place as a fraction of its own stretch of wall
+          const a0 = lo + (i * (hi - lo)) / n, a1 = lo + ((i + 1) * (hi - lo)) / n;
+          const pl = place(`w|${r.id}|${ei}|${si}|${i}`, a0, a1, w);
+          openings.push({ o: e.o, c: e.c, at: pl.at, span: [a0, a1], key: pl.key, w, kind: 'window', sill: isBath ? 5 : r.type === 'kitchen' ? 3.5 : 3, top: 7, room: r.id, bath: isBath });
           r.hasWindow = true;
         }
-      }
-    }
+      });
+    });
   }
   L.openings = openings;
   L.links = links;
