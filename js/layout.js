@@ -33,6 +33,17 @@ function shared(a, b) {
   return null;
 }
 
+// The part of a wall line [lo, hi] at c that a room can put a door in: not where its own washroom sits against that wall.
+function doorSpan(room, o, c, lo, hi) {
+  const a = room && room.att;
+  if (!a) return [lo, hi];
+  const on = o === 'v' ? Math.abs(a.x - c) < 0.02 || Math.abs(a.x + a.w - c) < 0.02 : Math.abs(a.z - c) < 0.02 || Math.abs(a.z + a.d - c) < 0.02;
+  if (!on) return [lo, hi];
+  const [b0, b1] = o === 'v' ? [a.z, a.z + a.d] : [a.x, a.x + a.w];
+  const left = [lo, Math.min(hi, b0)], right = [Math.max(lo, b1), hi];
+  return left[1] - left[0] >= right[1] - right[0] ? left : right;
+}
+
 export function finalize(L) {
   const { rooms, B, rule } = L;
   const mains = rooms.filter((r) => !r.type.endsWith('bath'));
@@ -56,7 +67,8 @@ export function finalize(L) {
     return { at: Math.max(lo + half, Math.min(hi - half, lo + pos[key] * (hi - lo))), key, lo, hi };
   };
   const outDoor = (d, isMain) => {
-    const [o, c, lo, hi] = d.wall;
+    const [o, c, lo0, hi0] = d.wall;
+    const [lo, hi] = doorSpan(byId(d.room), o, c, lo0, hi0);
     const w = Math.min(isMain ? 3.5 : 3, hi - lo - 0.5);
     const pl = place(`out|${d.room}|${isMain ? 'm' : 'g'}`, lo, hi, w);
     openings.push({ o, c, at: pl.at, span: [lo, hi], key: pl.key, w, kind: 'door', main: isMain, sill: 0, top: isMain ? 7.2 : 7, room: d.room });
@@ -79,19 +91,35 @@ export function finalize(L) {
     const prefs = r.type === 'bed'
       ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge', 'passage'] : ['lounge', 'dining', 'lobby', 'passage', 'drawing', 'kitchen'])
       : (PREF[r.type] || ['lounge', 'passage', 'lobby', 'dining']);
-    let pick = null;
+    let pick = null, narrow = null, any = null;
     for (const t of L.upper ? [...prefs, 'stairs'] : prefs) {
       for (const q of mains.filter((m) => m.type === t)) {
-        const s = shared(r, q);
-        if (s && s.hi - s.lo >= 3.2) { pick = { q, s }; break; }
+        const s0 = shared(r, q);
+        if (!s0) continue;
+        // keep the door off the part of the wall where either room has its washroom
+        const [a1, b1] = doorSpan(r, s0.o, s0.c, s0.lo, s0.hi), [a2, b2] = doorSpan(q, s0.o, s0.c, a1, b1);
+        const s = { ...s0, lo: a2, hi: b2 };
+        if (s.hi - s.lo >= 3.2) { pick = { q, s }; break; }
+        if (!narrow && s.hi - s.lo >= 2.4) narrow = { q, s };          // room for a narrower door beside the washroom
+        if (!any && s0.hi - s0.lo >= 3.2) any = { q, s: s0 };          // last resort: the whole shared wall
       }
       if (pick) break;
     }
+    if (!pick && !narrow) {                                         // any other neighbour with a clear stretch of wall
+      for (const q of mains) {
+        if (q === r || (r.type === 'bed' && q.type === 'kitchen')) continue;
+        const s0 = shared(r, q);
+        if (!s0) continue;
+        const [a1, b1] = doorSpan(r, s0.o, s0.c, s0.lo, s0.hi), [a2, b2] = doorSpan(q, s0.o, s0.c, a1, b1);
+        if (b2 - a2 >= 2.4) { narrow = { q, s: { ...s0, lo: a2, hi: b2 } }; break; }
+      }
+    }
+    pick ||= narrow || any;
     if (!pick) continue;
     const { q, s } = pick;
     const len = s.hi - s.lo;
     const open = (r.type === 'lobby' && q.type === 'lounge') || (r.type === 'dining' && q.type === 'lounge');
-    const w = open ? Math.min(6, len - 1.5) : 3;
+    const w = open ? Math.min(6, len - 1.5) : Math.max(2.2, Math.min(3, len - 0.2));
     const pl = open ? { at: (s.lo + s.hi) / 2 } : place(`${r.id}|${q.id}`, s.lo, s.hi, w);
     openings.push({ o: s.o, c: s.c, at: pl.at, span: [s.lo, s.hi], key: pl.key, w, kind: open ? 'opening' : 'door', sill: 0, top: open ? 8 : 7, room: r.id, to: q.id });
     links.push([r.id, q.id]);

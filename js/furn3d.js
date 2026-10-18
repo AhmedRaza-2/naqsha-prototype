@@ -92,6 +92,6 @@ export function furnitureColliders(items) {
   return items.filter((i) => !i.soft && !i.deco && i.k !== 'fan' && i.k !== 'rug')
     .map((i) => {
       const [ex, ez] = i.fz !== 0 ? [i.w, i.d] : [i.d, i.w];
-      return { x0: i.x - ex / 2, x1: i.x + ex / 2, z0: i.z - ez / 2, z1: i.z + ez / 2 };
+      return { x0: i.x - ex / 2, x1: i.x + ex / 2, z0: i.z - ez / 2, z1: i.z + ez / 2, k: i.k, room: i.room };
     });
 }

@@ -195,10 +195,13 @@ async function generate(regen) {
       for (let b = Math.min(beds, fitBeds) - 1; b >= 2; b--) relax.push([{ ...S.prefs, beds: b, baths: b + 1, focus: 'balanced', porch: 'any' },
         `${beds} bedrooms do not fit on the ground floor of ${S.plot.w} x ${S.plot.d} ft together with the stairs, so these are the closest layouts, with ${b}.`]);
     }
+    const perfect = (ls) => ls.some((L) => L.score === L.checks.length);
     for (const [prefs, note] of relax) {
-      if (layouts.length) break;
-      layouts = await draft(prefs);
-      if (layouts.length) S.note = note;
+      // a two-storey ground floor must pass every rule (the first floor is drafted over it): a near miss is not kept
+      // while a step down (a bedroom fewer here, which can go upstairs) still might pass
+      if (layouts.length && (S.prefs.storeys !== 2 || perfect(layouts))) break;
+      const next = await draft(prefs);
+      if (next.length && (!layouts.length || perfect(next))) { layouts = next; S.note = note; }
     }
   } catch (err) {
     console.warn('Naqsha model could not load.', err);

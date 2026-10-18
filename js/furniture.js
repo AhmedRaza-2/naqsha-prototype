@@ -102,6 +102,7 @@ function furnishRoom(room, L, ops) {
     }
   }
   for (const d of doors) blockers.push(d);
+  const solidBlocks = att ? [{ x0: att.x - 0.2, x1: att.x + att.w + 0.2, z0: att.z - 0.2, z1: att.z + att.d + 0.2 }] : [];   // with its walls
 
   const toPoint = (d) => ({ x: d.o === 'v' ? d.c : d.at, z: d.o === 'h' ? d.c : d.at });
   const doorPts = doors.map(toPoint);
@@ -124,6 +125,11 @@ function furnishRoom(room, L, ops) {
     it.fp = rectOf(cx, cz, fx, fz, w, d);
     if (extra.clear) it.reserve = frontZone(it.fp, fx, fz, extra.clear);
     items.push(it);
+    // a solid piece must leave the way through the room open: every door reachable from the first, most of the floor too
+    if (!it.soft && !it.deco && extra.walk !== false && doors.length && !walkable(items.filter((i) => !i.deco), inner, doors, solidBlocks)) {
+      items.pop(); nth[k]--;
+      return null;
+    }
     return it;
   };
   const behind = (host, k, extra = {}) => {                       // a thin piece against the back of `host`, facing the same way
@@ -150,7 +156,7 @@ function furnishRoom(room, L, ops) {
   /** Put a piece against a wall at the best spot; score(spot, footprint) -> number (higher is better). */
   const onWall = (k, o = {}) => {
     const c = CAT[o.cat || k], w = o.w ?? c.w, d = o.d ?? c.d, h = o.h ?? c.h;
-    let best = null, bs = -1e9;
+    const spots = [];
     for (const s of wallSpots(w, d, o.walls)) {
       const fp = rectOf(s.cx, s.cz, s.fx, s.fz, w, d);
       const need = o.clear ? frontZone(fp, s.fx, s.fz, o.clear) : null;
@@ -158,16 +164,20 @@ function furnishRoom(room, L, ops) {
       if (need && (!(need.x0 >= inner.x0 - 1e-6 && need.x1 <= inner.x1 + 1e-6 && need.z0 >= inner.z0 - 1e-6 && need.z1 <= inner.z1 + 1e-6) || blockers.some((b) => !doors.includes(b) && overlap(need, b)) || items.some((it) => !it.soft && overlap(need, it.fp)))) continue;
       let sc = o.score ? o.score(s, fp) : 0;
       if (o.center) sc -= Math.abs(s.along) * o.center;
-      if (sc > bs) { bs = sc; best = { s, fp }; }
+      spots.push({ s, sc });
     }
-    if (!best) return null;
-    return commit(k, best.s.cx, best.s.cz, best.s.fx, best.s.fz, { ...o, cat: o.cat || k, w, d, h });
+    spots.sort((a, b) => b.sc - a.sc);
+    for (const { s } of spots.slice(0, 25)) {                      // the best spot that keeps the room walkable
+      const it = commit(k, s.cx, s.cz, s.fx, s.fz, { ...o, cat: o.cat || k, w, d, h });
+      if (it) return it;
+    }
+    return null;
   };
   /** Free-standing piece: best spot on a grid (the footprint plus `pad` all round must be free). */
   const island = (k, o = {}) => {
     const c = CAT[o.cat || k], w = o.w ?? c.w, d = o.d ?? c.d, pad = o.pad ?? 0;
     const fx = o.fx ?? 0, fz = o.fz ?? 1;
-    let best = null, bs = -1e9;
+    const spots = [];
     for (let x = inner.x0 + w / 2; x <= inner.x1 - w / 2 + 1e-6; x += STEP) {
       for (let z = inner.z0 + d / 2; z <= inner.z1 - d / 2 + 1e-6; z += STEP) {
         const fp = rectOf(x, z, fx, fz, w, d);
@@ -176,11 +186,15 @@ function furnishRoom(room, L, ops) {
         if (!free(fp)) continue;
         if (pad && blockers.some((b) => overlap(padded, b) && !windows.includes(b))) continue;
         if (pad && items.some((it) => !it.soft && overlap(clipped, it.fp))) continue;
-        const sc = o.score ? o.score(x, z, fp) : 0;
-        if (sc > bs) { bs = sc; best = { x, z }; }
+        spots.push({ x, z, sc: o.score ? o.score(x, z, fp) : 0 });
       }
     }
-    return best ? commit(k, best.x, best.z, fx, fz, { ...o, cat: o.cat || k, w, d }) : null;
+    spots.sort((a, b) => b.sc - a.sc);
+    for (const sp of spots.slice(0, 20)) {
+      const it = commit(k, sp.x, sp.z, fx, fz, { ...o, cat: o.cat || k, w, d });
+      if (it) return it;
+    }
+    return null;
   };
   const at = (k, cx, cz, fx, fz, o = {}) => {
     const c = CAT[o.cat || k], w = o.w ?? c.w, d = o.d ?? c.d;
@@ -227,7 +241,7 @@ function furnishRoom(room, L, ops) {
 
   if (items.length === 0) return [];
   // the way through: the doors must still reach the rest of the room (remove the last optional pieces until they do)
-  while (!walkable(items.filter((i) => !i.deco), inner, doors) && dropOptional(items)) { /* dropped */ }
+  while (!walkable(items.filter((i) => !i.deco), inner, doors, solidBlocks) && dropOptional(items)) { /* dropped */ }
   return items.map(({ fp, reserve, ...it }) => it);
 
   // ================================================================= rooms
@@ -416,7 +430,7 @@ function furnishRoom(room, L, ops) {
         const hit = items.find((o) => !o.soft && overlap(fpk, o.fp));
         if (hit) { pos = horiz ? hit.fp.x1 : hit.fp.z1; continue; }                // the other run's end: start after it
         queue.shift();
-        commit(kind === 'counter' ? 'kcounter' : kind, cx, cz, fx, fz, { cat: catk, w: wdt, d: kind === 'fridge' ? CAT.fridge.d : U });
+        commit(kind === 'counter' ? 'kcounter' : kind, cx, cz, fx, fz, { cat: catk, w: wdt, d: kind === 'fridge' ? CAT.fridge.d : U, walk: false });
         const host = items[items.length - 1];
         const underWindow = windows.some((wn) => overlap(fpk, wn));                       // wall cabinets and the hood never cover a window
         if (kind === 'stove' && !underWindow) behind(host, 'hood', { cat: 'hood', y: 5.2, w: wdt });
@@ -459,7 +473,7 @@ function furnishRoom(room, L, ops) {
         const sc = far(cx, cz) - (windows.some((wn) => overlap(fp, wn)) ? 4 : 0);        // a corner without a window if there is one
         if (sc > bsc) { bsc = sc; best = [cx, cz]; }
       }
-      if (best) { sh = commit('shower', best[0], best[1], 0, 1, { cat: 'shower', w: s, d: s }); break; }
+      if (best) { sh = commit('shower', best[0], best[1], 0, 1, { cat: 'shower', w: s, d: s, soft: true }); break; }
     }
     if (room.w * room.d >= 70 && !sh) onWall('bathtub');
     void tl;
@@ -467,13 +481,13 @@ function furnishRoom(room, L, ops) {
 }
 
 /** Is the way through still open? Doors can reach every free cell (>= 85%) of the room: pieces grow 0.8 ft each side, a person's width. */
-function walkable(items, inner, doors) {
+function walkable(items, inner, doors, walls = []) {
   if (!doors.length) return true;
   const G = 0.5, nx = Math.ceil((inner.x1 - inner.x0) / G), nz = Math.ceil((inner.z1 - inner.z0) / G);
   if (nx < 2 || nz < 2) return true;
-  const grow = 0.45;
+  const grow = 0.5;                                               // the walkthrough's visitor is 1 ft wide (scene.js R)
   const blocked = new Uint8Array(nx * nz);
-  for (const it of items) {
+  for (const it of [...items, ...walls.map((fp) => ({ fp }))]) {   // walls: a washroom's block inside the room
     if (it.soft && it.y === 0 && (it.k === 'chair' || it.k === 'deskChair')) continue;     // chairs are pulled out of the way
     if (it.soft) continue;
     const fp = it.fp;
@@ -487,16 +501,20 @@ function walkable(items, inner, doors) {
     }
   }
   // cells that are only "close" to a piece stay walkable unless the gap on both sides is too narrow: approximate by the real footprint
-  const cell = (i, j) => i >= 0 && j >= 0 && i < nx && j < nz && !(blocked[i * nz + j] & 1);
+  const cell = (i, j) => i >= 0 && j >= 0 && i < nx && j < nz && !blocked[i * nz + j];
   let total = 0;
   for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) if (cell(i, j)) total++;
   const seen = new Uint8Array(nx * nz), stack = [];
-  for (const d of doors) {
+  // flood from the first door only: every other door (a washroom's, a second way in) must be reached from it
+  const seedOf = (d) => {
     const c = d.o === 'v' ? d.c : d.at, z = d.o === 'h' ? d.c : d.at;
     const dx = d.into ? d.into[0] * 0.8 : 0, dz = d.into ? d.into[1] * 0.8 : 0;
-    const i = Math.min(nx - 1, Math.max(0, Math.floor((c + dx - inner.x0) / G))), j = Math.min(nz - 1, Math.max(0, Math.floor((z + dz - inner.z0) / G)));
-    if (cell(i, j) && !seen[i * nz + j]) { seen[i * nz + j] = 1; stack.push([i, j]); }
-  }
+    return [Math.min(nx - 1, Math.max(0, Math.floor((c + dx - inner.x0) / G))), Math.min(nz - 1, Math.max(0, Math.floor((z + dz - inner.z0) / G)))];
+  };
+  const seeds = doors.map(seedOf);
+  const [i0, j0] = seeds[0];
+  if (!cell(i0, j0)) return false;
+  seen[i0 * nz + j0] = 1; stack.push([i0, j0]);
   let reached = 0;
   while (stack.length) {
     const [i, j] = stack.pop(); reached++;
@@ -505,7 +523,8 @@ function walkable(items, inner, doors) {
       if (cell(x, z) && !seen[x * nz + z]) { seen[x * nz + z] = 1; stack.push([x, z]); }
     }
   }
-  return total === 0 || reached / total >= 0.85;
+  if (seeds.some(([i, j]) => !seen[i * nz + j])) return false;
+  return total === 0 || reached / total >= 0.8;
 }
 
 const ESSENTIAL = new Set(['bedKing', 'bedQueen', 'bedSingle', 'sofa3', 'sofa2', 'kcounter', 'sink', 'stove', 'fridge', 'toilet', 'basin', 'shower', 'tableDining6', 'tableDining4', 'desk']);

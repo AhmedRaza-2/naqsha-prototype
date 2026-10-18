@@ -14,7 +14,7 @@ const FIXED = new Set(['void', 'lawn']);                       // setback strips
 // ---------------------------------------------------------------- slicing trees: every cut is a wall you can drag
 const at = (node, path) => path.reduce((n, k) => n.kids[k], node);
 
-function treeHandles(plan) {
+function treeHandles(plan, all = false) {
   const out = [];
   const isFixed = (n) => n.k === 'room' && FIXED.has(n.t);
   const isOpen = (n) => n.k === 'room' && OPEN.has(n.t);
@@ -36,7 +36,7 @@ function treeHandles(plan) {
       if (node.k === 'H') go(kid, x, y + pos, w, sz, [...path, k]); else go(kid, x + pos, y, sz, d, [...path, k]);
       pos += sz;
       const next = node.kids[k + 1];
-      if (!next || isFixed(kid) || isFixed(next) || (isOpen(kid) && isOpen(next))) return;
+      if (!next || (!all && (isFixed(kid) || isFixed(next))) || (isOpen(kid) && isOpen(next))) return;
       out.push(node.k === 'H'
         ? { kind: 'row', tree: true, path, k, parts, z: y + pos, x0: x, x1: x + w }
         : { kind: 'col', tree: true, path, k, parts, x: x + pos, z0: y, z1: y + d });
@@ -95,8 +95,8 @@ function handles(plan, L) {
   return [...wallHandles(plan), ...doors];
 }
 
-function wallHandles(plan) {
-  if (plan.tree) return treeHandles(plan);
+function wallHandles(plan, all = false) {          // all: also the edges of setback strips (for the automatic polish)
+  if (plan.tree) return treeHandles(plan, all);
   const out = [];
   let z = 0;
   plan.bands.forEach((b, bi) => {
@@ -104,7 +104,7 @@ function wallHandles(plan) {
     let x = 0;
     b.rooms.forEach((r, ri) => {
       const next = b.rooms[ri + 1];
-      if (next && !FIXED.has(r.t) && !FIXED.has(next.t) && !(OPEN.has(r.t) && OPEN.has(next.t))) {
+      if (next && (all || (!FIXED.has(r.t) && !FIXED.has(next.t))) && !(OPEN.has(r.t) && OPEN.has(next.t))) {
         out.push({ kind: 'col', band: bi, i: ri, x: x + r.w, z0: z, z1: z + b.d });
       }
       if (r.bath) {
@@ -337,3 +337,6 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
   render();
   return { get layout() { return L; }, destroy: () => { if (drag) end(true); off.abort(); } };
 }
+
+// the same wall moves, for the automatic polish (polish.js)
+export { wallHandles, apply as applyEdit };

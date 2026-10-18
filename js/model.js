@@ -2,8 +2,9 @@
 // The exported graph decodes one token per call with a key/value cache (see ml/export_onnx.py).
 // Everything is served from the same place as the page (models/), with real download progress, so a slow connection
 // shows a percentage instead of a frozen button, and the download can start before the visitor presses Generate.
-import { score } from './bands.js';
-import { parseAny, familyOf } from './tree.js';
+import { score, check as rowCheck, toRects as rowRects } from './bands.js';
+import { parseAny, familyOf, check as treeCheck, toRects as treeRects } from './tree.js';
+import { polish, refine, outlineKey } from './polish.js';
 
 const BASE = new URL('../models/', import.meta.url);
 const LAYERS = 6, HEADS = 8, HEAD_DIM = 32;
@@ -234,6 +235,22 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
       if (keep(item)) good.push(item);
     } catch { /* malformed output: skip */ }
   }
+  // a two-storey ground floor keeps its outline and stairs while it is adjusted: the first floor is drafted over them
+  const keepOutline = (g) => {
+    if (request.storeys !== 2) return null;
+    const k0 = outlineKey(g.rects);
+    return (p) => outlineKey(p.tree ? treeRects(p) : rowRects(p)) === k0;
+  };
+  // plans that miss a rule by a little are nudged into shape by the rule checker (polish.js) before the best are picked
+  const t0 = Date.now();
+  for (const g of good.filter((x) => x.score < 1).sort((a, b) => b.score - a.score)) {
+    if (Date.now() - t0 > 1500) break;
+    const beds = request.beds;
+    const same = keepOutline(g);
+    const r = polish(g.plan, (p) => (p.tree ? treeCheck(p, beds) : rowCheck(p, beds)), { budgetMs: 200, same });
+    if (!r) continue;
+    Object.assign(g, { plan: r.plan, checks: r.checks, score: r.score, rects: r.plan.tree ? treeRects(r.plan) : rowRects(r.plan), polished: r.moves });
+  }
   good.sort((a, b) => b.score - a.score);
   const picked = [];
   for (const st of styles) {                                          // the best plan of each family first: three different layouts
@@ -248,6 +265,15 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
     const near = rest.filter((g) => g.score >= rest[0].score - 0.05);
     const apart = (g) => Math.min(...picked.map((p) => layoutDistance(g, p)));
     picked.push(picked.length ? near.reduce((a, b) => (apart(b) > apart(a) ? b : a)) : near[0]);
+  }
+  // the picked plans: rooms grown toward the sizes of real Pakistani plans, without losing any rule the plan passes
+  // (text stays the model's own, which is what Regenerate leaves out)
+  for (const g of picked) {
+    const beds = request.beds;
+    const toR = (p) => (p.tree ? treeRects(p) : rowRects(p));
+    const r = refine(g.plan, (p) => (p.tree ? treeCheck(p, beds) : rowCheck(p, beds)), toR, { budgetMs: 180, same: keepOutline(g) });
+    if (!r) continue;
+    Object.assign(g, { plan: r.plan, checks: r.checks, score: score(r.checks), rects: toR(r.plan), refined: r.moves });
   }
   return picked;
 }

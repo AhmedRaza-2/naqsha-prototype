@@ -490,7 +490,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     else {
       const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 9.3, 24), st.pillar === 'column' ? mTrim : mExt);
       cyl.position.set(px, 4.65, pz); cyl.castShadow = cyl.receiveShadow = true; world.add(cyl);
-      colliders.push({ x0: px - 0.5, x1: px + 0.5, z0: pz - 0.5, z1: pz + 0.5 });
+      colliders.push({ x0: px - 0.5, x1: px + 0.5, z0: pz - 0.5, z1: pz + 0.5, k: 'pillar' });
       box(world, px - 0.8, px + 0.8, 8.9, 9.3, pz - 0.8, pz + 0.8, st.pillar === 'column' ? mTrim : mAccent);
       box(world, px - 0.8, px + 0.8, 0, 0.5, pz - 0.8, pz + 0.8, st.pillar === 'column' ? mTrim : mAccent);
     }
@@ -498,32 +498,6 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   // paved walkway to the door
   plane(mainDoor.at - 2, mainDoor.at + 2, 0, B.z, 0.025, mPave);
 
-  // car (parked in the car porch when the house has one), trees, shrubs
-  if (rule.front >= 10 || (porch && porch.w >= 8)) {
-    const carX = porch ? porch.x + porch.w / 2 : gateX > W / 2 ? Math.max(8, W * 0.25) : Math.min(W - 8, W * 0.75);
-    const car = new THREE.Group();
-    const paint = mat('#9a2f2f', { roughness: 0.25, metalness: 0.55, envMapIntensity: 1.2 }), black = mat('#1a1a1a', { roughness: 0.6 });
-    const cb = (cx, cy, cz, w, h, d, m) => bx(car, cx, cy, cz, w, h, d, m);
-    cb(0, 1.55, 0, 14, 1.6, 5.8, paint); cb(-0.6, 2.95, 0, 7.4, 1.25, 5.2, paint);
-    cb(-0.6, 2.95, 0, 7.6, 1.0, 5.3, mGlass); cb(6.9, 1.4, 0, 0.3, 0.6, 5.0, mat('#e8e8e8', { emissive: '#666' })); cb(-6.9, 1.6, 0, 0.3, 0.5, 5.0, mat('#a01818', { emissive: '#400' }));
-    cb(0, 0.9, 0, 14.2, 0.35, 5.9, black);
-    [[-4.5, 2.8], [4.5, 2.8], [-4.5, -2.8], [4.5, -2.8]].forEach(([x, z]) => {
-      const wh = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.8, 20), black);
-      wh.rotation.x = Math.PI / 2; wh.position.set(x, 1.1, z); wh.castShadow = true; car.add(wh);
-      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.85, 16), mat('#b9bfc4', { metalness: 0.7, roughness: 0.3 }));
-      hub.rotation.x = Math.PI / 2; hub.position.set(x, 1.1, z); car.add(hub);
-    });
-    car.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    if (porch) {                                                 // nose toward the house, back end toward the gate
-      car.rotation.y = Math.PI / 2;
-      car.position.set(carX, 0, porch.z + porch.d - 7.4);
-      colliders.push({ x0: carX - 3, x1: carX + 3, z0: car.position.z - 7, z1: car.position.z + 7 });
-    } else {
-      car.position.set(carX, 0, Math.min(rule.front / 2 + 0.5, 6.5));
-      colliders.push({ x0: carX - 7, x1: carX + 7, z0: car.position.z - 3, z1: car.position.z + 3 });
-    }
-    world.add(car);
-  }
   const leafMats = ['#4d7d36', '#5c8a3e', '#41702f', '#6a9645'].map((c) => mat(c, { roughness: 0.95, flatShading: true }));
   const tree = (x, z, s = 1) => {
     const t = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * s, 0.38 * s, 5.5 * s, 9), mat('#5e4430', { roughness: 1 }));
@@ -534,13 +508,75 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       l.position.set(x + (rnd() - 0.5) * 2.6 * s, (5.6 + rnd() * 2.2) * s, z + (rnd() - 0.5) * 2.6 * s);
       l.castShadow = true; world.add(l);
     }
-    colliders.push({ x0: x - 0.4, x1: x + 0.4, z0: z - 0.4, z1: z + 0.4 });
+    colliders.push({ x0: x - 0.4, x1: x + 0.4, z0: z - 0.4, z1: z + 0.4, k: 'tree' });
   };
   const shrub = (x, z, s = 1) => { const l = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9 * s, 1), leafMats[Math.floor(rnd() * 4)]); l.position.set(x, 0.7 * s, z); l.scale.y = 0.75; l.castShadow = true; world.add(l); };
   tree(1.5, 1.8); tree(W - 1.5, 1.8);
   if (rule.rear >= 4) tree(W / 2, D - 1.6, 0.9);
   tree(-6, -3, 1.2); tree(W + 6, -3, 1.2);
   for (let x = 1.2; x < W - 1; x += 2.2) if ((x < gateLo - 1.5 || x > gateHi + 1.5) && B.z > 3.5 && !(porch && x > porch.x - 1 && x < porch.x + porch.w + 1)) shrub(x, 1.1, 0.8);
+  // car: parked where it leaves the way from the gate to the front door open. Spots are tried in turn (in the porch
+  // away from the door, in the porch's middle, along the front lawn) and a flood fill over the collision boxes checks
+  // that a visitor can still walk from the gateway to a step inside the front door
+  if (rule.front >= 10 || (porch && porch.w >= 8)) {
+    const RW = 0.42;
+    const hitAt = (x, z, extra) => colliders.some((c) => x > c.x0 - RW && x < c.x1 + RW && z > c.z0 - RW && z < c.z1 + RW)
+      || extra.some((c) => x > c.x0 - RW && x < c.x1 + RW && z > c.z0 - RW && z < c.z1 + RW);
+    const doorReach = (extra) => {
+      if (mainDoor.o !== 'h') return true;
+      const G = 0.25, zt = mainDoor.c + 1, tx = mainDoor.at;
+      let sx = null;
+      for (let k = 0; k < 80 && sx === null; k++) for (const sg of [1, -1]) {
+        const x = gateX + sg * k * 0.5;
+        if (x > gateLo + RW && x < gateHi - RW && !hitAt(x, 2.5, extra)) { sx = x; break; }
+      }
+      if (sx === null) return false;
+      const st = [[Math.round(sx / G), 10]], seen = new Set([st[0].join()]);
+      while (st.length) {
+        const [i, j] = st.pop();
+        if (Math.abs(i * G - tx) < mainDoor.w / 2 && j * G >= zt) return true;
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const p = i + a, q = j + b, X = p * G, Z = q * G, k = p + ',' + q;
+          if (X < -1 || X > W + 1 || Z < 0.3 || Z > zt + 0.5 || seen.has(k) || hitAt(X, Z, extra)) continue;
+          seen.add(k); st.push([p, q]);
+        }
+      }
+      return false;
+    };
+    const doorX = mainDoor.o === 'h' ? mainDoor.at : mainDoor.c;
+    const cands = [];
+    if (porch) {
+      const z = porch.z + porch.d - 7.2 - (porch.d >= 17 ? 3 : 1.2);
+      cands.push({ x: doorX > porch.x + porch.w / 2 ? porch.x + 3.3 : porch.x + porch.w - 3.3, z, along: true }, { x: porch.x + porch.w / 2, z, along: true });
+    }
+    if (B.z >= 9.5) {                                              // across the front lawn, parallel to the road
+      const z = Math.max(3.8, Math.min(B.z - 4.2, 6.5));
+      for (const x of [W * 0.72, W * 0.28, W / 2]) cands.push({ x, z, along: false });
+    }
+    const boxOf = (c) => (c.along ? { x0: c.x - 3, x1: c.x + 3, z0: c.z - 7, z1: c.z + 7 } : { x0: c.x - 7, x1: c.x + 7, z0: c.z - 3, z1: c.z + 3 });
+    const fits = (c) => { const b = boxOf(c); return b.x0 > 0.4 && b.x1 < W - 0.4 && (c.along || b.z0 > 0.4) && !colliders.some((o) => o.x0 < b.x1 && o.x1 > b.x0 && o.z0 < b.z1 && o.z1 > b.z0); };
+    const open0 = doorReach([]);
+    const pick = cands.find((c) => fits(c) && (!open0 || doorReach([boxOf(c)])));
+    if (pick) {
+      const car = new THREE.Group();
+      const paint = mat('#9a2f2f', { roughness: 0.25, metalness: 0.55, envMapIntensity: 1.2 }), black = mat('#1a1a1a', { roughness: 0.6 });
+      const cb = (cx, cy, cz, w, h, d, m) => bx(car, cx, cy, cz, w, h, d, m);
+      cb(0, 1.55, 0, 14, 1.6, 5.8, paint); cb(-0.6, 2.95, 0, 7.4, 1.25, 5.2, paint);
+      cb(-0.6, 2.95, 0, 7.6, 1.0, 5.3, mGlass); cb(6.9, 1.4, 0, 0.3, 0.6, 5.0, mat('#e8e8e8', { emissive: '#666' })); cb(-6.9, 1.6, 0, 0.3, 0.5, 5.0, mat('#a01818', { emissive: '#400' }));
+      cb(0, 0.9, 0, 14.2, 0.35, 5.9, black);
+      [[-4.5, 2.8], [4.5, 2.8], [-4.5, -2.8], [4.5, -2.8]].forEach(([x, z]) => {
+        const wh = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.8, 20), black);
+        wh.rotation.x = Math.PI / 2; wh.position.set(x, 1.1, z); wh.castShadow = true; car.add(wh);
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.85, 16), mat('#b9bfc4', { metalness: 0.7, roughness: 0.3 }));
+        hub.rotation.x = Math.PI / 2; hub.position.set(x, 1.1, z); car.add(hub);
+      });
+      car.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      car.rotation.y = pick.along ? -Math.PI / 2 : 0;                // along: nose toward the house, back toward the gate
+      car.position.set(pick.x, 0, pick.z);
+      colliders.push({ ...boxOf(pick), k: 'car' });
+      world.add(car);
+    }
+  }
   // street lamps
   for (const lx of [-18, W + 18]) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.22, 16, 10), mat('#3a3f44', { metalness: 0.5, roughness: 0.5 }));
@@ -587,7 +623,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     if (c.trim) mTrim.color.set(c.trim);
     if (c.accent) mAccent.color.set(c.accent);
   }
-  return { scene, sun, world, roofG, colliders, upperColliders, landing, stairsRoom, upStairs, gateX, open, porch, mats, setColors, furnReady, pieces: { ground: piecesG, upper: piecesU } };
+  return { scene, sun, world, roofG, colliders, upperColliders, landing, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, mats, setColors, furnReady, pieces: { ground: piecesG, upper: piecesU } };
 }
 
 function disposeScene(scene) {
@@ -633,7 +669,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   renderer.domElement.style.touchAction = 'none';
 
   const S = buildScene(renderer, L, styleId, U, { colors, furniture: true });
-  const { scene, roofG, colliders, upperColliders, landing, stairsRoom, upStairs, gateX, open, porch } = S;
+  const { scene, roofG, colliders, upperColliders, landing, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch } = S;
   const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 2000);
   camera.rotation.order = 'YXZ';
 
@@ -650,7 +686,18 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   };
 
   // ---------- controls ----------
-  const state = { mode: 'walk', yaw: Math.PI, pitch: 0, pos: new THREE.Vector3(gateX, EYE, 3), keys: new Set(), floor: 0 };
+  // the visitor starts just inside the gate, in line with the front door, or beside it if the car is parked there
+  const R = 0.42;
+  const hit = (x, z) => colliders.some((c) => x > c.x0 - R && x < c.x1 + R && z > c.z0 - R && z < c.z1 + R);
+  const start = (() => {
+    for (let k = 0; k <= 40; k++) for (const sg of [1, -1]) {
+      const x = gateX + sg * k * 0.5;
+      if (x > gateLo + R && x < gateHi - R && !hit(x, 2.5)) return x;
+    }
+    return gateX;
+  })();
+  const state = { mode: 'walk', yaw: Math.PI, pitch: 0, pos: new THREE.Vector3(start, EYE, 2.5), keys: new Set(), floor: 0 };
+  if (/[?&]debug3d/.test(location.search)) window.__walk = { state, colliders, upperColliders, R, roomAt: (x, z) => roomAt(x, z), rooms: L.rooms, upRooms: U ? U.rooms : null, mainDoor: L.openings.find((o) => o.main), openings: L.openings, B, landing };   // for tests
   const orbit = new OrbitControls(camera, renderer.domElement);
   orbit.enabled = false;
   orbit.target.set(W / 2, 0, D / 2);
@@ -670,7 +717,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     hooks.onMode?.(mode, roofG.visible);
   }
   function setRoof(v) { roofG.visible = v; }
-  function resetWalk() { state.floor = 0; state.pos.set(gateX, EYE, 3); state.yaw = Math.PI; state.pitch = 0; hooks.onFloor?.(0); }
+  function resetWalk() { state.floor = 0; state.pos.set(start, EYE, 2.5); state.yaw = Math.PI; state.pitch = 0; hooks.onFloor?.(0); }
   /** Climb to the first floor (or come back down): the visitor stands at the foot or head of the stairs. */
   function setFloor(f) {
     if (!U || f === state.floor) return;
@@ -737,7 +784,6 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
       const sp = 7 * run * dt;
       const fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw), rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw);
       const dx = (fx * fwd + rx * str) * sp, dz = (fz * fwd + rz * str) * sp;
-      const R = 1.0;
       if (!blocked(state.pos.x + dx, state.pos.z, R)) state.pos.x += dx;
       if (!blocked(state.pos.x, state.pos.z + dz, R)) state.pos.z += dz;
       camera.position.copy(state.pos);
@@ -750,6 +796,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   }
   setMode('walk');
   raf = requestAnimationFrame(loop);
+  if (/[?&]debug3d/.test(location.search)) window.__walk = { state, colliders, upperColliders, roomAt };   // for tests
   Promise.all(S.furnReady).then(() => hooks.onReady?.());
 
   return {
