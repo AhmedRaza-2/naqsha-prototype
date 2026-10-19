@@ -39,8 +39,7 @@ const WORKLET = `class Cap extends AudioWorkletProcessor {
 registerProcessor('naqsha-cap', Cap);`;
 
 /**
- * Start listening. Calls onLevel(0..1) while recording and onSilence() once the speaker has stopped (about a second and a
- * half of quiet after some speech). stop() ends it and returns { audio: Float32Array at 16 kHz, speechMs }.
+ * Start listening. Calls onLevel(0..1) while recording and onSilence() once the speaker has stopped (3.5 seconds of quiet after some speech). stop() ends it and returns { audio: Float32Array at 16 kHz, speechMs }.
  */
 export async function startListening({ onLevel, onSilence } = {}) {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
@@ -48,19 +47,23 @@ export async function startListening({ onLevel, onSilence } = {}) {
   await ctx.resume();
   const src = ctx.createMediaStreamSource(stream);
   const chunks = [];
-  let samples = 0, speechMs = 0, quietMs = 0, noise = null, calib = 0, finished = false;
+  let samples = 0, speechMs = 0, quietMs = 0, floor = null, win = 0, winMs = 0, finished = false;
   const msOf = (n) => (n / ctx.sampleRate) * 1000;
   const onBlock = (block) => {
     chunks.push(block); samples += block.length;
     let s = 0;
     for (let i = 0; i < block.length; i++) s += block[i] * block[i];
-    const rms = Math.sqrt(s / block.length), ms = msOf(block.length);
-    calib += ms;
-    if (calib < 400) noise = noise == null ? rms : Math.max(noise * 0.9, rms);     // the first 0.4 s sets how noisy the room is
-    const loud = rms > Math.max(0.012, (noise || 0) * 2.5);
-    if (loud) { speechMs += ms; quietMs = 0; } else if (speechMs > 0) quietMs += ms;
+    const ms = msOf(block.length);
+    win += s; winMs += ms;
+    const rms = Math.sqrt(s / block.length);
     onLevel?.(Math.min(1, rms * 12));
-    if (!finished && ((speechMs > 500 && quietMs > 1500) || msOf(samples) > 25000)) { finished = true; onSilence?.(); }
+    if (winMs < 100) return;                                   // judged in 100 ms windows
+    const wr = Math.sqrt(win / ((winMs / 1000) * ctx.sampleRate)); win = 0; const wms = winMs; winMs = 0;
+    floor = floor == null ? wr : Math.min(wr, floor * 1.02 + 0.0005);   // the quietest the room has been so far, creeping up slowly
+    const loud = wr > Math.max(0.006, floor * 2.2);            // speech is clearly above the room's quiet level
+    if (loud) { speechMs += wms; quietMs = 0; } else if (speechMs > 0) quietMs += wms;
+    // only a long pause (3.5 s) after some speech ends it by itself; pressing Stop works any time
+    if (!finished && ((speechMs > 600 && quietMs > 3500) || msOf(samples) > 40000)) { finished = true; onSilence?.(); }
   };
   let node;
   try {

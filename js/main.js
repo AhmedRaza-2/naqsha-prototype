@@ -106,7 +106,7 @@ async function listenOnce() {
   let stopped = null;
   const finish = () => { if (rec) { const r = rec.stop(); rec = null; micState(false); stopped = r; } };
   try {
-    say('Allow the microphone, then speak. I stop when you pause.');
+    say('Allow the microphone, then speak. I stop after a long pause, or press Stop when you are done.');
     let dl = 0;
     const model = loadSpeechModel((p) => { dl = p; });          // the model downloads while the visitor speaks
     model.catch(() => {});
