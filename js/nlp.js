@@ -33,6 +33,9 @@ export function parseRequest(raw) {
   t = t.replace(/\bset[\s-]*backs?\b/g, 'setback')
     .replace(/\bsingles?[\s-]+stor(?:e)?y\b/g, 'single storey').replace(/\bdoubles?[\s-]+stor(?:e)?y\b/g, 'double storey')
     .replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[\s-]+(one|two|three|four|five|six|seven|eight|nine))?\b/g, (_, a, b) => String(TENS[a] + (b ? WORD_NUM[b] : 0)));
+  // what a speech model often writes for "marla" and "bedroom"
+  t = t.replace(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)\s*-?\s*(?:barla|merla|mala|marlo|mahla|marlah|marler|mar la|marl a)s?\b/g, '$1 marla')
+    .replace(/\b(?:bed|bent|bad|bet)\s*-?\s*rooms?\b/g, 'bedroom');
   const say = (label, value) => out.understood.push({ label, value });
   let m;
 
