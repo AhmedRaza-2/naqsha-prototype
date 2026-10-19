@@ -246,7 +246,7 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
       if (checks.some((c) => c.level === 'err')) continue;
       const item = { text, plan, rects, checks, score: score(checks), style: fam };
       if (keep(item)) good.push(item);
-    } catch { /* malformed output: skip */ }
+    } catch (e) { if (window.__S) console.log('[draft skip]', String(e.message).slice(0, 80), text.slice(0, 220)); /* malformed output: skip */ }
   }
   // a two-storey ground floor keeps its outline and stairs while it is adjusted: the first floor is drafted over them
   const keepOutline = (g) => {

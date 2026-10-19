@@ -11,6 +11,13 @@ export const CARS = {
   hatchback: { file: 'hatchback-sports', l: 13.2, w: 5.8, h: 4.5 },
   suv: { file: 'suv', l: 15.6, w: 6.3, h: 5.6 },
   luxury: { file: 'suv-luxury', l: 16.2, w: 6.4, h: 5.7 },
+  // popular models: the closest body in the kit, at the real length, width and height of the car
+  lc300: { file: 'suv', l: 16.4, w: 6.5, h: 6.3 },
+  corolla: { file: 'sedan', l: 15.2, w: 5.85, h: 4.7 },
+  cultus: { file: 'hatchback-sports', l: 11.8, w: 4.85, h: 5.1 },
+  swift: { file: 'hatchback-sports', l: 12.6, w: 5.7, h: 4.9 },
+  mercedesc: { file: 'sedan-sports', l: 15.6, w: 6.0, h: 4.7 },
+  mercedesgle: { file: 'suv-luxury', l: 16.2, w: 6.6, h: 5.8 },
 };
 
 // paint colours (the kit paints each car in one patch of its colour map; that patch is swapped for these)

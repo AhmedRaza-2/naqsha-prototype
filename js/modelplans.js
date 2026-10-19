@@ -5,7 +5,7 @@ import { toRects as treeRects } from './tree.js';
 import { finalize, ruleFor } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
 import { tidyRects } from './tidy.js';
-import { balconyRoom, insetFor, wrapGround, dropTerrace } from './plantweak.js';
+import { balconyRoom, insetFor, wrapGround, dropTerrace, outsetFor, trimGround } from './plantweak.js';
 import { draftPlans, sampleDrafts, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -148,13 +148,14 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
   // a model trained on layout families drafts each family that fits, so the three layouts differ in arrangement
   // more open space than the standard on a side: the model draws a smaller plot and the drawing is wrapped in the extra strips
   const ins = request.rule && !request.floor ? insetFor(plot.w, plot.d, request.rule) : null;
-  const inner = ins ? { w: ins.w, d: ins.d } : plot;
+  const outs = request.rule && !request.floor && !ins ? outsetFor(plot.w, plot.d, request.rule) : null;      // less open space than the standard
+  const inner = ins ? { w: ins.w, d: ins.d } : outs ? { w: outs.w, d: outs.d } : plot;
   const styles = (await knowsStyles()) ? (family !== 'any' ? [family] : familiesFor(inner, request.beds)) : [null];
   const hasPorch = (it) => it.rects.some((r) => r.t === 'porch' || r.t === 'garage');
   const keep = (it) => (wantPorch === null || hasPorch(it) === wantPorch) && (family === 'any' || !it.style || it.style === family);
   const items = await draftPlans({ w: inner.w, d: inner.d, ...request }, {
     n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles, keep,
-    embed: ins ? (p) => wrapGround(p, plot.w, plot.d, ins) : null,
+    embed: ins ? (p) => wrapGround(p, plot.w, plot.d, ins) : outs ? (p) => trimGround(p, plot.w, plot.d, outs) : null,
   });
   return items.map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
 }

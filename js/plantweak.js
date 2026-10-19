@@ -178,3 +178,63 @@ export function dropTerrace(plan) {
   p.tree = go(p.tree);
   return p;
 }
+
+// ---------------------------------------------------------------- less open space than the standard
+/**
+ * When the visitor asks for less open space than the standard on a side (no gap at the sides, 3 ft at the back), the model
+ * draws a bigger plot, whose standard open space is trimmed down to what was asked. Returns the plot to draw and the feet
+ * to trim off each side, or null when nothing is below the standard.
+ */
+export function outsetFor(W, D, own) {
+  if (!own) return null;
+  const want = (k) => (Number.isFinite(own[k]) ? own[k] : null);
+  const rs = ruleFor(W, D);
+  const less = (k) => want(k) != null && want(k) < rs[k] - 0.01;
+  if (!less('side') && !less('front') && !less('rear')) return null;
+  if ((want('side') != null && want('side') > rs.side + 0.01) || (want('front') != null && want('front') > rs.front + 0.01)
+    || (want('rear') != null && want('rear') > rs.rear + 0.01)) return null;        // asked for more somewhere else: that case is the inset
+  // one pass against the standard of the real plot; the bigger plot must stay in the same size class (same standard open space)
+  const cut = { s: want('side') != null ? Math.max(0, rs.side - want('side')) : 0, f: want('front') != null ? Math.max(0, rs.front - want('front')) : 0,
+    r: want('rear') != null ? Math.max(0, rs.rear - want('rear')) : 0 };
+  const w = Math.round(W + 2 * cut.s), d = Math.round(D + cut.f + cut.r);
+  const rb = ruleFor(w, d);
+  if (rb.side !== rs.side || rb.front !== rs.front || rb.rear !== rs.rear) return null;
+  return { w, d, l: cut.s, r: cut.s, f: cut.f, b: cut.r };
+}
+
+/** Trim the outer open strips of a tree plan drawn for the bigger plot, so it fits the real plot (W x D). Throws when a strip is too thin. */
+export function trimGround(plan, W, D, o) {
+  if (!plan.tree) return plan;
+  const p = clone(plan);
+  const strip = (n) => n.k === 'room' && (n.t === 'void' || n.t === 'lawn');
+  const walk = (node, cl, cr, cf, cb) => {
+    if (cl + cr + cf + cb < 0.001) return;
+    if (node.k === 'room') throw new Error('no strip to trim');
+    const vert = node.k === 'V', last = node.kids.length - 1;
+    const [a, z] = vert ? [cl, cr] : [cf, cb], [oa, oz] = vert ? [cf, cb] : [cl, cr];
+    const total = (vert ? p.__w : p.__d);
+    const sz = (i) => (i < last ? node.sizes[i] : total - node.sizes.reduce((s, v) => s + v, 0));
+    let ra = a, rz = z;
+    if (ra > 0 && strip(node.kids[0])) { if (sz(0) - ra < 0.5) throw new Error('strip too thin'); node.sizes[0] -= ra; ra = 0; }
+    if (rz > 0 && strip(node.kids[last])) { if (sz(last) - rz < 0.5) throw new Error('strip too thin'); rz = 0; }
+    const mid = node.kids.map((k, i) => i).filter((i) => !strip(node.kids[i]));
+    const need = ra + rz + oa + oz;
+    if (need < 0.001) return;
+    if (mid.length !== 1) throw new Error('cannot trim');
+    const j = mid[0], cut = ra + rz;
+    if (cut > 0 && j < last) node.sizes[j] -= cut;
+    const saveW = p.__w, saveD = p.__d;
+    if (vert) p.__w = saveW - (a - ra) - (z - rz) - cut; else p.__d = saveD - (a - ra) - (z - rz) - cut;
+    const kidArgs = vert ? [ra, rz, oa, oz] : [oa, oz, ra, rz];
+    // the kid spans the (reduced) extent along this node's axis, and the full extent across it
+    const w2 = vert ? saveW - (a - ra) - (z - rz) - cut : saveW, d2 = vert ? saveD : saveD - (a - ra) - (z - rz) - cut;
+    p.__w = w2; p.__d = d2;
+    walk(node.kids[j], ...kidArgs);
+    p.__w = saveW; p.__d = saveD;
+  };
+  p.__w = o.w; p.__d = o.d;
+  walk(p.tree, o.l, o.r, o.f, o.b);
+  delete p.__w; delete p.__d;
+  p.plot = { w: W, d: D };
+  return p;
+}
