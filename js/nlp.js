@@ -28,6 +28,11 @@ export function parseRequest(raw) {
   const out = { understood: [], notes: [] };
   if (!raw || !raw.trim()) return out;
   let t = ' ' + raw.toLowerCase().replace(/[×✕]/g, 'x').replace(/[,;]+/g, ' , ').replace(/\s+/g, ' ') + ' ';
+  // spoken forms: "set back", "singles story", "thirty five"
+  const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+  t = t.replace(/\bset[\s-]*backs?\b/g, 'setback')
+    .replace(/\bsingles?[\s-]+stor(?:e)?y\b/g, 'single storey').replace(/\bdoubles?[\s-]+stor(?:e)?y\b/g, 'double storey')
+    .replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[\s-]+(one|two|three|four|five|six|seven|eight|nine))?\b/g, (_, a, b) => String(TENS[a] + (b ? WORD_NUM[b] : 0)));
   const say = (label, value) => out.understood.push({ label, value });
   let m;
 
@@ -76,6 +81,15 @@ export function parseRequest(raw) {
     }
   }
 
+  // two floors and one bedroom count for the whole house: share them out (ground floor gets the extra one)
+  if (out.floors === 2 && out.beds && !out.upBeds && !upM && !downM && out.beds >= 2) {
+    const total = out.beds;
+    out.upBeds = Math.min(4, Math.floor(total / 2));
+    out.beds = total - out.upBeds;
+    const u = out.understood.find((x) => x.label === 'Bedrooms');
+    if (u) { u.label = 'Bedrooms'; u.value = `${total} in all: ${out.beds} downstairs, ${out.upBeds} upstairs`; }
+  }
+
   // ---- washrooms
   const bathM = t.match(new RegExp(`${NUM}\\s*-?\\s*(?:attached\\s*)?(?:bath\\w*|washroom\\w*|wc|toilet\\w*|restroom\\w*|lavatory)`));
   if (bathM) { const n = num(bathM[1]); if (n >= 1 && n <= 10) { out.baths = n; say('Washrooms', String(n)); } }
@@ -89,6 +103,10 @@ export function parseRequest(raw) {
   // ---- car porch
   if (/\b(?:no|without|bina|nahi|nahin)\s+(?:car\s*)?(?:porch|garage|parking|gari)/.test(t)) { out.porch = 'no'; say('Car porch', 'none'); }
   else if (/\b(?:car\s*porch|porch|garage|parking|gari|carport)\b/.test(t)) { out.porch = 'yes'; say('Car porch', 'yes'); }
+
+  // ---- terrace on the first floor (the open roof of the floor below)
+  if (/\b(?:no|without|bina|nahi|nahin)\s+(?:an?\s+)?(?:open\s+)?(?:roof\s*)?(?:terrace|chhat|chat)/.test(t)) { out.terrace = 'without'; say('Terrace', 'none'); }
+  else if (/\b(?:terrace|chhat|chat)\b/.test(t)) { out.terrace = 'with'; say('Terrace', 'open terrace'); }
 
   // ---- layout family
   const fam = { wing: /\b(?:wing|bedroom\s*wing)\b/, corridor: /\b(?:corridor|side\s*passage|passage\s*layout)\b/, compact: /\b(?:compact)\b/, rows: /\b(?:classic|rows|traditional\s*layout|simple\s*layout)\b/ };

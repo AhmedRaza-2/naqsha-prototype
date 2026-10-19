@@ -31,7 +31,25 @@
         <label class="field wide">Describe your plot (English or Roman Urdu)
           <input id="nl" placeholder="e.g. 10 marla double storey 4 bed car porch, front 12 ft, no stairs" autocomplete="off">
         </label>
+        <div class="voicebar" id="voicebar">
+          <button class="btn mic" id="mic" type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+            <span id="miclabel">Speak instead</span>
+          </button>
+          <span class="meter" id="meter" aria-hidden="true"><i></i></span>
+          <span class="fine" id="micstat" aria-live="polite">English only for now. A speech model runs on your device; the first time it downloads about 40 MB.</span>
+        </div>
         <div class="said" id="nlsaid" aria-live="polite"></div>
+        <div class="voiceok" id="voiceok" hidden role="group" aria-label="Check what was heard">
+          <p class="heard">I heard: <q id="heard"></q></p>
+          <p class="fine">The fields below are filled from it. Is this what you want?</p>
+          <div class="voiceacts">
+            <button class="btn primary" id="voiceyes" type="button">Yes, draft layouts</button>
+            <button class="btn" id="voicesay" type="button">Say yes or no</button>
+            <button class="btn" id="voiceedit" type="button">Let me change it</button>
+            <button class="btn" id="voiceagain" type="button">Speak again</button>
+          </div>
+        </div>
         <div class="presets" id="presets"></div>
         <div class="row">
           <label class="field">Width (ft)<input id="pw" type="number" min="18" max="120" value="25"></label>
@@ -49,6 +67,9 @@
           </label>
           <label class="field" id="pupbl">Washrooms upstairs
             <select id="pupbaths"></select>
+          </label>
+          <label class="field" id="pterrl">Terrace on the first floor
+            <select id="pterr"><option value="both" selected>Show both kinds</option><option value="with">With an open terrace</option><option value="without">Without a terrace</option></select>
           </label>
         </div>
         <details class="prefs" id="prefs">
@@ -126,7 +147,9 @@
       <h2>Choose the first floor</h2>
       <p class="lead" id="usub"></p>
       <div class="card pair" id="pair"></div>
-      <div class="regen-row"><button class="btn" id="uregen">Regenerate first floors</button><span class="fine">Not what you had in mind? Draft three new ones.</span></div>
+      <div class="regen-row"><button class="btn" id="uregen">Regenerate first floors</button>
+        <label class="mini">Terrace<select id="uterr"><option value="both">Show both kinds</option><option value="with">With an open terrace</option><option value="without">Without a terrace</option></select></label>
+        <span class="fine">Not what you had in mind? Draft three new ones, or change the terrace.</span></div>
       <div class="grid3" id="ulayouts"></div>
       <section class="card editor" id="ueditor" hidden>
         <div class="editor-head">

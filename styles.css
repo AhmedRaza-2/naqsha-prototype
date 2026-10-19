@@ -256,3 +256,26 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 #fnote { align-self: center; }
 .mini select { min-width: 112px; }
 .mini select#vwall, .mini select#vgate, .mini select#vcar, .mini select#vcarc, .mini select#vwallh { min-width: 96px; }
+
+.duo { display: flex; gap: 8px; align-items: flex-start; }
+.duo figure { flex: 1 1 0; min-width: 0; margin: 0; }
+.duo figcaption { font-size: 11px; color: var(--muted, #7a7568); margin-bottom: 2px; text-align: center; }
+.duo svg { width: 100%; height: auto; display: block; }
+.regen-row .mini { margin-left: 10px; }
+
+/* voice input */
+.voicebar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: -2px 0 6px; }
+.btn.mic { height: 40px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; }
+.btn.mic.on { background: var(--err); border-color: var(--err); color: #fff; }
+.btn.mic.on svg { animation: micpulse 1.1s ease-in-out infinite; }
+@keyframes micpulse { 50% { transform: scale(1.18); } }
+@media (prefers-reduced-motion: reduce) { .btn.mic.on svg { animation: none; } }
+.meter { width: 70px; height: 6px; border-radius: 99px; background: var(--ok-bg); overflow: hidden; flex: none; }
+.meter i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 80ms linear; }
+.voiceok { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; background: var(--bg-alt); margin: 8px 0 12px; }
+.voiceok .heard { margin: 0 0 4px; font-weight: 500; }
+.voiceok q { font-weight: 400; }
+.voiceacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.voiceacts .btn { height: 40px; }
+.meter { visibility: hidden; }
+.voicebar:has(.mic.on) .meter { visibility: visible; }

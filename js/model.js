@@ -4,7 +4,7 @@
 // shows a percentage instead of a frozen button, and the download can start before the visitor presses Generate.
 import { score, check as rowCheck, toRects as rowRects } from './bands.js';
 import { parseAny, familyOf, check as treeCheck, toRects as treeRects } from './tree.js';
-import { polish, refine, outlineKey } from './polish.js';
+import { polish, refine, tuck, outlineKey } from './polish.js';
 
 const BASE = new URL('../models/', import.meta.url);
 const LAYERS = 6, HEADS = 8, HEAD_DIM = 32;
@@ -219,10 +219,16 @@ async function sampleBatch(rows, temperature, maxNew, expected, progress) {
  * `exclude` is a Set of plan texts to skip (used by Regenerate so the visitor sees new layouts).
  * `keep(item)` drops plans the visitor ruled out (a car porch, a family) before the best of each family is picked.
  */
-export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, exclude = new Set(), onStatus, styles = [null], keep = () => true } = {}) {
+/** Sample raw drafts only (no checking): [{ text, style }], to be filtered and finished by several draftPlans calls via `drafts`. */
+export async function sampleDrafts(request, { n = 12, temperature = 0.8, onStatus, styles = [null] } = {}) {
+  const per = Math.max(1, Math.round(n / styles.length));
+  return sample(request, styles.flatMap((st) => new Array(per).fill(st)), { temperature }, onStatus);
+}
+
+export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, exclude = new Set(), onStatus, styles = [null], keep = () => true, hang = null, embed = null, drafts: given = null } = {}) {
   const per = Math.max(1, Math.round(n / styles.length));
   const want = styles.flatMap((st) => new Array(per).fill(st));
-  const drafts = await sample(request, want, { temperature }, onStatus);
+  const drafts = given || await sample(request, want, { temperature }, onStatus);        // `given`: drafts sampled earlier, shared by several calls
   const seen = new Set(exclude);
   const good = [];
   for (const { text, style } of drafts) {
@@ -230,12 +236,15 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
     seen.add(text);
     try {
       const parsed = parseAny(text, request.beds);
-      const { plan, rects } = parsed;
+      let { plan, rects } = parsed;
+      const fam = style && familyOf(plan, rects);                          // read from the plan as the model drew it
+      let changed = false;
+      if (embed && plan.tree) { plan = embed(plan); rects = treeRects(plan); changed = true; }   // the plan is changed on its way in (extra open space, no terrace)
       if (request.rule) plan.rule = request.rule;                           // the visitor's own open space: judged against that, not the standard
       if (request.tidy) plan.tidy = request.tidy;
-      const checks = request.rule ? (plan.tree ? treeCheck(plan, request.beds) : rowCheck(plan, request.beds)) : parsed.checks;
+      const checks = request.rule || changed ? (plan.tree ? treeCheck(plan, request.beds) : rowCheck(plan, request.beds)) : parsed.checks;
       if (checks.some((c) => c.level === 'err')) continue;
-      const item = { text, plan, rects, checks, score: score(checks), style: style && familyOf(plan, rects) };
+      const item = { text, plan, rects, checks, score: score(checks), style: fam };
       if (keep(item)) good.push(item);
     } catch { /* malformed output: skip */ }
   }
@@ -278,6 +287,16 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
     const r = refine(g.plan, (p) => (p.tree ? treeCheck(p, beds) : rowCheck(p, beds)), toR, { budgetMs: 180, same: keepOutline(g) });
     if (!r) continue;
     Object.assign(g, { plan: r.plan, checks: r.checks, score: score(r.checks), rects: toR(r.plan), refined: r.moves });
+  }
+  // a first floor: rooms drawn out over the yard are pulled back over the ground floor when that costs no rule
+  if (hang) {
+    for (const g of picked) {
+      const beds = request.beds;
+      const toR = (p) => (p.tree ? treeRects(p) : rowRects(p));
+      const r = tuck(g.plan, (p) => (p.tree ? treeCheck(p, beds) : rowCheck(p, beds)), toR, hang);
+      if (!r) continue;
+      Object.assign(g, { plan: r.plan, checks: r.checks, score: score(r.checks), rects: toR(r.plan), tucked: r.moves });
+    }
   }
   return picked;
 }

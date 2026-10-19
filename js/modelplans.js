@@ -5,8 +5,8 @@ import { toRects as treeRects } from './tree.js';
 import { finalize, ruleFor } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
 import { tidyRects } from './tidy.js';
-import { balconyRoom } from './plantweak.js';
-import { draftPlans, knowsStyles, knowsStoreys } from './model.js';
+import { balconyRoom, insetFor, wrapGround, dropTerrace } from './plantweak.js';
+import { draftPlans, sampleDrafts, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
 const NAMES = { drawing: 'Drawing Room', lobby: 'Entrance', dining: 'Dining', kitchen: 'Kitchen', stairs: 'Stairs', passage: 'Corridor',
@@ -146,11 +146,15 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
   if (Object.keys(tidy).length) request.tidy = tidy;
   const wantPorch = porch === 'any' ? null : porch === 'yes';
   // a model trained on layout families drafts each family that fits, so the three layouts differ in arrangement
-  const styles = (await knowsStyles()) ? (family !== 'any' ? [family] : familiesFor(plot, request.beds)) : [null];
+  // more open space than the standard on a side: the model draws a smaller plot and the drawing is wrapped in the extra strips
+  const ins = request.rule && !request.floor ? insetFor(plot.w, plot.d, request.rule) : null;
+  const inner = ins ? { w: ins.w, d: ins.d } : plot;
+  const styles = (await knowsStyles()) ? (family !== 'any' ? [family] : familiesFor(inner, request.beds)) : [null];
   const hasPorch = (it) => it.rects.some((r) => r.t === 'porch' || r.t === 'garage');
   const keep = (it) => (wantPorch === null || hasPorch(it) === wantPorch) && (family === 'any' || !it.style || it.style === family);
-  const items = await draftPlans({ w: plot.w, d: plot.d, ...request }, {
+  const items = await draftPlans({ w: inner.w, d: inner.d, ...request }, {
     n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles, keep,
+    embed: ins ? (p) => wrapGround(p, plot.w, plot.d, ins) : null,
   });
   return items.map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
 }
@@ -170,8 +174,8 @@ export function boxAndStairs(rects) {
 /** True when the loaded model can draw both floors of a two-storey house. */
 export { knowsStoreys };
 
-/** Share of a first floor's room area that stands over rooms of the ground floor (the rest would hang in the air). */
-export function supportShare(upperRects, groundRects) {
+/** Area (sq ft) of a first floor's rooms, and how much of it stands over rooms of the ground floor (the rest would hang in the air). */
+export function supportArea(upperRects, groundRects) {
   const built = (rs) => rs.filter((r) => !OPEN.has(r.t) && r.parent === undefined && r.t !== 'bath');
   const G = built(groundRects);
   let tot = 0, sup = 0;
@@ -182,27 +186,75 @@ export function supportShare(upperRects, groundRects) {
       if (w > 0 && d > 0) sup += w * d;
     }
   }
+  return { tot, sup };
+}
+export function supportShare(upperRects, groundRects) {
+  const { tot, sup } = supportArea(upperRects, groundRects);
   return tot ? sup / tot : 1;
 }
 
+/** Area (sq ft) of the terrace of a first floor: the open roof of the floor below that it does not cover. */
+export const terraceArea = (rects) => rects.filter((r) => r.t === 'terrace').reduce((s, r) => s + r.w * r.d, 0);
+
 /** First floors over a chosen ground floor: three layouts drafted by the model, each rule-checked (the stairs sit exactly
- *  above the stairs below). Empty list when the ground floor has no stairs or the model gives nothing valid. */
+ *  above the stairs below). Empty list when the ground floor has no stairs or the model gives nothing valid.
+ *  prefs.terrace: 'with' (keep the open roof), 'without' (rooms cover it), 'both' (the default: some of each) or 'any'.
+ *  The returned array has a `note` when the terrace choice could not be met. */
 export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   const fb = boxAndStairs(ground.rects);
   if (!fb) return [];
   const { w, d } = ground.plot;
-  const run = (minSupport) => draftPlans({ w, d, beds: prefs.beds, baths: prefs.baths, floor: fb }, {
-    n: opts.n ?? 12, top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles: [null],
-    keep: (it) => supportShare(it.rects, ground.rects) >= minSupport,
+  const mode = prefs.terrace || 'both';
+  const itemKey = (it) => JSON.stringify(it.plan.tree);
+  const request = { w, d, beds: prefs.beds, baths: prefs.baths, floor: fb, ...(ground.plan.rule ? { rule: ground.plan.rule } : {}) };
+  const dbg = (typeof window !== 'undefined' && window.__S) ? (...a) => console.info('[upper]', ...a) : () => {};
+  // The model is sampled once for this ground floor and every variant (with / without a terrace) and support level is cut
+  // from the same drafts: sampling is what takes the time. More is drawn only when the drafts so far are not enough.
+  let pool = [];
+  const draw = async (count) => {
+    const t0 = Date.now();
+    const more = await sampleDrafts(request, { n: count, temperature: opts.temperature ?? 0.8, onStatus });
+    pool = [...pool, ...more];
+    dbg('sampled', count, 'in', Date.now() - t0, 'ms');
+  };
+  // variant: 'with' keeps drafts that have a terrace; 'without' takes it away from every draft (dropTerrace); null: as drafted
+  const cut = (minSupport, variant) => draftPlans(request, {
+    top: 3, exclude: opts.exclude, onStatus, styles: [null], drafts: pool,
+    keep: (it) => supportShare(it.rects, ground.rects) >= minSupport
+      && (variant !== 'with' || terraceArea(it.rects) >= 40)
+      && (variant !== 'without' || (terraceArea(it.rects) < 40 && it.score >= 1)),     // no terrace left, and every rule still passes
+    embed: variant === 'without' ? dropTerrace : null,
+    hang: (rects) => { const a = supportArea(rects, ground.rects); return a.tot - a.sup; },        // rooms are then pulled back over the ground floor
   });
   // a first floor must stand on the ground floor: rooms hanging over a yard or a car porch are not drawn if an alternative exists
-  let items = await run(0.97);
-  for (const lvl of [0.88, 0.7]) {
-    if (items.length >= 3) break;
-    const more = await run(lvl);
-    const seen = new Set(items.map((i) => i.text));
-    items = [...items, ...more.filter((m) => !seen.has(m.text))].slice(0, 3);
-    if (opts.exclude && items.length) break;                          // Regenerate: take what there is
-  }
-  return items.map((it, i) => planToLayout(it, i));
+  const ladder = async (variant, want) => {
+    let items = [];
+    for (let round = 0; round < 1 + (variant === 'without' ? 0 : opts.quick ? 1 : 3); round++) {
+      if (round > 0 && opts.quick && items.length) break;             // the houses are pre-drafted: one more round only when nothing was found
+      if (round > 0) await draw(opts.quick ? 24 : 30);                // big upper floors are drafted validly only now and then: sample more
+      for (const lvl of variant === 'without' ? [0.7] : [0.97, 0.88, 0.7]) {
+        const t0 = Date.now();
+        const more = await cut(lvl, variant);
+        dbg(variant || 'any', 'support', lvl, '->', more.length, 'in', Date.now() - t0, 'ms');
+        const seen = new Set(items.map(itemKey));
+        items = [...items, ...more.filter((m) => !seen.has(itemKey(m)))].slice(0, want);
+        if (items.length >= want || (opts.exclude && items.length)) return items;
+      }
+    }
+    return items;
+  };
+  await draw(Math.max(opts.n ?? 12, mode === 'both' ? 16 : 0));
+  let items, note = '';
+  if (mode === 'both') {
+    const b = await ladder('without', 2);
+    const a = await ladder('with', b.length ? 2 : 3);
+    items = [a[0], b[0], a[1], b[1], a[2]].filter(Boolean).slice(0, 3);          // with a terrace, without, with
+    if (!b.length && a.length) note = 'No first floor without a terrace fitted over this ground floor, so these all have one.';
+  } else if (mode === 'without') {
+    items = await ladder('without', 3);
+    if (!items.length) { items = await ladder('with', 3); if (items.length) note = 'No first floor without a terrace fitted over this ground floor, so these have one.'; }
+  } else items = await ladder(mode === 'any' ? null : mode, 3);
+  const out = items.map((it, i) => Object.assign(planToLayout(it, i), { terrace: Math.round(terraceArea(it.rects)) }));
+  out.note = note;
+  return out;
 }

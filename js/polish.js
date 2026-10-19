@@ -100,6 +100,11 @@ export function sizeGap(rects, plot, own = null) {
       if (r.t === 'lobby' && r.w * r.d > 80) gap += 0.4 * (r.w * r.d - 80) / 80;
       continue;
     }
+    if (r.t === 'stairs' && r.parent == null) {                    // a flight is about 3.5 x 10 ft: a stairs room twice that is wasted floor
+      const a = r.w * r.d;
+      if (a > 55) gap += 0.6 * (a - 55) / 55;
+      continue;
+    }
     const t = TYPE[r.t];
     if (!t || r.parent != null) continue;
     const a = r.w * r.d, want = T[t];
@@ -143,6 +148,43 @@ export function refine(plan, checkFn, toRects, { budgetMs = 250, maxMoves = 30, 
     best = found.cand; bestChecks = found.cs; bestGap = found.g; moves++;
   }
   return moves ? { plan: best, checks: bestChecks, gap0, gap: bestGap, moves, ms: Math.round(now() - t0) } : null;
+}
+
+/**
+ * Pull a plan toward a smaller "hang" (square feet of rooms with nothing under them, for a first floor) by the same wall moves,
+ * keeping a move only if every rule the plan passed still passes. The biggest move that helps is taken first.
+ * -> { plan, checks, hang0, hang, moves } or null.
+ */
+export function tuck(plan, checkFn, toRects, hangFn, { budgetMs = 300, maxMoves = 12 } = {}) {
+  let best = plan, bestChecks = checkFn(plan);
+  if (bestChecks.some((c) => c.level === 'err')) return null;
+  const keepScore = score(bestChecks);
+  const hang0 = hangFn(toRects(plan));
+  let bestHang = hang0, moves = 0;
+  if (hang0 < 4) return null;
+  const t0 = now();
+  const key = (p) => JSON.stringify(p.tree || p.bands);
+  while (moves < maxMoves && now() - t0 < budgetMs && bestHang >= 4) {
+    let found = null;
+    const base = key(best);
+    for (const step of [4, 3, 2, 1, 0.5]) {
+      for (const h of wallHandles(best, true)) for (const d of [step, -step]) {
+        if (now() - t0 > budgetMs) break;
+        const hz = h.kind === 'row' || h.kind === 'bd';
+        const cand = applyEdit(best, h, hz ? 0 : d, hz ? d : 0);
+        if (key(cand) === base) continue;
+        const g = hangFn(toRects(cand));
+        if (g >= bestHang - 0.5 || (found && g >= found.g)) continue;
+        const cs = checkFn(cand);
+        if (cs.some((c) => c.level === 'err') || score(cs) < keepScore - 1e-9) continue;
+        found = { cand, cs, g };
+      }
+      if (found) break;
+    }
+    if (!found) break;
+    best = found.cand; bestChecks = found.cs; bestHang = found.g; moves++;
+  }
+  return moves ? { plan: best, checks: bestChecks, hang0, hang: bestHang, moves, ms: Math.round(now() - t0) } : null;
 }
 
 /** The built outline and the stairs of a ground floor: what its first floor is drafted around. A two-storey ground
