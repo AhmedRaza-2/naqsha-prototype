@@ -386,8 +386,11 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
         head.set(state.pos.x, state.hs + 4.6, state.pos.z);
         const bx = Math.sin(state.yaw), bz = Math.cos(state.yaw), lvl = level();
         let back = 8.5;
-        for (let t = 1.5; t <= 8.5; t += 0.5) { if (blocked(head.x + bx * t, head.z + bz * t, 0.3, lvl)) { back = Math.max(2.2, t - 0.8); break; } }
-        const up = 1.8 + back * 0.12 + Math.max(0, 6.5 - back) * 1.5 + state.pitch * 3;        // a wall behind: rise above it and look down
+        const onS = state.inS;                                      // on the flight the rails are not walls: keep a gentle view from behind
+        const camBlocked = (x, z) => (lvl ? upperColliders : colliders).some((c) => x > c.x0 - 0.3 && x < c.x1 + 0.3 && z > c.z0 - 0.3 && z < c.z1 + 0.3 && solid(c) && !(onS && c.k === 'rail'));
+        for (let t = 1.5; t <= 8.5; t += 0.5) { if (camBlocked(head.x + bx * t, head.z + bz * t)) { back = Math.max(onS ? 3.6 : 2.2, t - 0.8); break; } }
+        const up = onS ? 2.4 + back * 0.15 + Math.max(0, 6 - back) * 0.7 + state.pitch * 3
+          : 1.8 + back * 0.12 + Math.max(0, 6.5 - back) * 1.5 + state.pitch * 3;        // a wall behind: rise above it and look down
         camera.position.set(head.x + bx * back, head.y + up, head.z + bz * back);
         camera.lookAt(head.x, head.y - 0.4 + state.pitch * 1.5, head.z);
       }

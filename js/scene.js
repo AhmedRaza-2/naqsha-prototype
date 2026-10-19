@@ -14,8 +14,9 @@ const SLAB = 0.6, STOREY = H + SLAB;                                // thickness
 const texCache = new Map();
 let seed = 11;
 const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-function makeTex(kind) {
-  if (texCache.has(kind)) return texCache.get(kind);
+function makeTex(kind, tint = null) {
+  const key = tint ? `${kind}:${tint}` : kind;                    // tint: the base colour, for tiles that follow the style
+  if (texCache.has(key)) return texCache.get(key);
   const N = 512;
   const c = document.createElement('canvas');
   c.width = c.height = N;
@@ -82,7 +83,7 @@ function makeTex(kind) {
     g.fillStyle = '#c9c5bc'; g.fillRect(0, 0, N, N);
     blotch(50, 0.1, 70); speckle(9000, 0.08, 2);
   } else {
-    const base = { marble: '#ecE9e2', 'marble-warm': '#e8dcc4', terracotta: '#c9774c', tile: '#cfe0e6', roofTile: '#b0532f' }[kind] || '#ddd';
+    const base = tint || { marble: '#ecE9e2', 'marble-warm': '#e8dcc4', terracotta: '#c9774c', tile: '#cfe0e6', roofTile: '#b0532f' }[kind] || '#ddd';
     g.fillStyle = base; g.fillRect(0, 0, N, N);
     if (kind.startsWith('marble')) { blotch(40, 0.06, 90); for (let i = 0; i < 12; i++) { g.strokeStyle = `rgba(120,110,100,${0.08 + rnd() * 0.1})`; g.lineWidth = 1 + rnd() * 2; g.beginPath(); g.moveTo(rnd() * N, rnd() * N); for (let k = 0; k < 5; k++) g.lineTo(rnd() * N, rnd() * N); g.stroke(); } }
     speckle(500, 0.05);
@@ -95,7 +96,7 @@ function makeTex(kind) {
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
-  texCache.set(kind, t);
+  texCache.set(key, t);
   return t;
 }
 function skyTexture() {
@@ -500,7 +501,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); g.computeVertexNormals();
-    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: makeTex('roofTile'), roughness: 0.8, side: THREE.DoubleSide }));
+    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: makeTex('roofTile', st.tile || null), roughness: 0.8, side: THREE.DoubleSide }));
     mesh.castShadow = mesh.receiveShadow = true; parent.add(mesh);
     box(parent, bx0 - 0.1, bx1 + 0.1, y - 0.1, y + 0.1, bz0 - 0.1, bz1 + 0.1, mTrim, false);          // the eave board
   };

@@ -583,8 +583,10 @@ const FLOORS_B = [[null, 'Style floor'], ['wood', 'Light wood'], ['wood-dark', '
 const ACCENTS = [[null, 'Style colour'], ['#a8744c', 'Teak'], ['#6b4a32', 'Walnut'], ['#2f5d50', 'Deep green'], ['#8c2f2f', 'Brick red'], ['#c49a4a', 'Brass'], ['#2b2f33', 'Charcoal']];
 S.colors = { wall: null, trim: null, accent: null };
 S.site = { ...SITE_DEFAULT };
-function swatches(host, list, cur, onPick) {
-  host.innerHTML = list.map(([c, name]) => `<button type="button" role="radio" aria-checked="${c === cur}" title="${name}" aria-label="${name}" data-c="${c || ''}" class="swatch${c ? '' : ' auto'}"${c ? ` style="--c:${c}"` : ''}></button>`).join('');
+// what a floor material looks like in its swatch (the swatch colour is a CSS colour; a floor is named by its material)
+const FLOOR_LOOK = { marble: '#ece9e2', 'marble-warm': '#e8dcc4', terracotta: '#c9774c', wood: '#c99b62', 'wood-dark': '#6b4529' };
+function swatches(host, list, cur, onPick, look = null) {
+  host.innerHTML = list.map(([c, name]) => `<button type="button" role="radio" aria-checked="${c === cur}" title="${name}" aria-label="${name}" data-c="${c || ''}" class="swatch${c ? '' : ' auto'}"${c ? ` style="--c:${(look && look[c]) || c}"` : ''}></button>`).join('');
   host.querySelectorAll('button').forEach((b) => (b.onclick = () => {
     host.querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
     onPick(b.dataset.c || null);
@@ -782,8 +784,8 @@ function openViewer() {
   swatches($('vswwall'), WALLS.slice(1), S.colors.wall, (c) => v.setColors({ wall: c }));
   swatches($('vswint'), INTERIORS.slice(1), null, (c) => v.setColors({ interior: c }));
   swatches($('vswtrim'), TRIMS.slice(1), S.colors.trim, (c) => v.setColors({ trim: c }));
-  swatches($('vswfl'), FLOORS_L.slice(1), S.site.floorLiving, (c) => c && v.setFloors({ living: c }));
-  swatches($('vswfb'), FLOORS_B.slice(1), S.site.floorBed, (c) => c && v.setFloors({ bed: c }));
+  swatches($('vswfl'), FLOORS_L.slice(1), S.site.floorLiving, (c) => c && v.setFloors({ living: c }), FLOOR_LOOK);
+  swatches($('vswfb'), FLOORS_B.slice(1), S.site.floorBed, (c) => c && v.setFloors({ bed: c }), FLOOR_LOOK);
   swatches($('vswwc'), WALLC, S.site.wallColor, (c) => v.setSite({ wallColor: c }));
   for (const [id, key, cast] of [['vwall', 'wall'], ['vwallh', 'wallH', Number], ['vgate', 'gate'], ['vcar', 'car'], ['vcarc', 'carColor']]) {
     $(id).value = String(S.site[key]);
