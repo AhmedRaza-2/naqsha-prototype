@@ -293,7 +293,8 @@ async function generate(regen) {
       if (next.length && (!layouts.length || perfect(next))) { layouts = next; S.note = note; }
     }
     // a two-storey house: a first floor is drafted over each ground floor now, so the options are whole houses, side by side
-    if (layouts.length && S.prefs.storeys === 2) layouts = await withUppers(layouts, btn);
+    // (kept as it was before: the ground floors first, and the first floor is drafted over the one you choose)
+    // if (layouts.length && S.prefs.storeys === 2) layouts = await withUppers(layouts, btn);
   } catch (err) {
     console.warn('Naqsha model could not load.', err);
     failure = 'The Naqsha model could not load on this connection. Check the connection and try again.';

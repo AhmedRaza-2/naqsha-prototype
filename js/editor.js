@@ -16,7 +16,8 @@ const at = (node, path) => path.reduce((n, k) => n.kids[k], node);
 
 function treeHandles(plan, all = false) {
   const out = [];
-  const isFixed = (n) => n.k === 'room' && FIXED.has(n.t);
+  // the front lawn band stays as drawn; the open strips around the house are its outer walls, which can be dragged (the plot setbacks)
+  const isFixed = (n) => n.k === 'room' && (all ? FIXED.has(n.t) : n.t === 'lawn');
   const isOpen = (n) => n.k === 'room' && OPEN.has(n.t);
   const go = (node, x, y, w, d, path) => {
     if (node.k === 'room') {
