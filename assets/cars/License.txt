@@ -26,3 +26,5 @@
 	• Twitter:	 twitter.com/KenneyNL
 	• BlueSky:	 kenney.bsky.social
 	• Instagram: instagram.com/kenney_nl
+
+	ferrari.glb: Ferrari 458 Italia by vicent091036 (Sketchfab), CC-BY 4.0, from the three.js examples (MIT).

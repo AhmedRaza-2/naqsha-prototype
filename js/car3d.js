@@ -1,9 +1,11 @@
 // A parked car for the plot: the free "Car Kit" by Kenney (CC0, assets/cars/License.txt), fitted to real size in feet.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 const DIR = new URL('../assets/cars/', import.meta.url);
 const loader = new GLTFLoader();
+loader.setDRACOLoader(new DRACOLoader().setDecoderPath(new URL('../vendor/three/addons/libs/draco/gltf/', import.meta.url).href));      // for the sports car (compressed)
 const cache = new Map();
 // real sizes (ft): length, width, height
 export const CARS = {
@@ -16,6 +18,8 @@ export const CARS = {
   corolla: { file: 'sedan', l: 15.2, w: 5.85, h: 4.7 },
   cultus: { file: 'hatchback-sports', l: 11.8, w: 4.85, h: 5.1 },
   swift: { file: 'hatchback-sports', l: 12.6, w: 5.7, h: 4.9 },
+  // a sports car from the three.js examples (Ferrari 458 Italia by vicent091036, CC-BY 4.0, see assets/cars/License.txt): its own paint, real size
+  ferrari: { file: 'ferrari', l: 14.85, w: 6.5, h: 3.9, paint: true, flip: true },
   mercedesc: { file: 'sedan-sports', l: 15.6, w: 6.0, h: 4.7 },
   mercedesgle: { file: 'suv-luxury', l: 16.2, w: 6.6, h: 5.8 },
 };
@@ -62,9 +66,13 @@ export async function loadCar(kind = 'sedan', color = null) {
   obj.position.set(-c.x * sx, -box.min.y * sy, -c.z * sz);
   inner.add(obj);
   if (turn) inner.rotation.y = Math.PI / 2;
+  if (spec.flip) inner.rotation.y += Math.PI;                       // this model's nose points the other way
   holder.add(inner);
   let recoloured = null;
-  if (color && CAR_COLORS[color]) {                                 // swap the body's colour patch in a copy of the colour map
+  if (spec.paint) {                                                 // this car's body paint is a plain material colour
+    const c = CAR_COLORS[color] || CAR_COLORS.red;
+    holder.traverse((o) => { if (o.isMesh && o.material && /body/i.test(o.material.name)) { o.material = o.material.clone(); o.material.color.setRGB(c[0] / 255, c[1] / 255, c[2] / 255); } });
+  } else if (color && CAR_COLORS[color]) {                                 // swap the body's colour patch in a copy of the colour map
     const meshes = []; holder.traverse((o) => o.isMesh && meshes.push(o));
     const m0 = meshes[0] && meshes[0].material, img = m0 && m0.map && m0.map.image;
     if (img && img.width) {
