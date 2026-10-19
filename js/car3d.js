@@ -69,9 +69,15 @@ export async function loadCar(kind = 'sedan', color = null) {
   if (spec.flip) inner.rotation.y += Math.PI;                       // this model's nose points the other way
   holder.add(inner);
   let recoloured = null;
-  if (spec.paint) {                                                 // this car's body paint is a plain material colour
+  if (spec.paint) {                                                 // glossy car paint, as in the three.js car example: coloured metal under a clear coat
     const c = CAR_COLORS[color] || CAR_COLORS.red;
-    holder.traverse((o) => { if (o.isMesh && o.material && /body/i.test(o.material.name)) { o.material = o.material.clone(); o.material.color.setRGB(c[0] / 255, c[1] / 255, c[2] / 255); } });
+    holder.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      if (/body/i.test(o.material.name)) {
+        const m = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(c[0] / 255, c[1] / 255, c[2] / 255), metalness: 1, roughness: 0.5, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.4 });
+        m.name = o.material.name; o.material = m;
+      }
+    });
   } else if (color && CAR_COLORS[color]) {                                 // swap the body's colour patch in a copy of the colour map
     const meshes = []; holder.traverse((o) => o.isMesh && meshes.push(o));
     const m0 = meshes[0] && meshes[0].material, img = m0 && m0.map && m0.map.image;
@@ -91,6 +97,7 @@ export async function loadCar(kind = 'sedan', color = null) {
   holder.traverse((o) => {
     if (!o.isMesh) return;
     o.castShadow = true; o.receiveShadow = true;
+    if (spec.paint) return;                                         // keeps its own materials
     const m = o.material.clone();
     m.roughness = 0.4; m.metalness = Math.max(m.metalness || 0, 0.3); m.envMapIntensity = 1.15;
     if (recoloured) m.map = recoloured;
