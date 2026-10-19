@@ -264,6 +264,15 @@ export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
   const nb = (count.bed || 0) + (count.master || 0);
   for (const need of ['kitchen', 'drawing']) if (!count[need]) { add('err', `missing ${need}`); errs++; }   // a lobby is optional
   if ((plan.storeys || 1) >= 2 && !count.stairs) { add('err', 'stairs', 'a two-storey house needs stairs'); errs++; }
+  // check stair dimensions: standard residential stairs are 3-4 ft wide, with ~20 steps max in one flight
+  const stairs = rects.filter((r) => r.t === 'stairs');
+  if (stairs.length) {
+    for (const stair of stairs) {
+      if (stair.w < 2.5 || stair.w > 4.5) add('warn', `stair width ${stair.w.toFixed(1)}'`, `standard is 3–3.5 ft (got ${stair.w.toFixed(1)}')`);
+      const estSteps = Math.round(stair.d / 0.92);
+      if (estSteps > 22) add('warn', `stair length (${estSteps} steps)`, `single flight should be ≤20 steps, consider 2 flights or a landing`);
+    }
+  }
   if (count.terrace) { add('err', 'terrace', 'a terrace is the open roof of a lower floor'); errs++; }
   if (beds != null && nb !== beds) { add('err', 'bed count', `asked for ${beds}, plan has ${nb}`); errs++; }
   const nbath = rects.filter((r) => r.parent !== undefined).length;

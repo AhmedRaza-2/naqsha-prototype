@@ -292,6 +292,15 @@ async function generate(regen) {
       const next = await draft(prefs);
       if (next.length && (!layouts.length || perfect(next))) { layouts = next; S.note = note; }
     }
+    // guarantee porch: if user requested "yes" but model couldn't fit one, try to add it after generation
+    if (S.prefs.porch === 'yes' && layouts.length && !layouts.some((L) => L.rects.some((r) => r.t === 'porch'))) {
+      const withPorches = layouts.map((L, idx) => {
+        const withPorch = setPorch(L.plan, 'yes');
+        if (!withPorch) return L;
+        return { ...L, plan: withPorch, rects: withPorch.rects || L.rects, text: undefined };
+      }).filter((L) => L);
+      if (withPorches.length) layouts = withPorches;
+    }
     // a two-storey house: a first floor is drafted over each ground floor now, so the options are whole houses, side by side
     // (kept as it was before: the ground floors first, and the first floor is drafted over the one you choose)
     // if (layouts.length && S.prefs.storeys === 2) layouts = await withUppers(layouts, btn);
