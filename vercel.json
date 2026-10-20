@@ -1,0 +1,8 @@
+{
+  "framework": "vite",
+  "buildCommand": "cd landing && npm run build",
+  "outputDirectory": "landing/dist",
+  "git": {
+    "deploymentEnabled": false
+  }
+}
