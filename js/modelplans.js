@@ -5,7 +5,7 @@ import { toRects as treeRects } from './tree.js';
 import { finalize, ruleFor } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
 import { tidyRects } from './tidy.js';
-import { balconyRoom, insetFor, wrapGround, dropTerrace, outsetFor, trimGround } from './plantweak.js';
+import { balconyRoom, insetFor, wrapGround, dropTerrace, outsetFor, trimGround, standardStairs, sizePorch } from './plantweak.js';
 import { draftPlans, sampleDrafts, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -135,7 +135,7 @@ export function familiesFor(plot, beds) {
 }
 
 export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
-  const { porch = 'any', family = 'any', setbacks = null, entrance = 'auto', stairs = 'auto', ...request } = prefs;
+  const { porch = 'any', cars = 0, family = 'any', setbacks = null, entrance = 'auto', stairs = 'auto', ...request } = prefs;
   const marla = (plot.w * plot.d) / MARLA_SQFT;
   // the visitor's own front / back / side open space (only the ones they filled in), judged by the rule checker instead of the standard
   if (setbacks && Object.keys(setbacks).length) request.rule = Object.fromEntries(Object.entries(setbacks).filter(([, v]) => Number.isFinite(v)));
@@ -155,7 +155,12 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
   const keep = (it) => (wantPorch === null || hasPorch(it) === wantPorch) && (family === 'any' || !it.style || it.style === family);
   const items = await draftPlans({ w: inner.w, d: inner.d, ...request }, {
     n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles, keep,
-    embed: ins ? (p) => wrapGround(p, plot.w, plot.d, ins) : outs ? (p) => trimGround(p, plot.w, plot.d, outs) : null,
+    // a ground floor leaves the model with standard stairs (3.5-4 ft wide, 15-18 ft long) and a car porch as wide as the cars asked for
+    embed: request.floor ? null : (p) => {
+      let q = ins ? wrapGround(p, plot.w, plot.d, ins) : outs ? trimGround(p, plot.w, plot.d, outs) : p;
+      q = standardStairs(q);
+      return cars > 0 ? sizePorch(q, cars) : q;
+    },
   });
   return items.map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
 }
@@ -211,16 +216,26 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   const dbg = (typeof window !== 'undefined' && window.__S) ? (...a) => console.info('[upper]', ...a) : () => {};
   // The model is sampled once for this ground floor and every variant (with / without a terrace) and support level is cut
   // from the same drafts: sampling is what takes the time. More is drawn only when the drafts so far are not enough.
-  let pool = [];
+  let pool = [], draws = 0, shown = 0;
+  // the percentage only ever goes up: the first sampling fills 0-80%, and any extra sampling (drawn only when the drafts are not
+  // enough) creeps from 80 towards 99% instead of starting again from 0
+  const progress = (msg) => {
+    const m = /\((\d+)%\)/.exec(String(msg));
+    if (!m) { onStatus?.(msg); return; }
+    const pct = draws <= 1 ? +m[1] * 0.8 : 80 + +m[1] * 0.19;
+    shown = Math.max(shown, Math.min(99, Math.round(pct)));
+    onStatus?.(`Drafting layouts (${shown}%)`);
+  };
   const draw = async (count) => {
     const t0 = Date.now();
-    const more = await sampleDrafts(request, { n: count, temperature: opts.temperature ?? 0.8, onStatus });
+    draws += 1;
+    const more = await sampleDrafts(request, { n: count, temperature: opts.temperature ?? 0.8, onStatus: progress });
     pool = [...pool, ...more];
     dbg('sampled', count, 'in', Date.now() - t0, 'ms');
   };
   // variant: 'with' keeps drafts that have a terrace; 'without' takes it away from every draft (dropTerrace); null: as drafted
   const cut = (minSupport, variant) => draftPlans(request, {
-    top: 3, exclude: opts.exclude, onStatus, styles: [null], drafts: pool,
+    top: 3, exclude: opts.exclude, onStatus: progress, styles: [null], drafts: pool,
     keep: (it) => supportShare(it.rects, ground.rects) >= minSupport
       && (variant !== 'with' || terraceArea(it.rects) >= 40)
       && (variant !== 'without' || (terraceArea(it.rects) < 40 && it.score >= 1)),     // no terrace left, and every rule still passes

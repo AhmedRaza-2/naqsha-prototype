@@ -79,7 +79,7 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
     }
     for (const p of open) {
       const cx = X(p.x + p.w / 2), cy = Y(p.z + p.d / 2), maxPx = p.w * s - 4;
-      const nm = p.type === 'porch' ? 'Car porch' : p.type === 'terrace' ? 'Terrace' : p.type === 'balcony' ? 'Balcony' : 'Light well', size = `${fmtFt(p.w)}' x ${fmtFt(p.d)}'`;
+      const nm = p.type === 'porch' ? (p.w >= 9.5 ? `Car porch (${p.w >= 25.5 ? 3 : p.w >= 17.5 ? 2 : 1} car${p.w >= 17.5 ? 's' : ''})` : 'Small porch') : p.type === 'terrace' ? 'Terrace' : p.type === 'balcony' ? 'Balcony' : 'Light well', size = `${fmtFt(p.w)}' x ${fmtFt(p.d)}'`;
       o += `<text x="${cx}" y="${cy}" font-size="${fit(nm, 8.5, maxPx)}" text-anchor="middle" fill="#6f6b5e" font-weight="600" ${halo}>${nm}</text>`;
       o += `<text x="${cx}" y="${cy + 10}" font-size="${fit(size, 7.2, maxPx)}" text-anchor="middle" fill="#6f6b5e" ${halo}>${size}</text>`;
     }

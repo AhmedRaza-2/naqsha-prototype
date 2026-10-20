@@ -64,7 +64,7 @@ function applyTree(p, h, dx, dz) {
       return (n.k === 'H') === horiz ? mins.reduce((a, b) => a + b, 0) : Math.max(...mins);
     }
     if (n.bath) return Math.max(7, horiz ? n.bath[1] + 2 : n.bath[0] + 1);
-    if (n.t === 'passage' || n.t === 'lobby') return 3.5;
+    if (n.t === 'passage' || n.t === 'lobby' || n.t === 'stairs') return 3.5;
     return OPEN.has(n.t) || n.t === 'void' ? 3 : 7;
   };
   const a = h.parts[h.k], b = h.parts[h.k + 1];
@@ -89,6 +89,41 @@ function leafAt(plan, i) {
   walk(plan.tree);
   return out[i] || null;
 }
+
+/** Take a room out of a slicing-tree plan: the room beside it grows over its space (a room before an open strip), and a cut left with
+ *  one part disappears. Bedrooms and washrooms taken out are taken off the counts. Returns a changed copy, or null. */
+function removeLeaf(plan, idx) {
+  if (!plan.tree) return null;
+  const p = clone(plan), leaf = leafAt(p, idx);
+  if (!leaf) return null;
+  let ok = false;
+  const go = (node, w, d) => {
+    if (node.k === 'room') return node;
+    const total = node.k === 'H' ? d : w;
+    const parts = [...node.sizes, total - node.sizes.reduce((a, b) => a + b, 0)];
+    const at = node.kids.indexOf(leaf);
+    if (at >= 0) {
+      const cand = [at - 1, at + 1].filter((j) => j >= 0 && j < parts.length);
+      cand.sort((a, b) => (node.kids[a].k === 'room' && OPEN.has(node.kids[a].t) ? 1 : 0) - (node.kids[b].k === 'room' && OPEN.has(node.kids[b].t) ? 1 : 0));
+      if (!cand.length) return node;
+      const j = cand[0];
+      parts[j] += parts[at];
+      parts.splice(at, 1); node.kids.splice(at, 1);
+      node.sizes = parts.slice(0, -1).map((v) => Math.round(v * 100) / 100);
+      ok = true;
+      return node.kids.length === 1 ? node.kids[0] : node;
+    }
+    node.kids = node.kids.map((kid, k) => (node.k === 'H' ? go(kid, w, parts[k]) : go(kid, parts[k], d)));
+    return node;
+  };
+  p.tree = go(p.tree, p.plot.w, p.plot.d);
+  if (!ok) return null;
+  if (leaf.t === 'bed' || leaf.t === 'master') p.beds = Math.max(0, p.beds - 1);
+  if (leaf.bath && p.baths != null) p.baths = Math.max(0, p.baths - 1);
+  return p;
+}
+
+const stairsTooBig = (lay) => (lay.rects || []).some((r) => r.t === 'stairs' && Math.min(r.w, r.d) > 4.01 && Math.max(r.w, r.d) >= 14 || r.t === 'stairs' && Math.max(r.w, r.d) > 18.01);
 
 /** Wall positions of a plan (rows of rooms or a slicing tree), in feet. */
 function handles(plan, L) {
@@ -220,7 +255,11 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     const dx = (drag.last.px - drag.start.px) / drag.s, dz = -(drag.last.py - drag.start.py) / drag.s;   // screen y grows toward the road
     const next = apply(drag.base, drag.h, dx, dz);
     if (!accept(next)) return;                                   // e.g. a wall that would move the stairs of a first floor stays put
-    if (JSON.stringify(next) !== JSON.stringify(L.plan)) { L = rebuild(next); drag.moved = true; render(); onChange(L, true); }
+    if (JSON.stringify(next) !== JSON.stringify(L.plan)) {
+      const nl = rebuild(next);
+      if (stairsTooBig(nl) && !stairsTooBig(L)) return;           // a stair is at most 4 ft wide and 18 ft long: the wall stops there
+      L = nl; drag.moved = true; render(); onChange(L, true);
+    }
   }
   function end(commit) {
     if (!drag) return;
@@ -259,10 +298,18 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     const box = host.getBoundingClientRect();
     pick.style.left = Math.min(box.width - 190, Math.max(0, e.clientX - box.left - 20)) + 'px';
     pick.style.top = Math.max(0, e.clientY - box.top + 10) + 'px';
-    pick.innerHTML = `<label>This room is a<select>${Object.entries(RETYPE).map(([k, v]) => `<option value="${k}"${k === hit.t ? ' selected' : ''}>${v}</option>`).join('')}</select></label><span class="msg" role="status"></span>`;
+    pick.innerHTML = `<label>This room is a<select>${Object.entries(RETYPE).map(([k, v]) => `<option value="${k}"${k === hit.t ? ' selected' : ''}>${v}</option>`).join('')}</select></label><button type="button" class="rm">Remove this room</button><span class="msg" role="status"></span>`;
     host.append(pick);
     const sel = pick.querySelector('select'), msg = pick.querySelector('.msg');
     sel.focus();
+    pick.querySelector('.rm').onclick = () => {
+      if (hit.t === 'kitchen' || hit.t === 'drawing') { msg.textContent = `A house needs a ${hit.t === 'kitchen' ? 'kitchen' : 'drawing room'}; change what it is instead.`; return; }
+      const next = removeLeaf(L.plan, hit.i);
+      if (!next) { msg.textContent = 'This room cannot be taken out of the plan.'; return; }
+      if (!accept(next)) { msg.textContent = 'That would break a rule this floor must keep.'; return; }
+      closePick();
+      set(next, true);
+    };
     sel.onchange = () => {
       const next = clone(L.plan);
       leafAt(next, hit.i).t = sel.value;

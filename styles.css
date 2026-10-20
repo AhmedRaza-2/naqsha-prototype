@@ -81,7 +81,19 @@ h3 { margin: 0 0 12px; font-size: 1rem; font-weight: 600; letter-spacing: -0.01e
 
 /* ---------- surfaces ---------- */
 .card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
-.form { max-width: 720px; display: grid; gap: 20px; }
+.form { max-width: none; display: grid; gap: 18px; padding: 22px; }
+.fsplit { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.fleft, .fright { display: grid; gap: 14px; align-content: start; }
+.fright { padding: 18px; background: var(--bg-alt); border-radius: var(--radius); }
+.fright input, .fright select { background: var(--bg); }
+.row.r3 { grid-template-columns: 1fr 1fr 1.8fr; }
+#floorsrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fright .presets .chip { height: 32px; padding: 0 12px; font-size: 0.82rem; }
+.form .row { gap: 12px; }
+.form input, .form select { height: 44px; }
+.form #nl { height: 52px; }
+.form #gen { justify-self: start; min-width: 260px; }
+@media (max-width: 860px) { .fsplit { grid-template-columns: 1fr; gap: 18px; } .row.r3 { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); } }
 
 /* ---------- form fields: label above, 48px controls ---------- */
 .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
@@ -190,8 +202,9 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 }
 
 /* preferences: the washroom choice has the longest labels */
-.prefs .row { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); }
-@media (max-width: 760px) { .prefs .row { grid-template-columns: 1fr; } }
+.prefs .row { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
+@media (max-width: 860px) { .prefs .row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .prefs .row { grid-template-columns: 1fr; } }
 
 /* two-storey houses: ground floor and first floor side by side */
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px; }
@@ -282,3 +295,5 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 .voiceacts .btn { height: 40px; }
 .meter { visibility: hidden; }
 .voicebar:has(.mic.on) .meter { visibility: visible; }
+.edhost .retype .rm { display: block; margin-top: 8px; border-color: var(--err); color: var(--err); background: transparent; }
+.edhost .retype .rm:hover { background: var(--err); color: #fff; }

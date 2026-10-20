@@ -6,3 +6,4 @@ kaggle_upload/
 out/
 landing/node_modules/
 landing/dist/
+.vercel

@@ -238,3 +238,88 @@ export function trimGround(plan, W, D, o) {
   p.plot = { w: W, d: D };
   return p;
 }
+
+// ---------------------------------------------------------------- standard stairs and car porch size
+const SNAP5 = (v) => Math.round(v * 2) / 2;
+export const carsFit = (w) => (w >= 25.5 ? 3 : w >= 17.5 ? 2 : w >= 9.5 ? 1 : 0);   // cars that fit side by side in a porch this wide
+const PORCH_W = [10, 18, 26];                                                       // width wanted for 1, 2, 3 cars
+
+/** The first leaf of a tree plan that passes `pred`: { leaf, x, y, w, d, chain: [{ node, i, x, y, w, d }] } (chain: its cuts, root first). */
+function locate(plan, pred) {
+  let found = null;
+  const go = (node, x, y, w, d, chain) => {
+    if (found) return;
+    if (node.k === 'room') { if (pred(node)) found = { leaf: node, x, y, w, d, chain }; return; }
+    const total = node.k === 'H' ? d : w;
+    const parts = [...node.sizes, total - node.sizes.reduce((a, b) => a + b, 0)];
+    let pos = 0;
+    parts.forEach((s, i) => {
+      const c = [...chain, { node, i, x, y, w, d, parts }];
+      if (node.k === 'H') go(node.kids[i], x, y + pos, w, s, c); else go(node.kids[i], x + pos, y, s, d, c);
+      pos += s;
+    });
+  };
+  go(plan.tree, 0, 0, plan.plot.w, plan.plot.d, []);
+  return found;
+}
+
+/** Move `delta` feet (>0 shrinks) of kid i of a cut over to kid j. */
+function moveSize(node, parts, i, j, delta) {
+  const p = parts.slice();
+  p[i] -= delta; p[j] += delta;
+  node.sizes = p.slice(0, -1).map((v) => Math.round(v * 100) / 100);
+}
+const minLeaf = (n) => (n.k !== 'room' ? 7 : n.t === 'passage' || n.t === 'lobby' ? 3.5 : n.t === 'void' || n.t === 'lawn' || n.t === 'porch' ? 3 : 7);
+
+/** Change the size of the leaf found by `f` along one axis ('V' = its width, 'H' = its depth) to `target`, the difference going to / coming
+ *  from its neighbours in the nearest cut of that axis. Returns the size reached. */
+function resizeLeaf(plan, f, axis, target) {
+  const link = [...f.chain].reverse().find((c) => c.node.k === axis);
+  if (!link) return axis === 'V' ? f.w : f.d;
+  const { node, i, parts } = link;
+  const cur = parts[i], delta = target - cur;                       // delta > 0: grow
+  if (Math.abs(delta) < 0.01) return cur;
+  const order = [i - 1, i + 1].filter((j) => j >= 0 && j < parts.length)
+    .sort((a, b) => (OPEN.has(node.kids[a].t) ? 1 : 0) - (OPEN.has(node.kids[b].t) ? 1 : 0));   // rooms give / take before open strips
+  let left = Math.abs(delta), done = 0;
+  const work = parts.slice();
+  for (const j of order) {
+    if (left < 0.01) break;
+    const room = delta > 0 ? Math.max(0, work[j] - minLeaf(node.kids[j])) : Infinity;
+    const take = Math.min(left, room);
+    if (take <= 0) continue;
+    work[j] += delta > 0 ? -take : take; work[i] += delta > 0 ? take : -take;
+    left -= take; done += take;
+  }
+  node.sizes = work.slice(0, -1).map((v) => Math.round(v * 100) / 100);
+  return cur + (delta > 0 ? done : -done);
+}
+
+/** Standard stairs: a flight is 3.5 to 4 ft wide and 15 to 18 ft long (about 20 steps); what the model drew beyond that goes back
+ *  to the room beside it. Smaller stairs (a turning stair in a small plot) are left alone. Ground floors only. */
+export function standardStairs(plan) {
+  if (!plan.tree || plan.floor) return plan;
+  const p = clone(plan);
+  const f = locate(p, (n) => n.t === 'stairs');
+  if (!f) return p;
+  const wide = f.w >= f.d ? 'V' : 'H';                               // the stair runs along its longer side; the other is its width
+  const [short, long] = wide === 'V' ? [f.d, f.w] : [f.w, f.d];
+  const shortAxis = wide === 'V' ? 'H' : 'V', longAxis = wide === 'V' ? 'V' : 'H';
+  if (long >= 14 && short > 4) resizeLeaf(p, f, shortAxis, 4);
+  if (long > 18) {
+    const g = locate(p, (n) => n.t === 'stairs');
+    resizeLeaf(p, g, longAxis, 17.5);
+  }
+  return p;
+}
+
+/** A car porch wide enough for `cars` cars (10 ft for one, 18 for two, 26 for three), as far as the neighbouring rooms can give. */
+export function sizePorch(plan, cars) {
+  if (!plan.tree || plan.floor || !(cars >= 1)) return plan;
+  const p = clone(plan);
+  const f = locate(p, (n) => n.t === 'porch');
+  if (!f) return p;
+  const want = PORCH_W[Math.min(3, cars) - 1];
+  if (f.w < want) resizeLeaf(p, f, 'V', want);
+  return p;
+}

@@ -70,6 +70,7 @@ function applyParsed(r) {
   if (r.bathsAttachedOnly) { syncBaths(+$('pb').value); $('prefs').open = true; }
   if (r.focus) { $('pfocus').value = r.focus; $('prefs').open = true; }
   if (r.porch) { $('pporch').value = r.porch; $('prefs').open = true; }
+  if (r.cars) { $('pcars').value = String(r.cars); $('prefs').open = true; }
   if (r.family) { $('pfamily').value = r.family; $('prefs').open = true; }
   if (r.setbacks) {
     for (const [k, id] of [['front', 'psbf'], ['rear', 'psbb'], ['side', 'psbs']]) if (r.setbacks[k] != null) $(id).value = String(r.setbacks[k]);
@@ -254,7 +255,14 @@ async function generate(regen) {
   try {
     await preloadModel();                                        // after a failed download this starts it again
     waitingBtn = null;
-    const draft = (prefs) => modelLayouts(S.plot, prefs, (msg) => (btn.textContent = msg),
+    let shownPct = 0;                                           // the percentage never goes back when the model is asked again with fewer preferences
+    const status = (msg) => {
+      const m = /\((\d+)%\)/.exec(String(msg));
+      if (!m) { btn.textContent = msg; return; }
+      shownPct = Math.max(shownPct, Math.min(99, +m[1]));
+      btn.textContent = String(msg).replace(m[0], `(${shownPct}%)`);
+    };
+    const draft = (prefs) => modelLayouts(S.plot, prefs, status,
       { exclude: regen ? S.seen : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12 });
     layouts = await draft(S.prefs);
     // nothing valid for the exact request: ask the model again with fewer preferences, and say which one was dropped
@@ -338,7 +346,7 @@ $('gen').onclick = async () => {
   S.beds = +$('pb').value;
   const sbv = (id) => { const v = $(id).value.trim(); return v === '' ? undefined : Math.max(0, +v); };
   const setbacks = Object.fromEntries(Object.entries({ front: sbv('psbf'), rear: sbv('psbb'), side: sbv('psbs') }).filter(([, v]) => Number.isFinite(v)));
-  S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, family: $('pfamily').value,
+  S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, cars: +$('pcars').value, family: $('pfamily').value,
     setbacks: Object.keys(setbacks).length ? setbacks : null, entrance: $('pentr').value, stairs: $('pstairs').value,
     storeys: floors(), upBeds: +$('pup').value, upBaths: +$('pupbaths').value, terrace: $('pterr').value };
   S.seen = new Set(); S.upperLayouts = []; S.up = null;
@@ -461,8 +469,15 @@ async function upperFor(ground, { regen, quick = false }, onStatus) {
   const tries = [[upBeds, upBaths, '']];
   if (upBaths > upBeds) tries.push([upBeds, upBeds, `${upBaths} washrooms upstairs do not fit with this ground floor, so these have ${upBeds}, one attached to each bedroom.`]);
   for (let b = upBeds - 1; b >= 1; b--) tries.push([b, b + 1, `${upBeds} bedrooms do not fit upstairs over this ground floor, so these have ${b}.`], [b, b, `${upBeds} bedrooms do not fit upstairs over this ground floor, so these have ${b}.`]);
+  let shownPct = 0;                                             // the percentage never goes back when a step-down starts drafting again
+  const status = (m) => {
+    const q = /\((\d+)%\)/.exec(String(m));
+    if (!q) { onStatus(m); return; }
+    shownPct = Math.max(shownPct, +q[1]);
+    onStatus(String(m).replace(q[0], `(${shownPct}%)`));
+  };
   for (const [beds, baths, msg] of quick ? tries.slice(0, 1) : tries) {                // quick: the houses are drafted without the step-downs
-    const layouts = await upperLayouts(ground, { beds, baths, terrace }, onStatus,
+    const layouts = await upperLayouts(ground, { beds, baths, terrace }, status,
       { exclude: regen ? S.seenUp : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12, quick });
     if (layouts.length) return { layouts, note: [msg, layouts.note].filter(Boolean).join(' ') };
     if (regen) break;                                            // Regenerate keeps the request; only the first try relaxes it

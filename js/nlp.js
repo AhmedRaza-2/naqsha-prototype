@@ -106,6 +106,10 @@ export function parseRequest(raw) {
   // ---- car porch
   if (/\b(?:no|without|bina|nahi|nahin)\s+(?:car\s*)?(?:porch|garage|parking|gari)/.test(t)) { out.porch = 'no'; say('Car porch', 'none'); }
   else if (/\b(?:car\s*porch|porch|garage|parking|gari|carport)\b/.test(t)) { out.porch = 'yes'; say('Car porch', 'yes'); }
+  // how many cars: "2 car porch", "porch for three cars", "3 gaari parking"
+  const WORDN = { one: 1, two: 2, three: 3, ek: 1, do: 2, teen: 3, single: 1, double: 2, triple: 3 };
+  const carM = t.match(/\b(\d|one|two|three|ek|do|teen|single|double|triple)\s*[- ]?\s*(?:car|cars|gari|gaari|gadi|gadiyan|vehicle|vehicles)\b/);
+  if (carM && out.porch !== 'no') { const n = WORDN[carM[1]] || +carM[1]; if (n >= 1 && n <= 3) { out.cars = n; out.porch = 'yes'; say('Cars', String(n)); } }
 
   // ---- terrace on the first floor (the open roof of the floor below)
   if (/\b(?:no|without|bina|nahi|nahin)\s+(?:an?\s+)?(?:open\s+)?(?:roof\s*)?(?:terrace|chhat|chat)/.test(t)) { out.terrace = 'without'; say('Terrace', 'none'); }

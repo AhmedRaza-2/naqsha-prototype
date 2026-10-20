@@ -28,8 +28,10 @@
       <h1>Apna ghar, plot size se shuru</h1>
       <p class="lead">Enter your plot size, pick a layout, choose a facade style, then walk through the house in 3D.</p>
       <div class="card form">
+       <div class="fsplit">
+        <div class="fleft">
         <label class="field wide">Describe your plot (English or Roman Urdu)
-          <input id="nl" placeholder="e.g. 10 marla double storey 4 bed car porch, front 12 ft, no stairs" autocomplete="off">
+          <input id="nl" placeholder="e.g. 10 marla, 2 floors, 4 bed, car porch" autocomplete="off">
         </label>
         <div class="voicebar" id="voicebar">
           <button class="btn mic" id="mic" type="button" aria-pressed="false">
@@ -50,8 +52,10 @@
             <button class="btn" id="voiceagain" type="button">Speak again</button>
           </div>
         </div>
+        </div>
+        <div class="fright">
         <div class="presets" id="presets"></div>
-        <div class="row">
+        <div class="row r3">
           <label class="field">Width (ft)<input id="pw" type="number" min="18" max="120" value="25"></label>
           <label class="field">Depth (ft)<input id="pd" type="number" min="30" max="200" value="45"></label>
           <label class="field" id="pbl">Bedrooms
@@ -60,7 +64,7 @@
         </div>
         <div class="row" id="floorsrow">
           <label class="field">Floors
-            <select id="pfloors"><option value="1" selected>1 floor</option><option value="2">2 floors (ground + first)</option></select>
+            <select id="pfloors"><option value="1" selected>1 floor</option><option value="2">2 floors</option></select>
           </label>
           <label class="field" id="pupl">Bedrooms upstairs
             <select id="pup"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>
@@ -72,6 +76,8 @@
             <select id="pterr"><option value="both" selected>Show both kinds</option><option value="with">With an open terrace</option><option value="without">Without a terrace</option></select>
           </label>
         </div>
+        </div>
+       </div>
         <details class="prefs" id="prefs">
           <summary>More preferences</summary>
           <div class="row">
@@ -100,6 +106,14 @@
                 <option value="yes" selected>Yes, a car porch</option>
                 <option value="any">Either</option>
                 <option value="no">No car porch</option>
+              </select>
+            </label>
+            <label class="field">Cars to park
+              <select id="pcars">
+                <option value="0" selected>Standard (1 car)</option>
+                <option value="1">1 car</option>
+                <option value="2">2 cars</option>
+                <option value="3">3 cars</option>
               </select>
             </label>
           </div>
