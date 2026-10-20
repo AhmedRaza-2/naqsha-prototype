@@ -364,7 +364,7 @@ export function checkUpper(plan, rects, beds = plan.beds, out = [], errs = 0) {
   const onTop = rects.filter((r) => r.t === 'stairs' && Math.abs(r.x - sx) < 0.01 && Math.abs(r.y - sy) < 0.01
     && Math.abs(r.w - u.w) < 0.01 && Math.abs(r.d - u.d) < 0.01);
   if (!onTop.length) { add('err', 'stairs above stairs', `no stairs at ${u.x},${u.y} (${u.w}x${u.d}) in the box`); errs++; }
-  const bad = UPPER_NOT.filter((t) => count[t]);
+  const bad = UPPER_NOT.filter((t) => count[t] && !(t === 'drawing' && plan.upDrawing));   // a drawing room upstairs only when the visitor asked for one
   if (bad.length) { add('err', 'ground-floor rooms', bad.join(',')); errs++; }
   if (errs) return out;
 

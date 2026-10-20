@@ -76,6 +76,7 @@
             <select id="pterr"><option value="both" selected>Show both kinds</option><option value="with">With an open terrace</option><option value="without">Without a terrace</option></select>
           </label>
         </div>
+        <div class="advice" id="advice" aria-live="polite"></div>
         </div>
        </div>
         <details class="prefs" id="prefs">
@@ -128,6 +129,20 @@
               <select id="pstairs"><option value="auto" selected>Automatic (inside from 6 marla)</option><option value="inside">Keep stairs inside</option><option value="none">No stairs</option></select>
             </label>
           </div>
+          <div class="row">
+            <label class="field">Front lawn
+              <select id="plawn"><option value="yes" selected>Keep a lawn</option><option value="no">No lawn: car porch across the front</option></select>
+            </label>
+            <label class="field">Drawing room upstairs
+              <select id="pupdraw"><option value="no" selected>No, a family lounge</option><option value="yes">Yes, add one</option></select>
+            </label>
+            <fieldset class="omitset"><legend>Leave out</legend>
+              <label><input type="checkbox" name="omit" value="dining"> Dining room</label>
+              <label><input type="checkbox" name="omit" value="drawing"> Drawing room</label>
+              <label><input type="checkbox" name="omit" value="study"> Study</label>
+              <label><input type="checkbox" name="omit" value="store"> Store</label>
+            </fieldset>
+          </div>
           <p class="fine" id="prefnote">Leave the open space blank for the standard setbacks of the plot. Whatever you type is what the plan is built to, so no yard is left empty beyond it.</p>
         </details>
         <div class="info" id="plotinfo"></div>
@@ -142,6 +157,7 @@
       <p class="lead" id="s2sub"></p>
       <div class="regen-row"><button class="btn" id="regen">Regenerate layouts</button><span class="fine">Not what you had in mind? Draft three new ones.</span></div>
       <div class="grid3" id="layouts"></div>
+      <div class="work">
       <section class="card editor" id="editor" hidden>
         <div class="editor-head">
           <div><h3>Adjust the layout</h3><p class="fine">Drag a wall to resize the rooms on both sides, a gold dot to slide a door, a blue dot to slide a window. Drag furniture to move it; click a piece to turn or remove it, or click an empty floor to change what the room is. Sizes snap to half a foot and the rule check updates as you go.</p></div>
@@ -149,9 +165,10 @@
         </div>
         <div id="edhost" class="edhost"></div>
       </section>
-      <div class="split">
+      <div class="stack">
         <div class="card"><h3>Rule check <span id="chkscore"></span></h3><ul class="checks" id="checks"></ul></div>
         <div class="card"><h3>Areas</h3><div id="areas"></div></div>
+      </div>
       </div>
       <p class="formerr" id="uerr" role="alert" hidden></p>
       <div class="nav"><button class="btn" data-go="1">Back</button><button class="btn primary" id="to3" disabled>Use this layout</button></div>
@@ -160,11 +177,16 @@
     <section id="su" class="step" hidden>
       <h2>Choose the first floor</h2>
       <p class="lead" id="usub"></p>
-      <div class="card pair" id="pair"></div>
-      <div class="regen-row"><button class="btn" id="uregen">Regenerate first floors</button>
-        <label class="mini">Terrace<select id="uterr"><option value="both">Show both kinds</option><option value="with">With an open terrace</option><option value="without">Without a terrace</option></select></label>
-        <span class="fine">Not what you had in mind? Draft three new ones, or change the terrace.</span></div>
-      <div class="grid3" id="ulayouts"></div>
+      <div class="usplit">
+        <aside class="uside">
+          <div class="card pair" id="pair"></div>
+          <div class="regen-row"><button class="btn" id="uregen">Regenerate first floors</button>
+            <label class="mini">Terrace<select id="uterr"><option value="both">Show both kinds</option><option value="with">With an open terrace</option><option value="without">Without a terrace</option></select></label>
+            <span class="fine">Not what you had in mind? Draft three new ones, or change the terrace.</span></div>
+        </aside>
+        <div class="grid3" id="ulayouts"></div>
+      </div>
+      <div class="work">
       <section class="card editor" id="ueditor" hidden>
         <div class="editor-head">
           <div><h3>Adjust the first floor</h3><p class="fine">Drag a wall to resize the rooms on both sides, a gold dot to slide a door, a blue dot to slide a window. Drag furniture to move it; click a piece to turn or remove it, or click an empty floor to change what the room is. Walls beside the stairs stop where the stairs below end, so the two floors stay joined.</p></div>
@@ -172,16 +194,23 @@
         </div>
         <div id="uedhost" class="edhost"></div>
       </section>
-      <div class="split">
+      <div class="stack">
         <div class="card"><h3>Rule check <span id="uchkscore"></span></h3><ul class="checks" id="uchecks"></ul></div>
         <div class="card"><h3>Areas, both floors</h3><div id="uareas"></div></div>
+      </div>
       </div>
       <div class="nav"><button class="btn" data-go="2">Back</button><button class="btn primary" id="uto3" disabled>Use this first floor</button></div>
     </section>
 
     <section id="s3" class="step" hidden>
       <h2>Choose a design</h2>
-      <p class="lead">Your house from the street in three styles, rendered in 3D from your plan. Pick the wall and trim colours, then choose a style.</p>
+      <p class="lead">Your house from the street in three styles, rendered in 3D from your plan. Choose a style, and change colours and details in the panel beside it.</p>
+      <div class="dsplit">
+        <div class="dmain">
+          <div class="grid3" id="styles"></div>
+          <div class="card pair" id="pair3" hidden></div>
+        </div>
+        <aside class="dside" aria-label="Colours and details">
       <div class="card colors" id="colors">
         <div class="swrow"><span class="swlabel">Walls</span><div class="sw" id="swwall" role="radiogroup" aria-label="Wall colour"></div></div>
         <div class="swrow"><span class="swlabel">Trim and frames</span><div class="sw" id="swtrim" role="radiogroup" aria-label="Trim colour"></div></div>
@@ -189,7 +218,7 @@
           <label class="mini">Style<select id="swallstyle"><option value="plain">Plastered</option><option value="brick">Brick</option><option value="bars">Railings on a low wall</option><option value="none">No wall</option></select></label>
           <label class="mini">Height<select id="swallh"><option value="3">3 ft</option><option value="4.5" selected>4.5 ft</option><option value="6">6 ft</option><option value="8">8 ft</option></select></label>
           <label class="mini">Gate<select id="sgate"><option value="slide">Sliding</option><option value="swing">Swing</option></select></label>
-          <label class="mini">Car<select id="scar"><option value="sedan">Sedan</option><option value="hatchback">Hatchback</option><option value="suv">SUV</option><option value="luxury">Luxury SUV</option></select></label>
+          <label class="mini">Car<select id="scar"><option value="ferrari">Ferrari 458 (sports)</option><option value="sedan">Sedan</option><option value="hatchback">Hatchback</option><option value="suv">SUV</option><option value="luxury">Luxury SUV</option></select></label>
           <label class="mini">Car colour<select id="scarc"><option value="white">White</option><option value="silver">Silver</option><option value="black">Black</option><option value="graphite">Graphite</option><option value="maroon">Maroon</option><option value="navy">Navy</option><option value="red">Red</option></select></label>
         </div>
         <div class="swrow"><span class="swlabel">Wall colour</span><div class="sw" id="swwallc" role="radiogroup" aria-label="Boundary wall colour"></div></div>
@@ -212,8 +241,8 @@
           <span class="fine" id="finspout">A photo of a house you like gives the colours and the closest style. A photo of a floor plan cannot be read here: describe the layout in words instead, for example "bedroom wing".</span>
         </div>
       </div>
-      <div class="grid3" id="styles"></div>
-      <div class="card pair" id="pair3" hidden></div>
+        </aside>
+      </div>
       <div class="nav"><button class="btn" data-go="2" id="s3back">Back</button><button class="btn" id="dl">Download plan sheet (PNG)</button><button class="btn primary" id="to4" disabled>Enter 3D walkthrough</button></div>
     </section>
   </main>

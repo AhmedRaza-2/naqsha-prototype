@@ -142,7 +142,7 @@ export function prepareRenderer(renderer) {
  * The house as a scene: walls, floors, roof, facade details, plot, street and (optionally) furniture.
  * L: ground floor layout; U: first floor of a two-storey house (or null). colors: { wall, trim, interior, accent } overrides.
  */
-export const SITE_DEFAULT = { wall: 'plain', wallH: 4.5, wallColor: null, gate: 'slide', car: 'sedan', carColor: 'white', floorLiving: null, floorBed: null,
+export const SITE_DEFAULT = { wall: 'plain', wallH: 4.5, wallColor: null, gate: 'slide', car: 'ferrari', carColor: 'red', floorLiving: null, floorBed: null,
   roof: 'flat', windows: 'standard', shutters: false, cladding: 'none' };          // the last four are facade options (render only)
 export function buildScene(renderer, L, styleId, U = null, { colors = {}, furniture = true, context = false, site = {} } = {}) {
   site = { ...SITE_DEFAULT, ...site };
@@ -739,15 +739,31 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     const boxOf = (c) => (c.along ? { x0: c.x - 3, x1: c.x + 3, z0: c.z - 7, z1: c.z + 7 } : { x0: c.x - 7, x1: c.x + 7, z0: c.z - 3, z1: c.z + 3 });
     const fits = (c) => { const b = boxOf(c); return b.x0 > 0.4 && b.x1 < W - 0.4 && (c.along || b.z0 > 0.4) && !colliders.some((o) => o.x0 < b.x1 && o.x1 > b.x0 && o.z0 < b.z1 && o.z1 > b.z0); };
     const open0 = doorReach([]);
-    const pick = cands.find((c) => fits(c) && (!open0 || doorReach([boxOf(c)])));
-    if (pick) {
+    // one car per bay of the porch (a porch 10 ft wide holds 1 car, 18 ft 2, 26 ft 3), else one across the lawn
+    const bays = porch ? (porch.w >= 25.5 ? 3 : porch.w >= 17.5 ? 2 : 1) : 1;
+    const want = Math.max(1, Math.min(3, site.cars || 1));        // cars the visitor asked for; one per bay of the porch, the rest on the lawn
+    const kind = site.car || (W >= 40 ? 'suv' : 'sedan');
+    let placed = 0;
+    const put = (pick) => {
       const carG = new THREE.Group();
       carG.rotation.y = pick.along ? Math.PI : -Math.PI / 2;       // along: nose toward the house, back toward the gate; else along the lawn
       carG.position.set(pick.x, 0, pick.z);
       world.add(carG);
       colliders.push({ ...boxOf(pick), k: 'car' });
-      const kind = site.car || (W >= 40 ? 'suv' : 'sedan');
       furnReady.push(loadCar(kind, site.carColor).then((m) => { if (m) carG.add(m); }));
+      placed++;
+    };
+    if (porch && bays > 1 && want > 1) {
+      const z = porch.z + porch.d - 7.2 - (porch.d >= 17 ? 3 : 1.2), n = Math.min(bays, want), slot = porch.w / bays;
+      for (let i = 0; i < bays && placed < n; i++) {
+        const c = { x: porch.x + slot * (i + 0.5), z, along: true };
+        if (fits(c) && (!open0 || doorReach([boxOf(c)]))) put(c);
+      }
+    }
+    while (placed < want) {                                         // the first car in the porch (or on the lawn), any more across the lawn
+      const pick = cands.find((c) => fits(c) && (!open0 || doorReach([boxOf(c)])));
+      if (!pick) break;
+      put(pick);
     }
   }
   // street lamps

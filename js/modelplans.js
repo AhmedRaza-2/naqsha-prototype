@@ -5,7 +5,7 @@ import { toRects as treeRects } from './tree.js';
 import { finalize, ruleFor } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
 import { tidyRects } from './tidy.js';
-import { balconyRoom, insetFor, wrapGround, dropTerrace, outsetFor, trimGround, standardStairs, sizePorch } from './plantweak.js';
+import { balconyRoom, insetFor, wrapGround, dropTerrace, outsetFor, trimGround, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing } from './plantweak.js';
 import { draftPlans, sampleDrafts, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -135,7 +135,7 @@ export function familiesFor(plot, beds) {
 }
 
 export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
-  const { porch = 'any', cars = 0, family = 'any', setbacks = null, entrance = 'auto', stairs = 'auto', ...request } = prefs;
+  const { porch = 'any', cars = 0, family = 'any', setbacks = null, entrance = 'auto', stairs = 'auto', omit = [], lawn = 'yes', upDrawing, ...request } = prefs;
   const marla = (plot.w * plot.d) / MARLA_SQFT;
   // the visitor's own front / back / side open space (only the ones they filled in), judged by the rule checker instead of the standard
   if (setbacks && Object.keys(setbacks).length) request.rule = Object.fromEntries(Object.entries(setbacks).filter(([, v]) => Number.isFinite(v)));
@@ -159,6 +159,8 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
     embed: request.floor ? null : (p) => {
       let q = ins ? wrapGround(p, plot.w, plot.d, ins) : outs ? trimGround(p, plot.w, plot.d, outs) : p;
       q = standardStairs(q);
+      for (const t of omit) q = dropRoom(q, t);                      // rooms the visitor chose to leave out (dining, drawing room ...)
+      if (lawn === 'no') q = lawnToPorch(q);                          // no lawn: the front strip is all car porch
       return cars > 0 ? sizePorch(q, cars) : q;
     },
   });
@@ -216,7 +218,7 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   const dbg = (typeof window !== 'undefined' && window.__S) ? (...a) => console.info('[upper]', ...a) : () => {};
   // The model is sampled once for this ground floor and every variant (with / without a terrace) and support level is cut
   // from the same drafts: sampling is what takes the time. More is drawn only when the drafts so far are not enough.
-  let pool = [], draws = 0, shown = 0;
+  let pool = [], draws = 0, shown = 0, scale = 1;                  // scale: how deep the terrace is made, to show terraces of different sizes
   // the percentage only ever goes up: the first sampling fills 0-80%, and any extra sampling (drawn only when the drafts are not
   // enough) creeps from 80 towards 99% instead of starting again from 0
   const progress = (msg) => {
@@ -239,13 +241,14 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
     keep: (it) => supportShare(it.rects, ground.rects) >= minSupport
       && (variant !== 'with' || terraceArea(it.rects) >= 40)
       && (variant !== 'without' || (terraceArea(it.rects) < 40 && it.score >= 1)),     // no terrace left, and every rule still passes
-    embed: variant === 'without' ? dropTerrace : null,
+    embed: variant === 'without' || scale !== 1 || prefs.upDrawing
+      ? (p) => { let q = variant === 'without' ? dropTerrace(p) : scaleTerrace(p, scale); if (prefs.upDrawing) q = upperDrawing(q); return q; } : null,
     hang: (rects) => { const a = supportArea(rects, ground.rects); return a.tot - a.sup; },        // rooms are then pulled back over the ground floor
   });
   // a first floor must stand on the ground floor: rooms hanging over a yard or a car porch are not drawn if an alternative exists
-  const ladder = async (variant, want) => {
+  const ladder = async (variant, want, more = variant === 'without' ? 0 : opts.quick ? 1 : 3) => {
     let items = [];
-    for (let round = 0; round < 1 + (variant === 'without' ? 0 : opts.quick ? 1 : 3); round++) {
+    for (let round = 0; round < 1 + more; round++) {
       if (round > 0 && opts.quick && items.length) break;             // the houses are pre-drafted: one more round only when nothing was found
       if (round > 0) await draw(opts.quick ? 24 : 30);                // big upper floors are drafted validly only now and then: sample more
       for (const lvl of variant === 'without' ? [0.7] : [0.97, 0.88, 0.7]) {
@@ -264,7 +267,13 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   if (mode === 'both') {
     const b = await ladder('without', 2);
     const a = await ladder('with', b.length ? 2 : 3);
-    items = [a[0], b[0], a[1], b[1], a[2]].filter(Boolean).slice(0, 3);          // with a terrace, without, with
+    // a third kind: the terrace made smaller (or bigger when it cannot be smaller), so the cards do not all show the same terrace
+    const near = (x) => a.some((y) => Math.abs(terraceArea(x.rects) - terraceArea(y.rects)) < 0.1 * terraceArea(y.rects));
+    let c = [];
+    for (const k of [0.6, 1.5]) { scale = k; c = (await ladder('with', 1, 0)).filter((x) => !near(x)); if (c.length) break; }
+    scale = 1;
+    const seen = new Set();
+    items = [a[0], b[0], c[0], a[1], b[1], a[2]].filter((x) => { if (!x || seen.has(itemKey(x))) return false; seen.add(itemKey(x)); return true; }).slice(0, 3);          // with a terrace, without, a different terrace
     if (!b.length && a.length) note = 'No first floor without a terrace fitted over this ground floor, so these all have one.';
   } else if (mode === 'without') {
     items = await ladder('without', 3);

@@ -96,6 +96,10 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   const orbit = new OrbitControls(camera, renderer.domElement);
   orbit.enabled = false;
   orbit.target.set(W / 2, 0, D / 2);
+  orbit.enableDamping = true; orbit.dampingFactor = 0.09;           // smooth stop instead of a jerk
+  orbit.zoomToCursor = true; orbit.zoomSpeed = 0.8;                 // the wheel zooms toward what the pointer is on
+  orbit.minDistance = 6; orbit.maxDistance = Math.max(W, D) * 3.2;  // cannot zoom through the house or lose it in the sky
+  orbit.panSpeed = 0.9; orbit.rotateSpeed = 0.8; orbit.screenSpacePanning = true;
 
   function build(keepPos) {
     bind(buildScene(renderer, L, styleId, U, { colors: curColors, furniture: true, site }), keepPos);
@@ -118,6 +122,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     state.mode = mode;
     const orb = ['orbit', 'top', 'street', 'showcase'].includes(mode);
     orbit.enabled = orb;
+    camera.near = orb ? 1.2 : 0.1; camera.updateProjectionMatrix();       // far views need the finer depth: the floors and the slab below them flickered into each other
     orbit.autoRotate = mode === 'showcase';
     orbit.autoRotateSpeed = 1.4;
     orbit.minPolarAngle = 0; orbit.maxPolarAngle = Math.PI / 2 - 0.02;

@@ -111,6 +111,20 @@ export function parseRequest(raw) {
   const carM = t.match(/\b(\d|one|two|three|ek|do|teen|single|double|triple)\s*[- ]?\s*(?:car|cars|gari|gaari|gadi|gadiyan|vehicle|vehicles)\b/);
   if (carM && out.porch !== 'no') { const n = WORDN[carM[1]] || +carM[1]; if (n >= 1 && n <= 3) { out.cars = n; out.porch = 'yes'; say('Cars', String(n)); } }
 
+  // ---- front lawn: "no lawn", "use the lawn for cars"
+  const lawnNo = /\b(?:no|without|bina|nahi|nahin|skip|remove)\s+(?:front\s+)?(?:lawn|garden|grass)\b/.test(t)
+    || /\b(?:lawn|front\s*yard)\b.{0,24}\b(?:car\s*porch|parking|cars?|gari)\b/.test(t)
+    || /\b(?:car\s*porch|parking)\b.{0,24}\b(?:instead\s+of|in\s+place\s+of|on)\s+(?:the\s+)?lawn\b/.test(t);
+  if (lawnNo) { out.lawn = 'no'; say('Lawn', 'none, the front is car porch'); }
+  // ---- rooms to leave out: "no dining", "without a drawing room", "skip the store"
+  const OMITS = { dining: /dining/, drawing: /drawing(?:\s*room)?/, study: /study/, store: /store(?:\s*room)?/ };
+  const omit = [];
+  for (const [k, re] of Object.entries(OMITS)) if (new RegExp(/\b(?:no|without|skip|omit|remove|bina|nahi|nahin|drop)\s+(?:an?\s+|the\s+|any\s+)?/.source + re.source + /\b/.source).test(t)) omit.push(k);
+  if (omit.length) { out.omit = omit; say('Leave out', omit.join(', ')); }
+  // ---- a drawing room on the first floor
+  const UP = /(?:up\s*stairs|upstairs|upper|first\s*floor|upar)/.source, DR = /drawing(?:\s*room)?/.source;
+  if (!omit.includes('drawing') && (new RegExp('\\b' + DR + '\\b.{0,30}\\b' + UP + '\\b').test(t) || new RegExp('\\b' + UP + '\\b.{0,30}\\b' + DR + '\\b').test(t))) { out.upDrawing = true; say('First floor', 'with a drawing room'); }
+
   // ---- terrace on the first floor (the open roof of the floor below)
   if (/\b(?:no|without|bina|nahi|nahin)\s+(?:an?\s+)?(?:open\s+)?(?:roof\s*)?(?:terrace|chhat|chat)/.test(t)) { out.terrace = 'without'; say('Terrace', 'none'); }
   else if (/\b(?:terrace|chhat|chat)\b/.test(t)) { out.terrace = 'with'; say('Terrace', 'open terrace'); }

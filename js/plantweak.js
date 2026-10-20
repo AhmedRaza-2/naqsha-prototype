@@ -273,13 +273,13 @@ const minLeaf = (n) => (n.k !== 'room' ? 7 : n.t === 'passage' || n.t === 'lobby
 
 /** Change the size of the leaf found by `f` along one axis ('V' = its width, 'H' = its depth) to `target`, the difference going to / coming
  *  from its neighbours in the nearest cut of that axis. Returns the size reached. */
-function resizeLeaf(plan, f, axis, target) {
+function resizeLeaf(plan, f, axis, target, skip = () => false) {
   const link = [...f.chain].reverse().find((c) => c.node.k === axis);
   if (!link) return axis === 'V' ? f.w : f.d;
   const { node, i, parts } = link;
   const cur = parts[i], delta = target - cur;                       // delta > 0: grow
   if (Math.abs(delta) < 0.01) return cur;
-  const order = [i - 1, i + 1].filter((j) => j >= 0 && j < parts.length)
+  const order = [i - 1, i + 1].filter((j) => j >= 0 && j < parts.length && !skip(node.kids[j]))
     .sort((a, b) => (OPEN.has(node.kids[a].t) ? 1 : 0) - (OPEN.has(node.kids[b].t) ? 1 : 0));   // rooms give / take before open strips
   let left = Math.abs(delta), done = 0;
   const work = parts.slice();
@@ -321,5 +321,79 @@ export function sizePorch(plan, cars) {
   if (!f) return p;
   const want = PORCH_W[Math.min(3, cars) - 1];
   if (f.w < want) resizeLeaf(p, f, 'V', want);
+  return p;
+}
+
+// ---------------------------------------------------------------- rooms the visitor leaves out, lawn as car porch, terrace size, drawing room upstairs
+const hasType = (n, t) => (n.k === 'room' ? n.t === t : n.kids.some((k) => hasType(k, t)));
+/** A cut left with one part is that part. */
+function collapse(node) {
+  if (node.k === 'room') return node;
+  node.kids = node.kids.map(collapse);
+  return node.kids.length === 1 ? node.kids[0] : node;
+}
+/** Leave a room out: its neighbour (a room before an open strip, never the stairs) takes its space. Returns the plan unchanged when there is no such room. */
+export function dropRoom(plan, type) {
+  if (!plan.tree) return plan;
+  const p = clone(plan);
+  const f = locate(p, (n) => n.t === type);
+  const link = f && f.chain[f.chain.length - 1];
+  if (!link) return plan;
+  const { node, i, parts } = link;
+  const ok = (j) => j >= 0 && j < parts.length && !hasType(node.kids[j], 'stairs');
+  const cand = [i + 1, i - 1].filter(ok).sort((a, b) => (OPEN.has(node.kids[a].t) ? 1 : 0) - (OPEN.has(node.kids[b].t) ? 1 : 0));
+  if (!cand.length) return plan;
+  const j = cand[0], np = parts.slice();
+  np[j] += np[i]; np.splice(i, 1); node.kids.splice(i, 1);
+  node.sizes = np.slice(0, -1).map((v) => Math.round(v * 100) / 100);
+  p.tree = collapse(p.tree);
+  return p;
+}
+
+/** No lawn: the lawn beside the car porch becomes car porch too, so the whole front strip is one open porch for the cars. */
+export function lawnToPorch(plan) {
+  if (!plan.tree) return plan;
+  const p = clone(plan);
+  let did = false;
+  const go = (node) => {
+    if (node.k === 'room') return;
+    node.kids.forEach(go);
+    if (!node.kids.some((k) => k.k === 'room' && k.t === 'porch') || !node.kids.some((k) => k.k === 'room' && k.t === 'lawn')) return;
+    node.kids = node.kids.map((k) => (k.k === 'room' && k.t === 'lawn' ? { k: 'room', t: 'porch' } : k));
+    for (let g = 0; g < 6; g++) {
+      const i = node.kids.findIndex((k, a) => k.t === 'porch' && node.kids[a + 1] && node.kids[a + 1].t === 'porch');
+      if (i < 0) break;
+      const last = node.kids.length - 1;
+      if (i + 1 < last) node.sizes[i + 1] += node.sizes[i];
+      node.sizes.splice(i, 1); node.kids.splice(i + 1, 1);
+    }
+    did = true;
+  };
+  go(p.tree);
+  if (!did) return plan;
+  p.tree = collapse(p.tree);
+  return p;
+}
+
+/** A first floor's terrace made `k` times as deep (the thinner side of it), as far as the rooms beside it can give or take. */
+export function scaleTerrace(plan, k) {
+  if (!plan.tree || Math.abs(k - 1) < 0.05) return plan;
+  const p = clone(plan);
+  const f = locate(p, (n) => n.t === 'terrace');
+  if (!f) return plan;
+  const axis = f.w >= f.d ? 'H' : 'V', cur = axis === 'H' ? f.d : f.w;
+  const target = Math.max(5, SNAP5(cur * k));
+  resizeLeaf(p, f, axis, target, (n) => hasType(n, 'stairs'));
+  return p;
+}
+
+/** A drawing room on the first floor: the study, else the family lounge, is made the drawing room. */
+export function upperDrawing(plan) {
+  if (!plan.tree || hasType(plan.tree, 'drawing')) return plan;
+  const p = clone(plan);
+  const f = locate(p, (n) => n.t === 'study') || locate(p, (n) => n.t === 'lounge');
+  if (!f) return plan;
+  f.leaf.t = 'drawing';
+  p.upDrawing = true;                                                  // the rule that keeps the drawing room downstairs is lifted for it
   return p;
 }

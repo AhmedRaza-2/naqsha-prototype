@@ -77,6 +77,9 @@ function applyParsed(r) {
     $('prefs').open = true;
   }
   if (r.stairs) { $('pstairs').value = r.stairs; $('prefs').open = true; }
+  if (r.lawn) { $('plawn').value = r.lawn; $('prefs').open = true; }
+  if (r.omit) { document.querySelectorAll('input[name=omit]').forEach((c) => { if (r.omit.includes(c.value)) c.checked = true; }); $('prefs').open = true; }
+  if (r.upDrawing) { $('pupdraw').value = 'yes'; $('prefs').open = true; }
   if (r.terrace && $('floorsrow').style.display !== 'none' && floors() === 2) $('pterr').value = r.terrace;
   S.wantStyle = r.style || null;
   if (r.colors && r.colors.wall) S.colors.wall = r.colors.wall;
@@ -89,6 +92,88 @@ $('nl').addEventListener('input', () => {
   const notes = r.notes.length ? `<span class="chip-note">Noted, but the planner cannot place these yet: ${r.notes.join(', ')}.</span>` : '';
   NL_CHIPS.innerHTML = chips + notes;
 });
+
+// ---------- the assistant under the text box: asks about what is missing, and what to give up when two wishes clash ----------
+const ADV = $('advice');
+const answered = {}, asked = {};                                  // question id -> the answer chosen / the question as last asked
+let plotTouched = false, floorsTouched = false;
+['pw', 'pd'].forEach((id) => $(id).addEventListener('input', () => { plotTouched = true; }));
+$('presets').addEventListener('click', () => { plotTouched = true; });
+$('pfloors').addEventListener('change', () => { floorsTouched = true; });
+const PORCH_NEED = [10, 18, 26];                                  // ft across for 1, 2, 3 cars side by side
+const setField = (id, v) => { $(id).value = String(v); };
+const omitOn = (kind) => document.querySelectorAll('input[name=omit]').forEach((c) => { if (c.value === kind) c.checked = true; });
+function questions() {
+  const text = $('nl').value.trim(), r = parseRequest(text);
+  const w = +$('pw').value, d = +$('pd').value, two = floors() === 2, shown = $('floorsrow').style.display !== 'none';
+  const cars = +$('pcars').value || 0, porchOn = $('pporch').value !== 'no';
+  const rule = ruleFor(w, d), marla = Math.round((w * d) / MARLA * 10) / 10;
+  const qs = [];
+  if (text) {                                                     // something the sentence did not say
+    if (!r.plot && !plotTouched) qs.push({ id: 'plot', kind: 'missing', text: 'What size is the plot?', opts: [['5 marla', 25, 45], ['7 marla', 30, 52], ['10 marla', 35, 65], ['1 kanal', 50, 90]].map(([label, pw, pd]) => ({ label, apply: () => { setField('pw', pw); setField('pd', pd); plotTouched = true; } })) });
+    if (!r.beds && !userBeds) qs.push({ id: 'beds', kind: 'missing', text: 'How many bedrooms do you need?', opts: [2, 3, 4, 5].map((n) => ({ label: `${n} bedrooms`, apply: () => { setField('pb', n); userBeds = true; } })) });
+    if (!r.floors && !floorsTouched && shown) qs.push({ id: 'floors', kind: 'missing', text: 'One floor or two?', opts: [{ label: 'One floor', apply: () => { setField('pfloors', 1); syncFloors(); } }, { label: 'Two floors', apply: () => { setField('pfloors', 2); syncFloors(); } }] });
+  }
+  if (cars >= 2 && porchOn) {                                     // a porch for several cars
+    const need = PORCH_NEED[cars - 1], front = +$('psbf').value || rule.front;
+    if (w < need + 3) {
+      const fit = w - 3 >= 26 ? 3 : w - 3 >= 18 ? 2 : 1;                // cars that fit across, leaving a little lawn at each end
+      qs.push({ id: 'cars-width', kind: 'conflict', text: `${cars} cars side by side need about ${need} ft across, and the frontage is ${w} ft. How should I park them?`, opts: [
+        { label: `${fit} under the porch, the rest on the front lawn`, apply: () => setField('plawn', 'yes') },
+        { label: `No lawn: the whole front is car porch (${fit} cars)`, apply: () => { setField('plawn', 'no'); setField('pcars', fit); } },
+        { label: `Only ${fit} car${fit > 1 ? 's' : ''}`, apply: () => setField('pcars', fit) },
+        { label: 'Keep it as I said', apply: () => {} },
+      ] });
+    }
+    if (rule.front >= 10 && front < 15) {
+      const less = 15 - front;
+      qs.push({ id: 'cars-depth', kind: 'conflict', text: `A car is about 15 ft long, so a ${cars}-car porch needs 15 ft of depth; the front open space for ${marla} marla is ${rule.front} ft.${two ? ' On two floors that depth comes out of the rooms on both floors.' : ''} What should I give up?`, opts: [
+        { label: `Make the front 15 ft deep (rooms ${less} ft shorter)`, apply: () => setField('psbf', 15) },
+        { label: 'Use the lawn as car porch too (no lawn)', apply: () => { setField('psbf', 15); setField('plawn', 'no'); } },
+        { label: 'Leave out the dining room, keep the rest big', apply: () => { setField('psbf', 15); omitOn('dining'); } },
+        { label: 'Leave out the store and the study', apply: () => { setField('psbf', 15); omitOn('store'); omitOn('study'); } },
+        { label: 'Keep the standard front (cars may stand partly on the lawn)', apply: () => {} },
+      ] });
+    }
+  }
+  if (two && shown) qs.push({ id: 'updraw', kind: 'ask', text: 'The first floor has a family lounge. Do you want a drawing room up there too?', opts: [
+    { label: 'Yes, add a drawing room', apply: () => setField('pupdraw', 'yes') },
+    { label: 'No, the lounge is enough', apply: () => setField('pupdraw', 'no') },
+  ] });
+  return qs;
+}
+function renderAdvice() {
+  const qs = questions();
+  const gone = Object.entries(answered).filter(([id]) => !qs.some((q) => q.id === id));          // answered, and the clash it solved is gone: still shown as done
+  ADV.innerHTML = '';
+  const draw = (q, done, canChange = true) => {
+    const el = document.createElement('div');
+    el.className = `ask ${q.kind}${done ? ' done' : ''}`;
+    const p = document.createElement('p'); p.textContent = q.text; el.appendChild(p);
+    const row = document.createElement('div'); row.className = 'asks';
+    if (done) {
+      const t = document.createElement('span'); t.className = 'asked'; t.textContent = done; row.appendChild(t);
+      if (canChange) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'ask-opt link'; b.textContent = 'Change';
+        b.onclick = () => { delete answered[q.id]; renderAdvice(); };
+        row.appendChild(b);
+      }
+    } else q.opts.forEach((o) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'ask-opt'; b.textContent = o.label;
+      b.onclick = () => { o.apply(); answered[q.id] = o.label; asked[q.id] = q; readPlot(); renderAdvice(); };
+      row.appendChild(b);
+    });
+    el.appendChild(row);
+    ADV.appendChild(el);
+  };
+  for (const q of qs) { asked[q.id] = q; if (!(q.id === 'updraw' && $('pupdraw').value === 'yes' && !answered.updraw)) draw(q, answered[q.id]); }
+  for (const [id, label] of gone) if (asked[id]) draw(asked[id], label, false);
+  return qs;
+}
+/** A clash the visitor has not answered yet (shown under the text box): Generate waits for the answer. */
+const openConflict = () => questions().find((q) => q.kind === 'conflict' && !answered[q.id]);
+['nl', 'pw', 'pd'].forEach((id) => $(id).addEventListener('input', renderAdvice));
+['pfloors', 'pcars', 'pporch', 'pb'].forEach((id) => $(id).addEventListener('change', renderAdvice));
 
 // ---------- voice: speak the request; the words are read like typed text and the visitor confirms before anything is drafted ----------
 const mic = $('mic'), micstat = $('micstat'), meter = $('meter').firstElementChild;
@@ -343,12 +428,16 @@ $('gen').onclick = async () => {
   $('formerr').hidden = !problem;
   $('formerr').textContent = problem;
   if (problem) return;
+  const clash = openConflict();
+  if (clash) { $('formerr').hidden = false; $('formerr').textContent = 'One thing first: ' + clash.text + ' Pick an answer under the text box.'; $('advice').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
   S.beds = +$('pb').value;
   const sbv = (id) => { const v = $(id).value.trim(); return v === '' ? undefined : Math.max(0, +v); };
   const setbacks = Object.fromEntries(Object.entries({ front: sbv('psbf'), rear: sbv('psbb'), side: sbv('psbs') }).filter(([, v]) => Number.isFinite(v)));
   S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, cars: +$('pcars').value, family: $('pfamily').value,
     setbacks: Object.keys(setbacks).length ? setbacks : null, entrance: $('pentr').value, stairs: $('pstairs').value,
-    storeys: floors(), upBeds: +$('pup').value, upBaths: +$('pupbaths').value, terrace: $('pterr').value };
+    lawn: $('plawn').value, omit: [...document.querySelectorAll('input[name=omit]:checked')].map((c) => c.value),
+    storeys: floors(), upBeds: +$('pup').value, upBaths: +$('pupbaths').value, terrace: $('pterr').value, upDrawing: $('pupdraw').value === 'yes' };
+  S.site.cars = Math.max(1, S.prefs.cars);                       // how many cars the 3D scene parks
   S.seen = new Set(); S.upperLayouts = []; S.up = null;
   $('uerr').hidden = true;
   await generate(false);
@@ -465,7 +554,7 @@ function areaTable(floors) {
 }
 /** First floors over a ground floor, stepping down to fewer upstairs bedrooms or washrooms when the plan does not fit. */
 async function upperFor(ground, { regen, quick = false }, onStatus) {
-  const { upBeds, upBaths, terrace } = S.prefs;
+  const { upBeds, upBaths, terrace, upDrawing } = S.prefs;
   const tries = [[upBeds, upBaths, '']];
   if (upBaths > upBeds) tries.push([upBeds, upBeds, `${upBaths} washrooms upstairs do not fit with this ground floor, so these have ${upBeds}, one attached to each bedroom.`]);
   for (let b = upBeds - 1; b >= 1; b--) tries.push([b, b + 1, `${upBeds} bedrooms do not fit upstairs over this ground floor, so these have ${b}.`], [b, b, `${upBeds} bedrooms do not fit upstairs over this ground floor, so these have ${b}.`]);
@@ -477,7 +566,7 @@ async function upperFor(ground, { regen, quick = false }, onStatus) {
     onStatus(String(m).replace(q[0], `(${shownPct}%)`));
   };
   for (const [beds, baths, msg] of quick ? tries.slice(0, 1) : tries) {                // quick: the houses are drafted without the step-downs
-    const layouts = await upperLayouts(ground, { beds, baths, terrace }, status,
+    const layouts = await upperLayouts(ground, { beds, baths, terrace, upDrawing }, status,
       { exclude: regen ? S.seenUp : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12, quick });
     if (layouts.length) return { layouts, note: [msg, layouts.note].filter(Boolean).join(' ') };
     if (regen) break;                                            // Regenerate keeps the request; only the first try relaxes it
@@ -847,3 +936,4 @@ if (qs.get('q')) {
   if (qs.get('baths') || (qs.get('focus') && qs.get('focus') !== 'balanced')) $('prefs').open = true;
   $('gen').click();
 }
+renderAdvice();                                                   // the questions that apply before anything is typed

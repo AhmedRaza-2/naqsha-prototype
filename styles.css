@@ -297,3 +297,63 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 .voicebar:has(.mic.on) .meter { visibility: visible; }
 .edhost .retype .rm { display: block; margin-top: 8px; border-color: var(--err); color: var(--err); background: transparent; }
 .edhost .retype .rm:hover { background: var(--err); color: #fff; }
+
+/* ---------- the choosing steps use the width of the screen: options beside the house, not under it ---------- */
+main { max-width: 1280px; padding-top: 28px; }
+#s1 { max-width: 1120px; margin: 0 auto; }
+h2 { margin-top: 0; }
+.lead { margin-bottom: 18px; }
+.opt svg { max-height: min(52vh, 460px); }
+.work { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr); gap: 16px; margin-bottom: 24px; align-items: start; }
+.stack { display: grid; gap: 16px; }
+.work .editor { margin-bottom: 0; }
+.work:has(> .editor[hidden]) { grid-template-columns: 1fr; }
+.work:has(> .editor[hidden]) .stack { grid-template-columns: 1.4fr 1fr; }
+.usplit { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 24px; }
+.uside { position: sticky; top: 76px; display: grid; gap: 12px; }
+.uside .pair { grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; padding: 12px; }
+.uside .pair svg { max-height: 300px; width: 100%; }
+.uside .pair figcaption { font-size: 0.85rem; }
+.uside .regen-row { display: grid; gap: 8px; margin: 0; }
+.uside .regen-row .mini { margin-left: 0; }
+.uside .regen-row .mini select { width: 100%; }
+.usplit .grid3 { margin-bottom: 0; }
+.dsplit { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; margin-bottom: 24px; }
+.dmain .grid3 { margin-bottom: 16px; }
+.dside { position: sticky; top: 76px; max-height: calc(100dvh - 96px); overflow: auto; display: grid; gap: 12px; padding-right: 2px; scrollbar-width: thin; }
+.dside .colors { margin: 0; padding: 14px 16px; gap: 12px; }
+.dside .swrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; align-items: end; }
+.dside .swrow > .swlabel, .dside .swrow > .sw, .dside .swrow > .fine, .dside .swrow > input[type=file] { grid-column: 1 / -1; }
+.dside .swlabel { min-width: 0; }
+.dside .colors .mini { margin: 0; }
+.dside .mini select { width: 100%; min-width: 0; }
+.dside input[type=file] { height: auto; padding: 8px 10px; font-size: 0.82rem; }
+.dside .swatch { width: 30px; height: 30px; }
+@media (max-width: 1000px) {
+  .work, .usplit, .dsplit { grid-template-columns: 1fr; }
+  .work:has(> .editor[hidden]) .stack { grid-template-columns: 1fr; }
+  .uside, .dside { position: static; max-height: none; overflow: visible; }
+}
+
+/* the assistant under the text box */
+.advice { display: grid; gap: 10px; }
+.advice:empty { display: none; }
+.ask { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; background: var(--bg); }
+.ask.conflict { border-color: var(--warn); background: var(--warn-bg); }
+.ask.done { background: var(--ok-bg); border-color: transparent; }
+.ask p { margin: 0 0 8px; font-size: 0.9rem; line-height: 1.45; }
+.ask.done p { margin-bottom: 4px; font-size: 0.82rem; color: var(--ink-soft); }
+.asks { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ask-opt { font: inherit; font-size: 0.82rem; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; text-align: left;
+  transition: border-color 0.2s, transform 0.3s var(--ease); }
+.ask-opt:hover { border-color: var(--accent); }
+.ask-opt:active { transform: scale(0.98); }
+.ask-opt.link { border: 0; background: none; text-decoration: underline; padding: 7px 4px; }
+.asked { font-size: 0.88rem; font-weight: 600; }
+.omitset { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 14px 10px; display: flex; flex-wrap: wrap; gap: 6px 16px; grid-column: span 2; margin: 0; min-width: 0; background: var(--bg); }
+.omitset legend { font-size: 0.9rem; font-weight: 500; padding: 0 6px; }
+.omitset label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.88rem; }
+.omitset input { width: 16px; height: 16px; padding: 0; accent-color: var(--accent); }
+
+@media (min-width: 1100px) { .prefs .row { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.dmain .pair svg { max-height: 340px; width: 100%; }

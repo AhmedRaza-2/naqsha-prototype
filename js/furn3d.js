@@ -82,7 +82,7 @@ export async function addFurniture(parent, items) {
     obj.position.set(-m.centre.x * sx, -m.min.y * sy, -m.centre.z * sz);   // centred on the footprint, standing on y = 0
     holder.add(obj);
     holder.rotation.y = Math.atan2(it.fx, it.fz);                          // the models face +Z
-    holder.position.set(it.x, it.y + 0.03, it.z);
+    holder.position.set(it.x, it.y + (o.flat ? 0.085 : 0.065), it.z);   // clear of the floor plane (0.03, 0.05 in a bath / dressing room): no flicker where they touch
     parent.add(holder);
   }));
 }
