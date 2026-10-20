@@ -73,7 +73,7 @@ function furnishRoom(room, L, ops) {
   // ---- doors and windows on this room's walls; the washroom of a bedroom is a block inside it
   const addZone = (o, c, at, w, kind) => {
     let z = null, into = null;
-    const swing = kind === 'window' ? 1 : isBath ? 1.4 : Math.max(2.7, w + 0.2), m = 0.1;
+    const swing = kind === 'window' ? 1 : isBath ? 1.7 : Math.max(2.7, w + 0.2), m = 0.1;
     if (o === 'h') {
       if (at < R.x0 - 0.1 || at > R.x1 + 0.1) return;
       if (eq(c, R.z0)) { z = { x0: at - w / 2 - m, x1: at + w / 2 + m, z0: R.z0, z1: R.z0 + swing }; into = [0, 1]; }
@@ -459,7 +459,9 @@ function furnishRoom(room, L, ops) {
   function bath() {
     const doorP = doorPts[0] || { x: centre.x, z: centre.z };
     const far = (x, z) => Math.hypot(x - doorP.x, z - doorP.z);
-    const tl = onWall('toilet', { clear: 0.9, score: (s) => far(s.cx, s.cz) * 0.4 - (s.fz !== 0 && Math.abs(s.cx - doorP.x) < 1.5 ? 3 : 0) });
+    // the seat: back to a wall, not on the wall straight across from the door (it would face whoever opens it), not under a window
+    const dr = doors[0], across = dr ? (dr.o === 'v' ? (dr.c < centre.x ? 'E' : 'W') : (dr.c < centre.z ? 'N' : 'S')) : null;
+    const tl = onWall('toilet', { clear: 0.9, score: (s, fp) => far(s.cx, s.cz) * 0.4 - (s.wall === across ? 6 : 0) - (windows.some((wn) => overlap(fp, wn)) ? 4 : 0) - (s.fz !== 0 && Math.abs(s.cx - doorP.x) < 1.5 ? 3 : 0) });
     const bsOpt = { clear: 0.8, score: (s) => -far(s.cx, s.cz) * 0.5 };
     const bs = onWall('basin', { ...bsOpt, tall: true }) || onWall('basin', bsOpt);          // the mirror above it should not cover a window
     if (bs) behind(bs, 'mirror', { y: 4.2 });
@@ -579,17 +581,22 @@ export function applyOverrides(items, L, over = {}) {
     if (!h.o) { out.push(it); continue; }
     out.push(place(it, { rot: h.o.rot || 0 }, { x0: h.it.x, z0: h.it.z, x1: h.n.x, z1: h.n.z }));
   }
-  // clashes: a moved piece over another solid piece
+  // a moved piece may not sit on another solid piece or in a doorway: it stays where the plan had it (flagged blocked so the editor can say so)
   const fp = (i) => rectOf(i.x, i.z, i.fx, i.fz, i.w, i.d);
   const solid = out.filter((i) => !i.soft && !i.deco);
   for (const a of solid) {
     if (!over[a.key]) continue;
     const fa = fp(a);
-    if (solid.some((b) => b !== a && b.room === a.room && overlap(fa, fp(b)))) a.clash = true;
+    let bad = solid.some((b) => b !== a && b.room === a.room && !over[b.key] && overlap(fa, fp(b)));
     for (const op of L.openings || []) {                          // nor in a doorway
       if (op.kind === 'window') continue;
-      const z = op.o === 'h' ? { x0: op.at - op.w / 2, x1: op.at + op.w / 2, z0: op.c - 1.2, z1: op.c + 1.2 } : { x0: op.c - 1.2, x1: op.c + 1.2, z0: op.at - op.w / 2, z1: op.at + op.w / 2 };
-      if (overlap(fa, z)) a.clash = true;
+      const z = op.o === 'h' ? { x0: op.at - op.w / 2, x1: op.at + op.w / 2, z0: op.c - 1.6, z1: op.c + 1.6 } : { x0: op.c - 1.6, x1: op.c + 1.6, z0: op.at - op.w / 2, z1: op.at + op.w / 2 };
+      if (overlap(fa, z)) bad = true;
+    }
+    if (bad) {
+      const orig = moved.get(a.key);
+      const k = out.indexOf(a);
+      if (orig && k >= 0) out[k] = { ...orig.it, blocked: true };
     }
   }
   void byKey;

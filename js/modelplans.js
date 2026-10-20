@@ -1,11 +1,11 @@
 // Turns a model-drafted plan (rows of rooms or a slicing tree) into the layout object the planner (2D plan, rule check,
 // 3D walkthrough) uses.
 import { OPEN, MARLA_SQFT, toRects, outsideDoors } from './bands.js';
-import { toRects as treeRects } from './tree.js';
+import { toRects as treeRects, check as treeCheck } from './tree.js';
 import { finalize, ruleFor } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
 import { tidyRects } from './tidy.js';
-import { balconyRoom, insetFor, wrapGround, dropTerrace, outsetFor, trimGround, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing } from './plantweak.js';
+import { balconyRoom, insetFor, wrapGround, dropTerrace, outsetFor, trimGround, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox } from './plantweak.js';
 import { draftPlans, sampleDrafts, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -201,6 +201,21 @@ export function supportShare(upperRects, groundRects) {
   return tot ? sup / tot : 1;
 }
 
+/** Share (0-1) of the first floor's washroom area that stands over a washroom of the ground floor: stacked wet areas share one plumbing stack. */
+export function stackShare(upperRects, groundRects) {
+  const baths = (rs) => rs.filter((r) => r.t === 'bath');
+  const G = baths(groundRects);
+  let tot = 0, over = 0;
+  for (const u of baths(upperRects)) {
+    tot += u.w * u.d;
+    for (const g of G) {
+      const w = Math.min(u.x + u.w, g.x + g.w) - Math.max(u.x, g.x), d = Math.min(u.y + u.d, g.y + g.d) - Math.max(u.y, g.y);
+      if (w > 0 && d > 0) over += w * d;
+    }
+  }
+  return tot ? Math.min(1, over / tot) : 1;
+}
+
 /** Area (sq ft) of the terrace of a first floor: the open roof of the floor below that it does not cover. */
 export const terraceArea = (rects) => rects.filter((r) => r.t === 'terrace').reduce((s, r) => s + r.w * r.d, 0);
 
@@ -267,6 +282,7 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   if (mode === 'both') {
     const b = await ladder('without', 2);
     const a = await ladder('with', b.length ? 2 : 3);
+    for (const arr of [a, b]) arr.sort((x, y) => stackShare(y.rects, ground.rects) - stackShare(x.rects, ground.rects));      // washrooms over washrooms first
     // a third kind: the terrace made smaller (or bigger when it cannot be smaller), so the cards do not all show the same terrace
     const near = (x) => a.some((y) => Math.abs(terraceArea(x.rects) - terraceArea(y.rects)) < 0.1 * terraceArea(y.rects));
     let c = [];
@@ -279,7 +295,19 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
     items = await ladder('without', 3);
     if (!items.length) { items = await ladder('with', 3); if (items.length) note = 'No first floor without a terrace fitted over this ground floor, so these have one.'; }
   } else items = await ladder(mode === 'any' ? null : mode, 3);
-  const out = items.map((it, i) => Object.assign(planToLayout(it, i), { terrace: Math.round(terraceArea(it.rects)) }));
+  items = items.map((it) => {                                    // the walls of the first floor are the walls of the ground floor
+    const p = refitBox(it.plan, fb.box);
+    if (p === it.plan) return it;
+    const rects = treeRects(p), checks = treeCheck(p, prefs.beds);
+    return checks.some((c) => c.level === 'err') || checks.filter((c) => c.level === 'ok').length < it.checks.filter((c) => c.level === 'ok').length ? it : { ...it, plan: p, rects, checks, grid: undefined };
+  });
+  const out = items.map((it, i) => {
+    const L = Object.assign(planToLayout(it, i), { terrace: Math.round(terraceArea(it.rects)) });
+    const share = stackShare(it.rects, ground.rects);              // shown as a rule line, so the visitor sees how well the plumbing lines up
+    L.checks.push({ level: share >= 0.5 ? 'ok' : 'warn', title: 'Washrooms above washrooms', detail: share >= 0.5 ? `${Math.round(share * 100)}% of the first-floor washroom area sits over a ground-floor washroom, so the pipes can share a stack.` : `Only ${Math.round(share * 100)}% of the first-floor washrooms sit over a washroom below; moving them over the ones below saves plumbing.` });
+    L.score = L.checks.filter((c) => c.level === 'ok').length;
+    return L;
+  });
   out.note = note;
   return out;
 }

@@ -937,3 +937,9 @@ if (qs.get('q')) {
   $('gen').click();
 }
 renderAdvice();                                                   // the questions that apply before anything is typed
+
+$('themebtn').addEventListener('click', () => {                    // light is the default; dark only when asked for
+  const dark = document.documentElement.dataset.theme !== 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  try { localStorage.setItem('naqsha-theme', dark ? 'dark' : 'light'); } catch { /* private window */ }
+});

@@ -397,3 +397,27 @@ export function upperDrawing(plan) {
   p.upDrawing = true;                                                  // the rule that keeps the drawing room downstairs is lifted for it
   return p;
 }
+
+/**
+ * A first floor stands on the ground floor's walls: its built outline is the ground floor's box. Polishing can pull an edge
+ * a few inches in (a 3 ft sliver of open air where the wall should be), so the open strips around the box are put back to
+ * the box's own size; the rooms inside grow into it (the last part of every cut takes the rest).
+ */
+export function refitBox(plan, box) {
+  if (!plan.tree || !box) return plan;
+  const p = clone(plan), { w: W, d: D } = plan.plot;
+  const peel = (node, k, before, size, total) => {
+    const after = total - before - size, lead = before > 0.01, tail = after > 0.01;
+    if (!lead && !tail) return node;
+    const isVoid = (n) => n && n.k === 'room' && (n.t === 'void' || n.t === 'lawn');
+    if (node.k !== k || node.kids.length !== 1 + lead + tail) return null;
+    if (lead && !isVoid(node.kids[0])) return null;
+    if (tail && !isVoid(node.kids[node.kids.length - 1])) return null;
+    node.sizes = lead ? (tail ? [before, size] : [before]) : [size];
+    return node.kids[lead ? 1 : 0];
+  };
+  const h = peel(p.tree, 'H', box.y, box.d, D);
+  if (!h) return plan;
+  if (!peel(h, 'V', box.x, box.w, W)) return plan;
+  return p;
+}

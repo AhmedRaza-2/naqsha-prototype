@@ -30,8 +30,8 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
+@media all {
+  :root[data-theme="dark"] {
     --bg: #2b2320;
     --bg-alt: #342b28;
     --ink: #f0ead9;
@@ -357,3 +357,11 @@ h2 { margin-top: 0; }
 
 @media (min-width: 1100px) { .prefs .row { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .dmain .pair svg { max-height: 340px; width: 100%; }
+
+/* ---------- theme switch (light by default; the browser setting is ignored) ---------- */
+.themebtn { margin-left: auto; width: 36px; height: 36px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); display: grid; place-items: center; cursor: pointer; transition: background 0.2s var(--ease), transform 0.2s var(--ease); }
+.themebtn:hover { background: var(--bg-alt); }
+.themebtn:active { transform: scale(0.94); }
+.themebtn .moon { display: none; }
+:root[data-theme="dark"] .themebtn .sun { display: none; }
+:root[data-theme="dark"] .themebtn .moon { display: block; }

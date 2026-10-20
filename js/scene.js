@@ -552,7 +552,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   if (!U) roofOf(B, H, roofG, 2.6, null, true);
   else {
     roofOf(B, H, midG, 3, stairsRoom, false, U.rooms.filter((r) => !r.parent));   // the ground floor's roof is the upstairs floor, and its open part the terrace
-    roofOf(U.B, STOREY + H, roofG, 2.6, null, true);
+    roofOf(U.B, STOREY + H, roofG, 2.6, upStairs && site.roof !== 'hip' ? upStairs : null, true);      // the stairs go on up through the roof slab
     // a guard wall round the terrace edge keeps walkers on the slab
     upperColliders.push({ x0: B.x - 2, x1: B.x - 0.4, z0: B.z - 2, z1: B.z + B.d + 2 }, { x0: B.x + B.w + 0.4, x1: B.x + B.w + 2, z0: B.z - 2, z1: B.z + B.d + 2 },
       { x0: B.x - 2, x1: B.x + B.w + 2, z0: B.z - 2, z1: B.z - 0.4 }, { x0: B.x - 2, x1: B.x + B.w + 2, z0: B.z + B.d + 0.4, z1: B.z + B.d + 2 });
@@ -617,6 +617,39 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       return d.o === 'h' ? { x: d.at, z: d.c + away * 2.4 } : { x: d.c + away * 2.4, z: d.at };
     };
     stairs = { room: sr, alongX, lo, len, wid, dir, s0, s1, n, h: hOf, entry: [push(L, sr, gd), push(U, upStairs, ud)] };
+  }
+
+  // ---------- the way up to the roof: the same stairs turn back and climb on to a stair-head room (mumty) on the roof ----------
+  if (U && stairs && upStairs && site.roof !== 'hip') {
+    const sr = upStairs, { alongX, len, dir, s0, s1 } = stairs, yR = STOREY + H + SLAB, rise = yR - STOREY, n2 = 16, tr = (s1 - s0) / n2;
+    const mStep = st.floorLiving.startsWith('marble') ? texMat(st.floorLiving, { roughness: 0.35 }, 4) : mTrim;
+    const span = (u0, u1) => (dir > 0 ? [u0, u1] : [len - u1, len - u0]);
+    const lift = 0.55;                                              // the turn: the first step of the second flight sits one rise above the landing
+    for (let i = 0; i < n2; i++) {                                  // the second flight runs back over the first, from the landing end to the far end
+      const [a0, a1] = span(s1 - (i + 1) * tr, s1 - i * tr), top = STOREY + lift + ((i + 1) / n2) * (rise - lift);
+      if (alongX) box(stairsG, sr.x + a0, sr.x + a1, top - 0.45, top, sr.z + 0.05, sr.z + sr.d - 0.05, mStep, false);
+      else box(stairsG, sr.x + 0.05, sr.x + sr.w - 0.05, top - 0.45, top, sr.z + a0, sr.z + a1, mStep, false);
+    }
+    const t = 0.45, wh = 7.6, cx = U.B.x + U.B.w / 2, cz = U.B.z + U.B.d / 2;          // the stair-head room: walls, a door towards the middle of the roof, a slab on top
+    const doorOnX = Math.abs(cx - (sr.x + sr.w / 2)) > Math.abs(cz - (sr.z + sr.d / 2));
+    const dSign = doorOnX ? Math.sign(cx - (sr.x + sr.w / 2)) || 1 : Math.sign(cz - (sr.z + sr.d / 2)) || 1;
+    const x0 = sr.x - t, x1 = sr.x + sr.w + t, z0 = sr.z - t, z1 = sr.z + sr.d + t, gw = Math.min(3.2, (doorOnX ? sr.d : sr.w) - 0.8), gh = 6.8;
+    const wall = (a0, a1, b0, b1) => box(roofG, a0, a1, yR, yR + wh, b0, b1, mExt);
+    const gapW = (lo, hi) => { const m = (lo + hi) / 2; return [m - gw / 2, m + gw / 2]; };
+    if (doorOnX) {
+      const [g0, g1] = gapW(sr.z, sr.z + sr.d), xs = dSign > 0 ? [x1 - t, x1] : [x0, x0 + t];
+      wall(x0, x1, z0, sr.z); wall(x0, x1, sr.z + sr.d, z1);
+      wall(dSign > 0 ? x0 : x0 + t, dSign > 0 ? x1 - t : x1, sr.z, sr.z + sr.d);
+      wall(xs[0], xs[1], sr.z, g0); wall(xs[0], xs[1], g1, sr.z + sr.d); box(roofG, xs[0], xs[1], yR + gh, yR + wh, g0, g1, mExt);
+      box(roofG, xs[0] - 0.1, xs[1] + 0.1, yR, yR + 0.06, g0, g1, mTrim, false);
+    } else {
+      const [g0, g1] = gapW(sr.x, sr.x + sr.w), zs = dSign > 0 ? [z1 - t, z1] : [z0, z0 + t];
+      wall(x0, sr.x, z0, z1); wall(sr.x + sr.w, x1, z0, z1);
+      wall(sr.x, sr.x + sr.w, dSign > 0 ? z0 : z0 + t, dSign > 0 ? z1 - t : z1);
+      wall(sr.x, g0, zs[0], zs[1]); wall(g1, sr.x + sr.w, zs[0], zs[1]); box(roofG, g0, g1, yR + gh, yR + wh, zs[0], zs[1], mExt);
+      box(roofG, g0, g1, yR, yR + 0.06, zs[0] - 0.1, zs[1] + 0.1, mTrim, false);
+    }
+    box(roofG, x0 - 0.3, x1 + 0.3, yR + wh, yR + wh + 0.4, z0 - 0.3, z1 + 0.3, mConcrete);
   }
 
   // ---------- balcony of the first floor (an open space of type balcony in front of the box) ----------

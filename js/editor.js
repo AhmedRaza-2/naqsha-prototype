@@ -329,7 +329,7 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     pick.style.left = Math.min(box.width - 190, Math.max(0, cx - box.left - 20)) + 'px';
     pick.style.top = Math.max(0, cy - box.top + 10) + 'px';
     const moved = !!(L.plan.furnPos && L.plan.furnPos[key]);
-    pick.innerHTML = `<b>${NAMES[it.k] || 'Piece'}</b><div class="row"><button type="button" data-a="turn">Turn</button><button type="button" data-a="hide">Remove</button>${moved ? '<button type="button" data-a="reset">Put back</button>' : ''}</div>${it.clash ? '<span class="msg">It sits on another piece or in a doorway. Drag it somewhere free.</span>' : '<span class="msg muted">Drag it to move it.</span>'}`;
+    pick.innerHTML = `<b>${NAMES[it.k] || 'Piece'}</b><div class="row"><button type="button" data-a="turn">Turn</button><button type="button" data-a="hide">Remove</button>${moved ? '<button type="button" data-a="reset">Put back</button>' : ''}</div>${it.clash || it.blocked ? '<span class="msg">That spot is taken (another piece or a doorway), so it stays here. Drag it somewhere free.</span>' : '<span class="msg muted">Drag it to move it.</span>'}`;
     host.append(pick);
     pick.querySelectorAll('button').forEach((b) => b.onclick = () => {
       const next = clone(L.plan), fp = (next.furnPos ||= {}), o = { ...(fp[key] || {}) };

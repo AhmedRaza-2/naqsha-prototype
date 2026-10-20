@@ -86,7 +86,7 @@ export function finalize(L) {
     kitchen: ['dining', 'lounge', 'lobby', 'passage'],
     dining: ['lounge', 'kitchen'],
   };
-  for (const r of mains) {
+  for (const r of [...mains].sort((a, b) => (b.type === 'stairs') - (a.type === 'stairs'))) {   // the stairs first: their one door is then known to the rooms after
     if (r.type === 'lounge') continue;
     const prefs = r.type === 'bed'
       ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge', 'passage'] : ['lounge', 'dining', 'lobby', 'passage', 'drawing', 'kitchen'])
@@ -132,7 +132,7 @@ export function finalize(L) {
     }
     if (!pick && !narrow) {                                         // any other neighbour with a clear stretch of wall
       for (const q of mains) {
-        if (q === r || (r.type === 'bed' && q.type === 'kitchen')) continue;
+        if (q === r || (r.type === 'bed' && q.type === 'kitchen') || (q.type === 'stairs' && !L.upper)) continue;   // the flight has the one door at its foot, no other room opens onto it
         const s0 = shared(r, q);
         if (!s0) continue;
         const [a1, b1] = doorSpan(r, s0.o, s0.c, s0.lo, s0.hi), [a2, b2] = doorSpan(q, s0.o, s0.c, a1, b1);
@@ -140,6 +140,7 @@ export function finalize(L) {
       }
     }
     pick ||= narrow || any;
+    if (pick && pick.q.type === 'stairs' && (!L.upper || openings.some((o) => o.kind !== 'window' && (o.room === pick.q.id || o.to === pick.q.id)))) pick = null;   // a second door onto the stairs
     if (!pick) continue;
     const { q, s } = pick;
     const len = s.hi - s.lo;
