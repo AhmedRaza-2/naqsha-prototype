@@ -201,6 +201,25 @@ export function supportShare(upperRects, groundRects) {
   return tot ? sup / tot : 1;
 }
 
+/** How far the first floor's outline is from the ground floor's, in sq ft: rooms standing outside the ground floor's built outline plus
+ *  built ground-floor area the first floor (rooms or terrace) does not cover. 0 means the outer walls are the same. */
+export function outlineGap(upperRects, groundRects) {
+  const cells = (rs, keep) => {
+    const set = new Set();
+    for (const r of rs) {
+      if (r.parent !== undefined || r.t === 'bath' || !keep(r)) continue;
+      for (let x = Math.round(r.x * 2); x < Math.round((r.x + r.w) * 2); x++) for (let y = Math.round(r.y * 2); y < Math.round((r.y + r.d) * 2); y++) set.add(x + ',' + y);
+    }
+    return set;
+  };
+  const G = cells(groundRects, (r) => !OPEN.has(r.t));
+  const rooms = cells(upperRects, (r) => !OPEN.has(r.t)), all = cells(upperRects, (r) => !OPEN.has(r.t) || r.t === 'terrace');
+  let out = 0, miss = 0;
+  for (const c of rooms) if (!G.has(c)) out++;
+  for (const c of G) if (!all.has(c)) miss++;
+  return (out + miss) / 4;
+}
+
 /** Share (0-1) of the first floor's washroom area that stands over a washroom of the ground floor: stacked wet areas share one plumbing stack. */
 export function stackShare(upperRects, groundRects) {
   const baths = (rs) => rs.filter((r) => r.t === 'bath');
@@ -266,7 +285,7 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
     for (let round = 0; round < 1 + more; round++) {
       if (round > 0 && opts.quick && items.length) break;             // the houses are pre-drafted: one more round only when nothing was found
       if (round > 0) await draw(opts.quick ? 24 : 30);                // big upper floors are drafted validly only now and then: sample more
-      for (const lvl of variant === 'without' ? [0.7] : [0.97, 0.88, 0.7]) {
+      for (const lvl of variant === 'without' ? [0.999, 0.9] : [0.999, 0.97, 0.88]) {       // the walls stand on the ground floor's walls: no room over the yard first
         const t0 = Date.now();
         const more = await cut(lvl, variant);
         dbg(variant || 'any', 'support', lvl, '->', more.length, 'in', Date.now() - t0, 'ms');
@@ -282,7 +301,9 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   if (mode === 'both') {
     const b = await ladder('without', 2);
     const a = await ladder('with', b.length ? 2 : 3);
-    for (const arr of [a, b]) arr.sort((x, y) => stackShare(y.rects, ground.rects) - stackShare(x.rects, ground.rects));      // washrooms over washrooms first
+    const gap = (x) => Math.min(8, Math.floor(outlineGap(x.rects, ground.rects) / 4));
+    const sup = (x) => Math.floor(supportShare(x.rects, ground.rects) * 50);
+    for (const arr of [a, b]) arr.sort((x, y) => (gap(x) - gap(y)) || (sup(y) - sup(x)) || (stackShare(y.rects, ground.rects) - stackShare(x.rects, ground.rects)));      // standing on the ground floor first, then washrooms over washrooms
     // a third kind: the terrace made smaller (or bigger when it cannot be smaller), so the cards do not all show the same terrace
     const near = (x) => a.some((y) => Math.abs(terraceArea(x.rects) - terraceArea(y.rects)) < 0.1 * terraceArea(y.rects));
     let c = [];
@@ -299,12 +320,15 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
     const p = refitBox(it.plan, fb.box);
     if (p === it.plan) return it;
     const rects = treeRects(p), checks = treeCheck(p, prefs.beds);
+    if (outlineGap(rects, ground.rects) > outlineGap(it.rects, ground.rects)) return it;      // only when it brings the walls closer to the ground floor's
     return checks.some((c) => c.level === 'err') || checks.filter((c) => c.level === 'ok').length < it.checks.filter((c) => c.level === 'ok').length ? it : { ...it, plan: p, rects, checks, grid: undefined };
   });
   const out = items.map((it, i) => {
     const L = Object.assign(planToLayout(it, i), { terrace: Math.round(terraceArea(it.rects)) });
     const share = stackShare(it.rects, ground.rects);              // shown as a rule line, so the visitor sees how well the plumbing lines up
     L.checks.push({ level: share >= 0.5 ? 'ok' : 'warn', title: 'Washrooms above washrooms', detail: share >= 0.5 ? `${Math.round(share * 100)}% of the first-floor washroom area sits over a ground-floor washroom, so the pipes can share a stack.` : `Only ${Math.round(share * 100)}% of the first-floor washrooms sit over a washroom below; moving them over the ones below saves plumbing.` });
+    const gp = outlineGap(it.rects, ground.rects);
+    L.checks.push({ level: gp < 1 ? 'ok' : 'warn', title: 'Same outer walls as the ground floor', detail: gp < 1 ? `The first floor stands on exactly the ground floor's outline.` : `The outline differs from the ground floor's by about ${Math.round(gp)} sq ft.` });
     L.score = L.checks.filter((c) => c.level === 'ok').length;
     return L;
   });

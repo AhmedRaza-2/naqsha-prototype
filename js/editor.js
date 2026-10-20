@@ -207,7 +207,7 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
   st.history ||= [];
   const { original, history } = st;
   let L = layout, drag = null;
-  const OPTS = { maxW: 640, maxH: 760 };
+  const OPTS = { maxW: 640, maxH: 760 };                        // read the other way round when the plan lies on its side
   const off = new AbortController();                            // removes the listeners when another layout is edited
   const sig = { signal: off.signal };
 
@@ -246,7 +246,8 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     const svg = host.querySelector('svg');
     const box = svg.getBoundingClientRect();
     const vb = svg.viewBox.baseVal;
-    return { px: ((e.clientX - box.left) / box.width) * vb.width, py: ((e.clientY - box.top) / box.height) * vb.height };
+    const ox = ((e.clientX - box.left) / box.width) * vb.width, oy = ((e.clientY - box.top) / box.height) * vb.height;
+    return svg.dataset.turn ? { px: oy, py: vb.width - ox } : { px: ox, py: oy };          // a plan on its side: back to the upright drawing's coordinates
   };
 
   // the edit is computed once per animation frame from the latest pointer position, and once more on release

@@ -6,27 +6,33 @@ const FILL = {
 };
 const PAPER = '#fbf8f1', YARD = '#efeae2', INK = '#3a2f2c', WINDOW = '#6f8f96';
 
-/** Drawing scale of a plan: feet -> SVG units (x across, z from the road, which is at the bottom). */
-export function planFrame(L, { maxW = 320, maxH = 470 } = {}) {
+/** Drawing scale of a plan: feet -> SVG units (x across, z from the road, which is at the bottom of the plan as drawn).
+ *  The plan is shown turned on its side (`landscape`, the road on the left) so a long plot lies across the screen; the box
+ *  maxW x maxH is then read the other way round, so a plan keeps the size it had standing up. X and Y are the plan's own
+ *  (upright) coordinates; vw x vh is the size the SVG ends up with. */
+export function planFrame(L, { maxW = 320, maxH = 470, landscape = true } = {}) {
   const { w: W, d: D } = L.plot;
-  const m = 24, road = 20;
-  const s = Math.min((maxW - 2 * m) / W, (maxH - 2 * m - road) / D);
-  return { s, m, vw: 2 * m + W * s, vh: 2 * m + D * s + road, X: (x) => m + x * s, Y: (z) => m + (D - z) * s };
+  const m = 24, road = 20, turn = landscape && D > W * 1.05;
+  const [bw, bh] = turn ? [maxH, maxW] : [maxW, maxH];
+  const s = Math.min((bw - 2 * m) / W, (bh - 2 * m - road) / D);
+  const iw = 2 * m + W * s, ih = 2 * m + D * s + road;
+  return { s, m, turn, iw, ih, vw: turn ? ih : iw, vh: turn ? iw : ih, X: (x) => m + x * s, Y: (z) => m + (D - z) * s };
 }
 
 /** overlay(frame) -> extra SVG markup drawn on top (the editor's drag handles). */
-export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = null, furniture = false } = {}) {
+export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = null, furniture = false, landscape = true } = {}) {
   const { w: W, d: D } = L.plot;
-  const frame = planFrame(L, { maxW, maxH });
-  const { s, X, Y, vw, vh } = frame;
+  const frame = planFrame(L, { maxW, maxH, landscape });
+  const { s, X, Y, iw: vw, ih: vh } = frame;           // the upright drawing's own size
   const B = L.B;
-  let o = `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan ${L.label}">`;
+  const off = (x, y, dx, dy) => (frame.turn ? [x + dy, y - dx] : [x + dx, y + dy]);   // a point dx to the right and dy down of (x, y) as the viewer sees the plan
+  let o = '', txt = '';                                           // txt: the labels, which are turned back upright when the plan lies on its side
   o += `<rect x="${X(0)}" y="${Y(D)}" width="${W * s}" height="${D * s}" fill="${PAPER}" stroke="${INK}" stroke-width="1.5"/>`;
   const open = L.open || [];
   const innerPorch = open.some((p) => p.type === 'porch');      // any car porch: the front strip is then just lawn
   if (!L.upper) {
     o += `<rect x="${X(0)}" y="${Y(B.z)}" width="${W * s}" height="${B.z * s}" fill="${YARD}"/>`;
-    o += `<text x="${X(W / 2)}" y="${Y(B.z / 2) + 3}" font-size="9" fill="#8a8678" text-anchor="middle">${innerPorch ? 'lawn' : 'porch / lawn'}</text>`;
+    { const [lx, ly] = off(X(W / 2), Y(B.z / 2), 0, 3); txt += `<text x="${lx}" y="${ly}" font-size="9" fill="#8a8678" text-anchor="middle">${innerPorch ? 'lawn' : 'porch / lawn'}</text>`; }
   }
   o += `<rect x="${X(B.x)}" y="${Y(B.z + B.d)}" width="${B.w * s}" height="${B.d * s}" fill="none" stroke="#999" stroke-dasharray="3 3" stroke-width=".8"/>`;
   // car porch and light wells inside the house outline: open to the sky or roofed, but not rooms
@@ -64,31 +70,39 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
     const fit = (txt, fs, maxPx) => Math.max(5.2, Math.min(fs, maxPx / (txt.length * 0.56)));   // shrink text that would not fit its room
     for (const r of L.rooms) {
       const cx = X(r.x + r.w / 2), cy = Y(r.z + r.d / 2);
-      const small = r.parent || r.w * s < 62;
+      const across = frame.turn ? r.d : r.w;                       // the room's width as the viewer sees it
+      const small = r.parent || across * s < 62;
       const fs = r.parent ? 7 : small ? 8 : 9.5;
       const nm = r.parent ? (r.name === 'Guest Bath' ? 'Guest bath' : r.name === 'Common Bath' ? 'Common bath' : 'Bath')
         : r.name.replace('Bedroom', 'Bed').replace('Master Bed', 'Master Bed').replace('Drawing Room', 'Drawing').replace('Lounge & Dining', 'Lounge/Dining');
       let tx = cx, ty = cy;
-      if (r.parent) { tx = X(r.x + r.w / 2); ty = Y(r.z + r.d / 2) - 3; }
+      const nameDy = r.parent ? -3 : 0;
+      if (r.parent) { tx = X(r.x + r.w / 2); ty = Y(r.z + r.d / 2); }
       else if (r.att) { ty = Y(r.z + r.d / 2) + (r.att.z > r.z + r.d / 2 ? 0 : 0); tx = X(r.x + (r.att.x > r.x ? (r.w - r.att.w) / 2 : r.att.w + (r.w - r.att.w) / 2)); }
-      const maxPx = r.w * s - 4;
+      const maxPx = across * s - 4;
       const size = `${fmtFt(r.w)}' x ${fmtFt(r.d)}'`;
-      o += `<text x="${tx}" y="${ty}" font-size="${fit(nm, fs, maxPx)}" text-anchor="middle" fill="#222" font-weight="${r.parent ? 500 : 600}" ${halo}>${nm}</text>`;
+      const [nx, ny] = off(tx, ty, 0, nameDy), [zx, zy] = off(tx, ty, 0, nameDy + (r.parent ? 8 : 10));
+      txt += `<text x="${nx}" y="${ny}" font-size="${fit(nm, fs, maxPx)}" text-anchor="middle" fill="#222" font-weight="${r.parent ? 500 : 600}" ${halo}>${nm}</text>`;
       // every room shows its size, washrooms and the kitchen included
-      o += `<text x="${tx}" y="${ty + (r.parent ? 8 : 10)}" font-size="${fit(size, r.parent ? 6.4 : 7.5, maxPx)}" text-anchor="middle" fill="#444" ${halo}>${size}</text>`;
+      txt += `<text x="${zx}" y="${zy}" font-size="${fit(size, r.parent ? 6.4 : 7.5, maxPx)}" text-anchor="middle" fill="#444" ${halo}>${size}</text>`;
     }
     for (const p of open) {
-      const cx = X(p.x + p.w / 2), cy = Y(p.z + p.d / 2), maxPx = p.w * s - 4;
+      const cx = X(p.x + p.w / 2), cy = Y(p.z + p.d / 2), maxPx = (frame.turn ? p.d : p.w) * s - 4, [sx, sy] = off(cx, cy, 0, 10);
       const nm = p.type === 'porch' ? (p.w >= 9.5 ? `Car porch (${p.w >= 25.5 ? 3 : p.w >= 17.5 ? 2 : 1} car${p.w >= 17.5 ? 's' : ''})` : 'Small porch') : p.type === 'terrace' ? 'Terrace' : p.type === 'balcony' ? 'Balcony' : 'Light well', size = `${fmtFt(p.w)}' x ${fmtFt(p.d)}'`;
-      o += `<text x="${cx}" y="${cy}" font-size="${fit(nm, 8.5, maxPx)}" text-anchor="middle" fill="#6f6b5e" font-weight="600" ${halo}>${nm}</text>`;
-      o += `<text x="${cx}" y="${cy + 10}" font-size="${fit(size, 7.2, maxPx)}" text-anchor="middle" fill="#6f6b5e" ${halo}>${size}</text>`;
+      txt += `<text x="${cx}" y="${cy}" font-size="${fit(nm, 8.5, maxPx)}" text-anchor="middle" fill="#6f6b5e" font-weight="600" ${halo}>${nm}</text>`;
+      txt += `<text x="${sx}" y="${sy}" font-size="${fit(size, 7.2, maxPx)}" text-anchor="middle" fill="#6f6b5e" ${halo}>${size}</text>`;
     }
   }
-  o += `<text x="${X(W / 2)}" y="${Y(0) + 13}" font-size="9" text-anchor="middle" fill="#666">${W} ft</text>`;
-  o += `<text x="${X(0) - 10}" y="${Y(D / 2)}" font-size="9" text-anchor="middle" fill="#666" transform="rotate(-90 ${X(0) - 10} ${Y(D / 2)})">${D} ft</text>`;
-  o += `<rect x="${X(-3)}" y="${vh - 9}" width="${W * s + 6 * s}" height="6" fill="#8d8d8d"/><text x="${X(W / 2)}" y="${vh - 3.6}" font-size="5.5" fill="#fff" text-anchor="middle" letter-spacing="2">ROAD</text>`;
+  txt += `<text x="${X(W / 2)}" y="${Y(0) + 13}" font-size="9" text-anchor="middle" fill="#666">${W} ft</text>`;
+  txt += `<text x="${X(0) - 10}" y="${Y(D / 2)}" font-size="9" text-anchor="middle" fill="#666" transform="rotate(-90 ${X(0) - 10} ${Y(D / 2)})">${D} ft</text>`;
+  o += `<rect x="${X(-3)}" y="${vh - 9}" width="${W * s + 6 * s}" height="6" fill="#8d8d8d"/>`;
+  if (!frame.turn) txt += `<text x="${X(W / 2)}" y="${vh - 3.6}" font-size="5.5" fill="#fff" text-anchor="middle" letter-spacing="2">ROAD</text>`;
+  if (frame.turn) txt = txt.replace(/<text x="([-\d.]+)" y="([-\d.]+)"(?![^>]*transform=)/g, '<text x="$1" y="$2" transform="rotate(-90 $1 $2)"');
+  o += txt;
   if (overlay) o += overlay(frame);
-  return o + '</svg>';
+  // lying on its side: turned a quarter, the road on the left (a point (x, y) of the upright drawing lands at (ih - y, x))
+  const body = frame.turn ? `<g transform="translate(${frame.ih} 0) rotate(90)">${o}</g>` : o;
+  return `<svg viewBox="0 0 ${frame.vw} ${frame.vh}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan ${L.label}"${frame.turn ? ' data-turn="1"' : ''}>${body}</svg>`;
 }
 
 /** Front elevation. U: the first-floor layout of a two-storey house (its storey is drawn above the ground floor). */

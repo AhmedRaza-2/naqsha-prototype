@@ -225,6 +225,19 @@ export async function sampleDrafts(request, { n = 12, temperature = 0.8, onStatu
   return sample(request, styles.flatMap((st) => new Array(per).fill(st)), { temperature }, onStatus);
 }
 
+/** How cramped a plan's rooms are against comfortable sizes (the rule check's minimums are lower): 0 when none is, more when rooms are small.
+ *  Used to prefer the roomier of plans that pass the same rules. */
+const COMFORT = { bed: [110, 10], master: [140, 11], drawing: [130, 10], lounge: [120, 9], kitchen: [75, 7.5], dining: [70, 7], lobby: [25, 4.5], study: [80, 8], bath: [28, 4.5] };
+export function cramped(rects) {
+  let c = 0;
+  for (const r of rects) {
+    const m = COMFORT[r.t];
+    if (!m) continue;
+    c += Math.max(0, (m[0] - r.w * r.d) / m[0]) + Math.max(0, (m[1] - Math.min(r.w, r.d)) / m[1]);
+  }
+  return c;
+}
+
 export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, exclude = new Set(), onStatus, styles = [null], keep = () => true, hang = null, embed = null, drafts: given = null } = {}) {
   const per = Math.max(1, Math.round(n / styles.length));
   const want = styles.flatMap((st) => new Array(per).fill(st));
@@ -244,7 +257,7 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
       if (request.tidy) plan.tidy = request.tidy;
       const checks = request.rule || changed ? (plan.tree ? treeCheck(plan, request.beds) : rowCheck(plan, request.beds)) : parsed.checks;
       if (checks.some((c) => c.level === 'err')) continue;
-      const item = { text, plan, rects, checks, score: score(checks), style: fam };
+      const item = { text, plan, rects, checks, score: score(checks), style: fam, cramp: cramped(rects) };
       if (keep(item)) good.push(item);
     } catch (e) { if (window.__S) console.log('[draft skip]', String(e.message).slice(0, 80), text.slice(0, 220)); /* malformed output: skip */ }
   }
@@ -264,7 +277,7 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
     if (!r) continue;
     Object.assign(g, { plan: r.plan, checks: r.checks, score: r.score, rects: r.plan.tree ? treeRects(r.plan) : rowRects(r.plan), polished: r.moves });
   }
-  good.sort((a, b) => b.score - a.score);
+  good.sort((a, b) => (b.score - a.score) || (a.cramp - b.cramp));       // among plans that pass the same rules, the roomier first
   const picked = [];
   for (const st of styles) {                                          // the best plan of each family first: three different layouts
     const best = good.find((g) => g.style === st && !picked.includes(g));
@@ -275,7 +288,8 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
   while (picked.length < top) {
     const rest = good.filter((g) => !picked.includes(g));
     if (!rest.length) break;
-    const near = rest.filter((g) => g.score >= rest[0].score - 0.05);
+    const roomy = Math.min(...rest.filter((g) => g.score >= rest[0].score - 0.05).map((g) => g.cramp));
+    const near = rest.filter((g) => g.score >= rest[0].score - 0.05 && g.cramp <= roomy + 0.25);      // not much more cramped than the roomiest of them
     const apart = (g) => Math.min(...picked.map((p) => layoutDistance(g, p)));
     picked.push(picked.length ? near.reduce((a, b) => (apart(b) > apart(a) ? b : a)) : near[0]);
   }

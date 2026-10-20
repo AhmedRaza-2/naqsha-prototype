@@ -136,7 +136,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .regen-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 20px; }
 
 /* ---------- layout cards ---------- */
-.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+.grid3 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; }
 .opt { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; cursor: pointer; text-align: left; font: inherit; color: inherit;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.3s var(--ease); display: flex; flex-direction: column; }
 .opt:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(168, 108, 71, 0.08); }
@@ -180,7 +180,7 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 .editor-actions { display: flex; gap: 8px; }
 .editor-actions .btn { height: 40px; }
 .edhost { display: flex; justify-content: center; touch-action: none; user-select: none; }
-.edhost svg { width: 100%; max-width: 640px; height: auto; }
+.edhost svg { width: 100%; max-width: 900px; height: auto; }
 .edhost .h { cursor: col-resize; }
 .edhost .h.hz { cursor: row-resize; }
 .edhost .h .hit { stroke: transparent; stroke-width: 14; }
@@ -273,7 +273,7 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 .mini select { min-width: 112px; }
 .mini select#vwall, .mini select#vgate, .mini select#vcar, .mini select#vcarc, .mini select#vwallh { min-width: 96px; }
 
-.duo { display: flex; gap: 8px; align-items: flex-start; }
+.duo { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .duo figure { flex: 1 1 0; min-width: 0; margin: 0; }
 .duo figcaption { font-size: 11px; color: var(--muted, #7a7568); margin-bottom: 2px; text-align: center; }
 .duo svg { width: 100%; height: auto; display: block; }
@@ -311,8 +311,8 @@ h2 { margin-top: 0; }
 .work:has(> .editor[hidden]) .stack { grid-template-columns: 1.4fr 1fr; }
 .usplit { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 24px; }
 .uside { position: sticky; top: 76px; display: grid; gap: 12px; }
-.uside .pair { grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; padding: 12px; }
-.uside .pair svg { max-height: 300px; width: 100%; }
+.uside .pair { grid-template-columns: 1fr; gap: 8px; margin: 0; padding: 12px; }
+.uside .pair svg { max-height: 240px; width: 100%; }
 .uside .pair figcaption { font-size: 0.85rem; }
 .uside .regen-row { display: grid; gap: 8px; margin: 0; }
 .uside .regen-row .mini { margin-left: 0; }
@@ -365,3 +365,8 @@ h2 { margin-top: 0; }
 .themebtn .moon { display: none; }
 :root[data-theme="dark"] .themebtn .sun { display: none; }
 :root[data-theme="dark"] .themebtn .moon { display: block; }
+
+/* the three house renders stay in a row; the plan cards (drawn on their side) get two columns so the labels stay readable */
+#styles.grid3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 1000px) { #styles.grid3 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { #styles.grid3 { grid-template-columns: 1fr; } }
