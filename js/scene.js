@@ -4,7 +4,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { STYLES } from './styles.js';
 import { furnish } from './furniture.js';
 import { addFurniture, furnitureColliders } from './furn3d.js';
-import { loadCar } from './car3d.js';
+import { loadCar, CARS } from './car3d.js';
+import { turningStair, stairPlan } from './layout.js';
 
 const H = 10; // wall height (ft)
 const EYE = 5.4;
@@ -264,14 +265,35 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   cwall(0, W, D - cw / 2, D + cw / 2);
   if (rule.side > 0) { cwall(-cw / 2, cw / 2, 0, D); cwall(W - cw / 2, W + cw / 2, 0, D); }
   if (site.wall !== 'none') [gateLo - 0.4, gateHi + 0.4].forEach((x) => { box(world, x - 0.7, x + 0.7, 0, Math.max(6, ch + 1.5), -0.75, 0.75, mStone, true); box(world, x - 0.85, x + 0.85, Math.max(6, ch + 1.5), Math.max(6, ch + 1.5) + 0.4, -0.9, 0.9, mTrim); });
-  if (site.wall !== 'none') {                                       // the gate: a sliding leaf parked beside the gateway, or two swing leaves
+  if (site.wall !== 'none') {                                       // the gate: a sliding leaf parked beside the gateway, or two swing leaves; it opens and closes like the doors
     const gw = gateHi - gateLo, gh = Math.max(5.3, ch + 0.8);
-    const leaf = (g0, g1, z0, z1) => {
-      box(world, g0, g1, 0.2, 0.45, z0, z1, mGrill); box(world, g0, g1, gh - 0.3, gh, z0, z1, mGrill);
-      for (let x = g0 + 0.25; x < g1; x += 0.45) box(world, x - 0.04, x + 0.04, 0.2, gh, z0 + 0.03, z1 - 0.03, mGrill, false);
+    const leaf = (parent, g0, g1, z0, z1) => {
+      box(parent, g0, g1, 0.2, 0.45, z0, z1, mGrill); box(parent, g0, g1, gh - 0.3, gh, z0, z1, mGrill);
+      for (let x = g0 + 0.25; x < g1; x += 0.45) box(parent, x - 0.04, x + 0.04, 0.2, gh, z0 + 0.03, z1 - 0.03, mGrill, false);
     };
-    if (site.gate === 'swing') { leaf(gateLo, gateLo + gw / 2 - 0.1, -1.6, -1.45); leaf(gateHi - gw / 2 + 0.1, gateHi, -1.6, -1.45); }
-    else { const right = gateHi + gw <= W - 0.4; const g0 = right ? gateHi + 0.3 : gateLo - gw - 0.3; leaf(g0, g0 + gw, 0.35, 0.5); }
+    const gateDoor = (d) => {
+      Object.assign(d, { t: 1, target: 1, upper: false, dy: 0, name: 'Main gate', main: false, z: 0.4 });
+      d.col.door = d; d.col.k = 'door';
+      (d.kind === 'swing' ? d.mesh : d.slide).traverse((q) => { q.userData.door = d; });
+      colliders.push(d.col); doorList.push(d);
+    };
+    if (site.gate === 'swing') {                                    // two leaves hinged on the pillars, swinging in towards the house
+      [[gateLo, 1, -Math.PI / 2], [gateHi, -1, Math.PI / 2]].forEach(([hx, dir, open], i) => {
+        const pivot = new THREE.Group(); pivot.position.set(hx, 0, 0.4); world.add(pivot);
+        const mesh = new THREE.Group(); pivot.add(mesh);
+        const x0 = dir > 0 ? 0.05 : -gw / 2 + 0.1, x1 = dir > 0 ? gw / 2 - 0.1 : -0.05;
+        leaf(mesh, x0, x1, -0.08, 0.08);
+        pivot.rotation.y = open;
+        gateDoor({ kind: 'swing', pivot, open, mesh, x: hx + dir * gw / 4, col: { x0: Math.min(hx, hx + dir * (gw / 2 - 0.1)), x1: Math.max(hx, hx + dir * (gw / 2 - 0.1)), z0: 0.1, z1: 0.7 } });
+      });
+    } else {
+      const right = gateHi + gw <= W - 0.4, g0 = right ? gateHi + 0.3 : gateLo - gw - 0.3;
+      const slide = new THREE.Group(); world.add(slide);
+      leaf(slide, gateLo, gateHi, 0.35, 0.5);                       // drawn across the gateway; slid aside when open
+      const travel = g0 - gateLo;
+      slide.position.x = travel;
+      gateDoor({ kind: 'slide', slide, axis: 'x', travel, open: 1, x: gateX, col: { x0: gateLo, x1: gateHi, z0: 0.1, z1: 0.75 } });
+    }
   }
 
   // ---------- walls, floors, furniture: one storey (dy = height of its floor) ----------
@@ -566,7 +588,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   let stairs = null;
   if (U && stairsRoom && upStairs) {
     const sr = stairsRoom, alongX = sr.w > sr.d, len = alongX ? sr.w : sr.d, wid = alongX ? sr.d : sr.w, lo = alongX ? sr.x : sr.z;
-    const doorOf = (lay, rm) => lay.openings.find((o) => o.kind === 'door' && !o.terrace && (o.room === rm.id || o.to === rm.id));
+    const doorOf = (lay, rm) => lay.openings.find((o) => o.kind === 'door' && (o.room === rm.id || o.to === rm.id));
     const spanOf = (d) => {
       if (!d) return null;
       const longWall = alongX ? d.o === 'h' : d.o === 'v';
@@ -575,6 +597,55 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     };
     const gd = doorOf(L, sr), ud = doorOf(U, upStairs);
     const gS = spanOf(gd) || [0, 0], uS = spanOf(ud) || [len, len];
+    // a turning stair (two flights side by side, a landing at the far end) when the room is wide enough and both doors are at the same end
+    const doorMid = (d, sp) => (d ? (sp[0] + sp[1]) / 2 : null), gm = doorMid(gd, gS), um = doorMid(ud, uS);
+    const turned = (() => {
+      if (!turningStair(sr) || gm == null || um == null || (gm < len / 2) !== (um < len / 2)) return null;
+      const dir = gm < len / 2 ? 1 : -1, { u0, wf, ld, run } = stairPlan(sr);
+      const n = Math.max(7, Math.min(9, Math.round(run / 0.6))), tr = run / n, half = STOREY / 2, stepH = half / n;
+      const mStep = st.floorLiving.startsWith('marble') ? texMat(st.floorLiving, { roughness: 0.35 }, 4) : mTrim;
+      const lowX = alongX ? sr.x : sr.z, lowAcross = alongX ? sr.z : sr.x;
+      const bx = (ua, ub, va, vb, y0, y1, m, solid = false) => {            // a box from u (along, from the doors' end) and v (across, from the low side) ranges
+        const a = dir > 0 ? [ua, ub] : [len - ub, len - ua];
+        if (alongX) box(stairsG, sr.x + a[0], sr.x + a[1], y0, y1, sr.z + va, sr.z + vb, m, false);
+        else box(stairsG, sr.x + va, sr.x + vb, y0, y1, sr.z + a[0], sr.z + a[1], m, false);
+        return a;
+      };
+      for (let i = 0; i < n; i++) {
+        bx(u0 + i * tr, u0 + (i + 1) * tr, 0.05, wf, 0, (i + 1) * stepH, mStep);                              // the way up, on the low side
+        bx(len - ld - (i + 1) * tr, len - ld - i * tr, wid - wf, wid - 0.05, 0, half + (i + 1) * stepH, mStep);   // the way on, back over it on the other side
+      }
+      bx(len - ld, len, 0.05, wid - 0.05, half - 0.5, half, mStep);                                         // the half landing
+      bx(0, u0, 0.05, wid - 0.05, STOREY - 0.5, STOREY, mStep);                                              // the floor at the doors' end, over the foot of the stair
+      const wl = bx(u0, len - ld, wf, wid - wf, 0, STOREY, mExt);                                          // the wall between the flights
+      const dv = alongX ? { x0: sr.x + wl[0], x1: sr.x + wl[1], z0: sr.z + wf, z1: sr.z + wid - wf } : { x0: sr.x + wf, x1: sr.x + wid - wf, z0: sr.z + wl[0], z1: sr.z + wl[1] };
+      colliders.push({ ...dv, k: 'rail' }); upperColliders.push({ ...dv, k: 'rail' });
+      // a handrail along each flight's outer wall
+      const rail = (v, y0, y1, uA, uB) => {
+        const A = alongX ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(0, 0, 0), at = (u, y) => { const o = dir > 0 ? u : len - u; return alongX ? new THREE.Vector3(sr.x + o, y, sr.z + v) : new THREE.Vector3(sr.x + v, y, sr.z + o); };
+        void A;
+        const p0 = at(uA, y0 + 3), p1 = at(uB, y1 + 3), vec = p1.clone().sub(p0);
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(vec.length(), 0.14, 0.14), mFrame);
+        bar.position.copy(p0.clone().add(p1).multiplyScalar(0.5)); bar.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), vec.clone().normalize()); bar.castShadow = true; stairsG.add(bar);
+      };
+      rail(0.28, 0, half, u0, len - ld); rail(wid - 0.28, STOREY, half, u0, len - ld);
+      const pushU = (d) => {                                          // a spot just beyond a door, in the room on its other side
+        if (!d) return { x: sr.x + sr.w / 2, z: sr.z + sr.d / 2 };
+        const away = d.o === 'h' ? (sr.z + sr.d / 2 > d.c ? -1 : 1) : (sr.x + sr.w / 2 > d.c ? -1 : 1);
+        return d.o === 'h' ? { x: d.at, z: d.c + away * 2.4 } : { x: d.c + away * 2.4, z: d.at };
+      };
+      void lowX; void lowAcross;
+      const hxz = (x, z, floor) => {
+        const a = alongX ? x - sr.x : z - sr.z, v = alongX ? z - sr.z : x - sr.x, u = dir > 0 ? a : len - a;
+        if (u < u0) return floor * STOREY;
+        if (u >= len - ld) return half;
+        if (v <= wid / 2) return (Math.min(n - 1, Math.floor((u - u0) / tr)) + 1) * stepH;
+        return half + (Math.min(n - 1, Math.floor((len - ld - u) / tr)) + 1) * stepH;
+      };
+      return { room: sr, alongX, lo, len, wid, dir, s0: u0, s1: len - ld, n: 2 * n, turn: true, wf, ld, u0, h: () => 0, hxz, entry: [pushU(gd), pushU(ud)] };
+    })();
+    if (turned) stairs = turned;
+    else {
     const A = { dir: 1, s0: gS[1], s1: uS[0] }, Bk = { dir: -1, s0: len - gS[0], s1: len - uS[1] };
     let pick = A.s1 - A.s0 >= Bk.s1 - Bk.s0 ? A : Bk;
     let { dir, s0, s1 } = pick;
@@ -617,6 +688,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       return d.o === 'h' ? { x: d.at, z: d.c + away * 2.4 } : { x: d.c + away * 2.4, z: d.at };
     };
     stairs = { room: sr, alongX, lo, len, wid, dir, s0, s1, n, h: hOf, entry: [push(L, sr, gd), push(U, upStairs, ud)] };
+    }
   }
 
   // ---------- the way up to the roof: the same stairs turn back and climb on to a stair-head room (mumty) on the roof ----------
@@ -626,7 +698,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     const span = (u0, u1) => (dir > 0 ? [u0, u1] : [len - u1, len - u0]);
     const lift = 0.55;                                              // the turn: the first step of the second flight sits one rise above the landing
     for (let i = 0; i < n2; i++) {                                  // the second flight runs back over the first, from the landing end to the far end
-      const [a0, a1] = span(s1 - (i + 1) * tr, s1 - i * tr), top = STOREY + lift + ((i + 1) / n2) * (rise - lift);
+      const [a0, a1] = stairs.turn ? span(s0 + i * tr, s0 + (i + 1) * tr) : span(s1 - (i + 1) * tr, s1 - i * tr), top = STOREY + lift + ((i + 1) / n2) * (rise - lift);
       if (alongX) box(stairsG, sr.x + a0, sr.x + a1, top - 0.45, top, sr.z + 0.05, sr.z + sr.d - 0.05, mStep, false);
       else box(stairsG, sr.x + 0.05, sr.x + sr.w - 0.05, top - 0.45, top, sr.z + a0, sr.z + a1, mStep, false);
     }
@@ -734,7 +806,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   // car: parked where it leaves the way from the gate to the front door open. Spots are tried in turn (in the porch
   // away from the door, in the porch's middle, along the front lawn) and a flood fill over the collision boxes checks
   // that a visitor can still walk from the gateway to a step inside the front door
-  if (rule.front >= 10 || (porch && porch.w >= 8)) {
+  if (site.car !== 'none' && (rule.front >= 10 || (porch && porch.w >= 8))) {
     const RW = 0.42;
     const hitAt = (x, z, extra) => colliders.some((c) => x > c.x0 - RW && x < c.x1 + RW && z > c.z0 - RW && z < c.z1 + RW)
       || extra.some((c) => x > c.x0 - RW && x < c.x1 + RW && z > c.z0 - RW && z < c.z1 + RW);
@@ -775,7 +847,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     // one car per bay of the porch (a porch 10 ft wide holds 1 car, 18 ft 2, 26 ft 3), else one across the lawn
     const bays = porch ? (porch.w >= 25.5 ? 3 : porch.w >= 17.5 ? 2 : 1) : 1;
     const want = Math.max(1, Math.min(3, site.cars || 1));        // cars the visitor asked for; one per bay of the porch, the rest on the lawn
-    const kind = site.car || (W >= 40 ? 'suv' : 'sedan');
+    const kind = site.car && CARS[site.car] ? site.car : 'ferrari';
     let placed = 0;
     const put = (pick) => {
       const carG = new THREE.Group();

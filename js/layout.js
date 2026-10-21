@@ -2,6 +2,12 @@
 // Coordinates are feet. x = across the plot, z = depth from the road (z=0 is the road/front).
 
 export const MARLA = 225;
+/** A stair room big enough for a turning (half-landing) stair: two flights side by side, so the way up and the way out are at the same end. */
+export const stairPlan = (r) => {                                // the turning stair's parts (ft): foot strip u0, flight width wf, landing depth ld, run of each flight
+  const wid = Math.min(r.w, r.d), len = Math.max(r.w, r.d), wf = (wid - 0.5) / 2, u0 = 3.2, ld = wf + 0.1;
+  return { wid, len, wf, u0, ld, run: len - u0 - ld };
+};
+export const turningStair = (r) => { const p = stairPlan(r); return p.wf >= 2.6 && p.run >= 4.2; };
 export const PRESETS = [
   { label: '5 Marla', w: 25, d: 45 },
   { label: '7 Marla', w: 30, d: 50 },
@@ -80,6 +86,7 @@ export function finalize(L) {
     (dOut.guests || []).forEach((g) => outDoor(g, false));
   }
 
+  const terraceDoors = [];
   const PREF = {
     lobby: ['lounge', 'dining', 'passage'],
     drawing: ['lobby', 'lounge'],
@@ -92,9 +99,10 @@ export function finalize(L) {
       ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge', 'passage'] : ['lounge', 'dining', 'lobby', 'passage', 'drawing', 'kitchen'])
       : (PREF[r.type] || ['lounge', 'passage', 'lobby', 'dining']);
     if (r.type === 'stairs') {                                      // the flight needs its doors at the two ends: ground floor at the low end, first floor at the high end
-      const alongX = r.w > r.d, lo = alongX ? r.x : r.z, hi = lo + (alongX ? r.w : r.d), order = L.upper ? ['lounge', 'passage', 'bed', 'dining', 'study', 'store', 'lobby'] : ['lobby', 'lounge', 'passage', 'drawing', 'dining', 'kitchen', 'bed'];
+      const alongX = r.w > r.d, lo = alongX ? r.x : r.z, hi = lo + (alongX ? r.w : r.d), turn = turningStair(r), up = L.upper && !turn, order = L.upper ? ['lounge', 'terrace', 'passage', 'dining', 'study', 'store', 'lobby', 'bed'] : ['lobby', 'lounge', 'passage', 'drawing', 'dining', 'kitchen', 'bed'];
       const w = 3; let best = null;
-      for (const q of mains) {
+      const wayOut = L.upper ? (L.open || []).filter((p) => p.type === 'terrace').map((p) => ({ id: 'terrace', type: 'terrace', x: p.x, z: p.z, w: p.w, d: p.d, att: null })) : [];      // the stairs open into the lounge or onto the terrace, not into a bedroom
+      for (const q of [...mains, ...wayOut]) {
         if (q === r) continue;
         const s0 = shared(r, q);
         if (!s0) continue;
@@ -102,8 +110,8 @@ export function finalize(L) {
         if (b2 - a2 < 2.4) continue;
         const longWall = alongX ? s0.o === 'h' : s0.o === 'v';
         let at, dist;
-        if (longWall) { const target = L.upper ? hi - w / 2 - 0.2 : lo + w / 2 + 0.2; at = Math.max(a2 + w / 2, Math.min(b2 - w / 2, target)); if (b2 - a2 < w) at = (a2 + b2) / 2; dist = Math.abs(at - target); }
-        else { at = (a2 + b2) / 2; const endWall = alongX ? s0.c : s0.c; dist = Math.abs(endWall - (L.upper ? hi : lo)) < 0.3 ? 0 : 60; }
+        if (longWall) { const target = up ? hi - w / 2 - 0.2 : lo + w / 2 + 0.2; at = Math.max(a2 + w / 2, Math.min(b2 - w / 2, target)); if (b2 - a2 < w) at = (a2 + b2) / 2; dist = Math.abs(at - target); }
+        else { at = (a2 + b2) / 2; const endWall = alongX ? s0.c : s0.c; dist = Math.abs(endWall - (up ? hi : lo)) < 0.3 ? 0 : 60; }
         const rank = order.indexOf(q.type) < 0 ? 9 : order.indexOf(q.type);
         const key = dist * 10 + rank;
         if (!best || key < best.key) best = { q, s: { ...s0, lo: a2, hi: b2 }, at, key, w: Math.min(w, Math.max(2.2, b2 - a2 - 0.2)) };
@@ -111,7 +119,9 @@ export function finalize(L) {
       if (best) {
         const k = `${r.id}|${best.q.id}`;
         const pl = pos[k] != null ? place(k, best.s.lo, best.s.hi, best.w) : { at: best.at, key: k };
-        openings.push({ o: best.s.o, c: best.s.c, at: pl.at, span: [best.s.lo, best.s.hi], key: k, w: best.w, kind: 'door', sill: 0, top: 7, room: r.id, to: best.q.id });
+        const op = { o: best.s.o, c: best.s.c, at: pl.at, span: [best.s.lo, best.s.hi], key: k, w: best.w, kind: 'door', sill: 0, top: best.q.id === 'terrace' ? 7.4 : 7, room: r.id, to: best.q.id };
+        if (best.q.id === 'terrace') { op.terrace = true; terraceDoors.push(op); }
+        openings.push(op);
         links.push([r.id, best.q.id]);
         continue;
       }
@@ -160,7 +170,6 @@ export function finalize(L) {
   }
 
   // a door onto each terrace of a first floor: a sliding glass door from the room that shares the longest wall with it
-  const terraceDoors = [];
   if (L.upper) {
     for (const t of (L.open || []).filter((p) => p.type === 'terrace' || p.type === 'balcony')) {
       const cands = mains.filter((m) => !['stairs', 'passage', 'store', 'servant'].includes(m.type)).map((m) => ({ m, s: shared(m, { x: t.x, z: t.z, w: t.w, d: t.d }) }))
