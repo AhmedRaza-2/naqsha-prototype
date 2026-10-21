@@ -60,36 +60,39 @@
         </div>
         <div class="fright">
         <div class="presets" id="presets"></div>
-        <div class="row r3">
-          <label class="field">Width (ft)<input id="pw" type="number" min="18" max="120" value="25"></label>
-          <label class="field">Depth (ft)<input id="pd" type="number" min="30" max="200" value="45"></label>
-          <label class="field" id="pbl">Bedrooms
-            <select id="pb"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
+        <div class="row r3 plotrow">
+          <label class="field">Measure in
+            <select id="punit"><option value="ft">Feet</option><option value="gaz">Gaz (yards)</option><option value="m">Metres</option></select>
           </label>
+          <label class="field"><span id="lpw">Width (ft)</span><input id="pwu" type="number" min="1" step="any" inputmode="decimal" value="25"></label>
+          <label class="field"><span id="lpd">Depth (ft)</span><input id="pdu" type="number" min="1" step="any" inputmode="decimal" value="45"></label>
         </div>
-        <div class="row" id="floorsrow">
-          <label class="field">Floors
-            <select id="pfloors"><option value="1" selected>1 floor</option><option value="2">2 floors</option></select>
-          </label>
-          <label class="field" id="pupl">Bedrooms upstairs
-            <select id="pup"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>
-          </label>
-          <label class="field" id="pupbl">Washrooms upstairs
-            <select id="pupbaths"></select>
-          </label>
-          <label class="field" id="pterrl">Terrace on the first floor
-            <select id="pterr"><option value="both" selected>Show both kinds</option><option value="with">With an open terrace</option><option value="without">Without a terrace</option></select>
-          </label>
+        <div class="floorsrow" id="floorsrow">
+          <span class="swlabel">Floors</span>
+          <div class="seg" id="fseg" role="radiogroup" aria-label="Number of floors">
+            <button type="button" role="radio" data-f="1" aria-checked="true" class="on">One floor</button>
+            <button type="button" role="radio" data-f="2" aria-checked="false">Two floors</button>
+          </div>
         </div>
+        <div id="ffhost"></div>
         <div class="advice" id="advice" aria-live="polite"></div>
         </div>
+       </div>
+       <div id="legacy" hidden>
+          <input id="pw" type="number" value="25"><input id="pd" type="number" value="45">
+          <label id="pbl">Bedrooms <select id="pb"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
+          <select id="pfloors"><option value="1" selected>1 floor</option><option value="2">2 floors</option></select>
+          <label id="pupl">Bedrooms upstairs <select id="pup"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select></label>
+          <label id="pupbl">Washrooms upstairs <select id="pupbaths"></select></label>
+          <label id="pterrl">Terrace <select id="pterr"><option value="both" selected>both</option><option value="with">with</option><option value="without">without</option></select></label>
+          <select id="pupdraw"><option value="no" selected>no</option><option value="yes">yes</option></select>
+          <select id="pporch"><option value="yes" selected>yes</option><option value="any">any</option><option value="no">no</option></select>
+          <select id="pbaths"></select>
+          <input type="checkbox" name="omit" value="dining"><input type="checkbox" name="omit" value="drawing"><input type="checkbox" name="omit" value="lounge">
        </div>
         <details class="prefs" id="prefs">
           <summary>More preferences</summary>
           <div class="row">
-            <label class="field">Washrooms (total)
-              <select id="pbaths"></select>
-            </label>
             <label class="field">Make bigger
               <select id="pfocus">
                 <option value="balanced" selected>Nothing in particular</option>
@@ -107,13 +110,6 @@
                 <option value="compact">Compact (small plots)</option>
               </select>
             </label>
-            <label class="field">Car porch
-              <select id="pporch">
-                <option value="yes" selected>Yes, a car porch</option>
-                <option value="any">Either</option>
-                <option value="no">No car porch</option>
-              </select>
-            </label>
             <label class="field">Cars to park
               <select id="pcars">
                 <option value="0" selected>Standard (1 car)</option>
@@ -124,9 +120,9 @@
             </label>
           </div>
           <div class="row">
-            <label class="field">Front open space (ft)<input id="psbf" type="number" min="0" max="40" step="0.5" placeholder="standard" inputmode="decimal"></label>
-            <label class="field">Back open space (ft)<input id="psbb" type="number" min="0" max="40" step="0.5" placeholder="standard" inputmode="decimal"></label>
-            <label class="field">Side open space (ft)<input id="psbs" type="number" min="0" max="20" step="0.5" placeholder="standard" inputmode="decimal"></label>
+            <label class="field">Front open space (<span class="u">ft</span>)<input id="psbf" type="number" min="0" max="40" step="0.5" placeholder="standard" inputmode="decimal"></label>
+            <label class="field">Back open space (<span class="u">ft</span>)<input id="psbb" type="number" min="0" max="40" step="0.5" placeholder="standard" inputmode="decimal"></label>
+            <label class="field">Side open space (<span class="u">ft</span>)<input id="psbs" type="number" min="0" max="20" step="0.5" placeholder="standard" inputmode="decimal"></label>
             <label class="field">Entrance room
               <select id="pentr"><option value="auto" selected>Automatic (separate from 10 marla)</option><option value="never">No separate entrance</option><option value="keep">Keep an entrance room</option></select>
             </label>
@@ -138,15 +134,6 @@
             <label class="field">Front lawn
               <select id="plawn"><option value="yes" selected>Keep a lawn</option><option value="no">No lawn: car porch across the front</option></select>
             </label>
-            <label class="field">Drawing room upstairs
-              <select id="pupdraw"><option value="no" selected>No, a family lounge</option><option value="yes">Yes, add one</option></select>
-            </label>
-            <fieldset class="omitset"><legend>Leave out</legend>
-              <label><input type="checkbox" name="omit" value="dining"> Dining room</label>
-              <label><input type="checkbox" name="omit" value="drawing"> Drawing room</label>
-              <label><input type="checkbox" name="omit" value="study"> Study</label>
-              <label><input type="checkbox" name="omit" value="store"> Store</label>
-            </fieldset>
           </div>
           <p class="fine" id="prefnote">Leave the open space blank for the standard setbacks of the plot. Whatever you type is what the plan is built to, so no yard is left empty beyond it.</p>
         </details>
@@ -160,7 +147,11 @@
     <section id="s2" class="step" hidden>
       <h2>Choose a layout</h2>
       <p class="lead" id="s2sub"></p>
-      <div class="regen-row"><button class="btn" id="regen">Regenerate layouts</button><span class="fine">Not what you had in mind? Draft three new ones.</span></div>
+      <div class="card regenform" id="regenform">
+        <div class="rfhead"><h3>What you asked for</h3><span class="fine">Change anything here and redraft. Only the ground floor is redrafted.</span></div>
+        <div id="gformhost"></div>
+        <div class="regen-row"><button class="btn" id="regen">Regenerate layouts</button><span class="fine" id="regenhint">Not what you had in mind? Draft three new ones.</span></div>
+      </div>
       <div class="grid3" id="layouts"></div>
       <div class="work">
       <section class="card editor" id="editor" hidden>
@@ -185,9 +176,11 @@
       <div class="usplit">
         <aside class="uside">
           <div class="card pair" id="pair"></div>
-          <div class="regen-row"><button class="btn" id="uregen">Regenerate first floors</button>
-            <label class="mini">Terrace<select id="uterr"><option value="both">Show both kinds</option><option value="with">With an open terrace</option><option value="without">Without a terrace</option></select></label>
-            <span class="fine">Not what you had in mind? Draft three new ones, or change the terrace.</span></div>
+          <div class="card regenform" id="uregenform">
+            <div class="rfhead"><h3>What you asked for</h3><span class="fine">Change anything here and redraft. Only the first floor is redrafted; the ground floor stays.</span></div>
+            <div id="uformhost"></div>
+            <div class="regen-row"><button class="btn" id="uregen">Regenerate first floors</button><span class="fine" id="uregenhint">Not what you had in mind? Draft three new ones.</span></div>
+          </div>
         </aside>
         <div class="grid3" id="ulayouts"></div>
       </div>
@@ -209,7 +202,7 @@
 
     <section id="s3" class="step" hidden>
       <h2>Choose a design</h2>
-      <p class="lead">Your house from the street in three styles, rendered in 3D from your plan. Choose a style, and change colours and details in the panel beside it.</p>
+      <p class="lead">Here is your house from the street in three looks, drawn in 3D from your plan. Tap the one you like. Use the panel on the right to change colours and details; you will see them change straight away.</p>
       <div class="dsplit">
         <div class="dmain">
           <div class="grid3" id="styles"></div>
@@ -217,33 +210,33 @@
         </div>
         <aside class="dside" aria-label="Colours and details">
       <div class="card colors" id="colors">
-        <div class="swrow"><span class="swlabel">Walls</span><div class="sw" id="swwall" role="radiogroup" aria-label="Wall colour"></div></div>
-        <div class="swrow"><span class="swlabel">Trim and frames</span><div class="sw" id="swtrim" role="radiogroup" aria-label="Trim colour"></div></div>
-        <div class="swrow"><span class="swlabel">Boundary wall</span>
-          <label class="mini">Style<select id="swallstyle"><option value="plain">Plastered</option><option value="brick">Brick</option><option value="bars">Railings on a low wall</option><option value="none">No wall</option></select></label>
+        <div class="swrow"><span class="swlabel">House walls</span><div class="sw" id="swwall" role="radiogroup" aria-label="Wall colour"></div></div>
+        <div class="swrow"><span class="swlabel">Window frames and edges</span><div class="sw" id="swtrim" role="radiogroup" aria-label="Trim colour"></div></div>
+        <div class="swrow"><span class="swlabel">Compound wall and gate</span>
+          <label class="mini">Wall type<select id="swallstyle"><option value="plain">Plain plaster</option><option value="brick">Brick</option><option value="bars">Iron railings on a low wall</option><option value="none">No wall</option></select></label>
           <label class="mini">Height<select id="swallh"><option value="3">3 ft</option><option value="4.5" selected>4.5 ft</option><option value="6">6 ft</option><option value="8">8 ft</option></select></label>
-          <label class="mini">Gate<select id="sgate"><option value="slide">Sliding</option><option value="swing">Swing</option></select></label>
-          <label class="mini">Car<select id="scar"><option value="ferrari">Show a car</option><option value="none">No car</option></select></label>
+          <label class="mini">Gate<select id="sgate"><option value="slide">Slides sideways</option><option value="swing">Opens like a door</option></select></label>
+          <label class="mini">Car in the porch<select id="scar"><option value="ferrari">Show a car</option><option value="none">No car</option></select></label>
           <label class="mini">Car colour<select id="scarc"><option value="white">White</option><option value="silver">Silver</option><option value="black">Black</option><option value="graphite">Graphite</option><option value="maroon">Maroon</option><option value="navy">Navy</option><option value="red">Red</option></select></label>
         </div>
-        <div class="swrow"><span class="swlabel">Wall colour</span><div class="sw" id="swwallc" role="radiogroup" aria-label="Boundary wall colour"></div></div>
+        <div class="swrow"><span class="swlabel">Compound wall colour</span><div class="sw" id="swwallc" role="radiogroup" aria-label="Compound wall colour"></div></div>
       </div>
       <div class="card colors" id="facade">
-        <div class="swrow"><span class="swlabel">Accent (doors, shutters)</span><div class="sw" id="swacc" role="radiogroup" aria-label="Accent colour"></div></div>
-        <div class="swrow"><span class="swlabel">Facade</span>
-          <label class="mini">Roof<select id="froof"><option value="flat">Flat with parapet</option><option value="hip">Sloped tiles</option></select></label>
-          <label class="mini">Windows<select id="fwin"><option value="standard">Standard</option><option value="tall">Tall</option><option value="wide">Wide</option></select></label>
-          <label class="mini">Shutters<select id="fshut"><option value="0">None</option><option value="1">Wooden shutters</option></select></label>
-          <label class="mini">Front<select id="fclad"><option value="none">Plain</option><option value="stone">Stone base</option><option value="brick">Brick</option><option value="slats">Timber slats</option></select></label>
+        <div class="swrow"><span class="swlabel">Doors and shutters</span><div class="sw" id="swacc" role="radiogroup" aria-label="Accent colour"></div></div>
+        <div class="swrow"><span class="swlabel">Front of the house</span>
+          <label class="mini">Roof<select id="froof"><option value="flat">Flat, with a low wall round it</option><option value="hip">Sloping, with tiles</option></select></label>
+          <label class="mini">Window shape<select id="fwin"><option value="standard">Normal</option><option value="tall">Tall and narrow</option><option value="wide">Wide</option></select></label>
+          <label class="mini">Window shutters<select id="fshut"><option value="0">No shutters</option><option value="1">Wooden shutters</option></select></label>
+          <label class="mini">Front wall finish<select id="fclad"><option value="none">Plain paint</option><option value="stone">Stone at the bottom</option><option value="brick">Brick</option><option value="slats">Wooden slats</option></select></label>
         </div>
-        <div class="swrow"><span class="swlabel">Changes the plan</span>
-          <label class="mini">Car porch<select id="fporch"><option value="keep">As drafted</option><option value="yes">Open car porch</option><option value="no">No car porch</option></select></label>
-          <label class="mini" id="fbalcl" hidden>Balcony<select id="fbalc"><option value="0">None</option><option value="1">Front balcony</option></select></label>
+        <div class="swrow"><span class="swlabel">Changes the floor plan</span>
+          <label class="mini">Car porch<select id="fporch"><option value="keep">Keep as planned</option><option value="yes">Add an open car porch</option><option value="no">Take the car porch out</option></select></label>
+          <label class="mini" id="fbalcl" hidden>Front balcony<select id="fbalc"><option value="0">No balcony</option><option value="1">Add a balcony</option></select></label>
           <span class="fine" id="fnote" aria-live="polite"></span>
         </div>
-        <div class="swrow"><span class="swlabel">Your inspiration</span>
+        <div class="swrow"><span class="swlabel">Copy a house you like</span>
           <input type="file" id="finsp" accept="image/*" aria-label="A photo of a house you like">
-          <span class="fine" id="finspout">A photo of a house you like gives the colours and the closest style. A photo of a floor plan cannot be read here: describe the layout in words instead, for example "bedroom wing".</span>
+          <span class="fine" id="finspout">Upload a photo of a house you like and the colours and the nearest look are picked from it. Floor plan photos cannot be read; describe the layout in words instead.</span>
         </div>
       </div>
         </aside>
@@ -278,20 +271,20 @@
       <button class="btn sm" id="vback">Exit</button>
     </div>
     <div class="hud palette" id="vpalette" hidden>
-      <div class="swrow"><span class="swlabel">Outside walls</span><div class="sw" id="vswwall"></div></div>
-      <div class="swrow"><span class="swlabel">Inside walls</span><div class="sw" id="vswint"></div></div>
-      <div class="swrow"><span class="swlabel">Trim</span><div class="sw" id="vswtrim"></div></div>
-      <div class="swrow"><span class="swlabel">Living floors</span><div class="sw" id="vswfl"></div></div>
-      <div class="swrow"><span class="swlabel">Bedroom floors</span><div class="sw" id="vswfb"></div></div>
-      <div class="swrow"><label class="mini">Wall<select id="vwall"><option value="plain">Plastered</option><option value="brick">Brick</option><option value="bars">Railings</option><option value="none">None</option></select></label>
+      <div class="swrow"><span class="swlabel">House walls</span><div class="sw" id="vswwall"></div></div>
+      <div class="swrow"><span class="swlabel">Walls inside</span><div class="sw" id="vswint"></div></div>
+      <div class="swrow"><span class="swlabel">Window frames and edges</span><div class="sw" id="vswtrim"></div></div>
+      <div class="swrow"><span class="swlabel">Floor: lounge, kitchen</span><div class="sw" id="vswfl"></div></div>
+      <div class="swrow"><span class="swlabel">Floor: bedrooms</span><div class="sw" id="vswfb"></div></div>
+      <div class="swrow"><label class="mini">Compound wall<select id="vwall"><option value="plain">Plain plaster</option><option value="brick">Brick</option><option value="bars">Iron railings</option><option value="none">No wall</option></select></label>
         <label class="mini">Height<select id="vwallh"><option value="3">3 ft</option><option value="4.5">4.5 ft</option><option value="6">6 ft</option><option value="8">8 ft</option></select></label>
-        <label class="mini">Gate<select id="vgate"><option value="slide">Sliding</option><option value="swing">Swing</option></select></label>
+        <label class="mini">Gate<select id="vgate"><option value="slide">Slides sideways</option><option value="swing">Opens like a door</option></select></label>
       </div>
-      <div class="swrow"><span class="swlabel">Boundary wall colour</span><div class="sw" id="vswwc"></div></div>
+      <div class="swrow"><span class="swlabel">Compound wall colour</span><div class="sw" id="vswwc"></div></div>
       <div class="swrow">
-        <label class="mini">Car<select id="vcar"><option value="ferrari">Show a car</option><option value="none">No car</option></select></label>
+        <label class="mini">Car in the porch<select id="vcar"><option value="ferrari">Show a car</option><option value="none">No car</option></select></label>
         <label class="mini">Car colour<select id="vcarc"><option value="white">White</option><option value="silver">Silver</option><option value="black">Black</option><option value="graphite">Graphite</option><option value="maroon">Maroon</option><option value="navy">Navy</option><option value="red">Red</option></select></label></div>
-      <div class="swrow"><label class="mini wide">Field of view<input type="range" id="vfov" min="40" max="100" value="70"></label></div>
+      <div class="swrow"><label class="mini wide">How wide you see<input type="range" id="vfov" min="40" max="100" value="70"></label></div>
     </div>
   </div>
 

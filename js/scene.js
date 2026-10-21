@@ -506,6 +506,25 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const stairsRoom = L.rooms.find((r) => r.type === 'stairs');
   const upStairs = U && U.rooms.find((r) => r.type === 'stairs');
 
+  // ---------- the stair-head room (mumty): at least 10 x 14 ft, over the stairs and grown towards the middle of the roof ----------
+  const MUM = { short: 10, long: 14 };
+  const mumtyBox = (sr, RB) => {
+    if (!sr || site.roof === 'hip') return null;
+    const alongX = sr.w >= sr.d, m = 1.4, cx = RB.x + RB.w / 2, cz = RB.z + RB.d / 2;
+    const grow = (lo, hi, want, c, l0, l1) => {                    // widen [lo, hi] to `want`, towards c, inside [l0, l1]
+      let need = want - (hi - lo);
+      if (need <= 0) return [lo, hi];
+      const up = c >= (lo + hi) / 2;
+      const take = (room) => { const g = Math.max(0, Math.min(need, room)); need -= g; return g; };
+      if (up) { hi += take(l1 - hi); lo -= take(lo - l0); } else { lo -= take(lo - l0); hi += take(l1 - hi); }
+      return [lo, hi];
+    };
+    const [x0, x1] = grow(sr.x, sr.x + sr.w, alongX ? MUM.long : MUM.short, cx, RB.x + m, RB.x + RB.w - m);
+    const [z0, z1] = grow(sr.z, sr.z + sr.d, alongX ? MUM.short : MUM.long, cz, RB.z + m, RB.z + RB.d - m);
+    return { x0, x1, z0, z1, rb: RB, sr };
+  };
+  const mum = mumtyBox(U ? upStairs : stairsRoom, U ? U.B : B);
+
   // ---------- roof ----------
   // slab over a storey (with a stairwell hole when the storey above reaches it), a parapet round it, a cornice, a water tank
   const ov = 0.45;
@@ -566,9 +585,15 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       box(parent, cx0, cx0 + ct, y - 0.7, y, cz0, cz1, mTrim); box(parent, cx1 - ct, cx1, y - 0.7, y, cz0, cz1, mTrim);
     }
     if (top) {
-      box(parent, B.x + B.w - 5, B.x + B.w - 2, y + SLAB, y + SLAB + 2.8, B.z + B.d - 4, B.z + B.d - 1.5, mat('#2f3f4a', { roughness: 0.5 }));   // water tank
-      box(parent, B.x + B.w - 5.3, B.x + B.w - 1.7, y + SLAB + 2.8, y + SLAB + 3.0, B.z + B.d - 4.3, B.z + B.d - 1.2, mat('#3b4d59'));
-      for (let i = 0; i < 2; i++) box(parent, B.x + 2 + i * 3.5, B.x + 4.6 + i * 3.5, y + SLAB, y + SLAB + 1.9, B.z + B.d - 2.6, B.z + B.d - 1.4, mat('#d9dcdc', { roughness: 0.5, metalness: 0.2 }));   // AC units
+      if (!mum) {                                                   // no stair-head room: the tank stands on the roof itself
+        box(parent, B.x + B.w - 5, B.x + B.w - 2, y + SLAB, y + SLAB + 2.8, B.z + B.d - 4, B.z + B.d - 1.5, mat('#2f3f4a', { roughness: 0.5 }));
+        box(parent, B.x + B.w - 5.3, B.x + B.w - 1.7, y + SLAB + 2.8, y + SLAB + 3.0, B.z + B.d - 4.3, B.z + B.d - 1.2, mat('#3b4d59'));
+      }
+      for (let i = 0; i < 2; i++) {                                 // AC units along the back parapet, clear of the stair-head room
+        const ax0 = B.x + 2 + i * 3.5, ax1 = ax0 + 2.6, az0 = B.z + B.d - 2.6, az1 = B.z + B.d - 1.4;
+        if (mum && ax1 > mum.x0 - 0.8 && ax0 < mum.x1 + 0.8 && az1 > mum.z0 - 0.8 && az0 < mum.z1 + 0.8) continue;
+        box(parent, ax0, ax1, y + SLAB, y + SLAB + 1.9, az0, az1, mat('#d9dcdc', { roughness: 0.5, metalness: 0.2 }));
+      }
     }
   };
   if (!U) roofOf(B, H, roofG, 2.6, null, true);
@@ -702,26 +727,45 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       if (alongX) box(stairsG, sr.x + a0, sr.x + a1, top - 0.45, top, sr.z + 0.05, sr.z + sr.d - 0.05, mStep, false);
       else box(stairsG, sr.x + 0.05, sr.x + sr.w - 0.05, top - 0.45, top, sr.z + a0, sr.z + a1, mStep, false);
     }
-    const t = 0.45, wh = 7.6, cx = U.B.x + U.B.w / 2, cz = U.B.z + U.B.d / 2;          // the stair-head room: walls, a door towards the middle of the roof, a slab on top
-    const doorOnX = Math.abs(cx - (sr.x + sr.w / 2)) > Math.abs(cz - (sr.z + sr.d / 2));
-    const dSign = doorOnX ? Math.sign(cx - (sr.x + sr.w / 2)) || 1 : Math.sign(cz - (sr.z + sr.d / 2)) || 1;
-    const x0 = sr.x - t, x1 = sr.x + sr.w + t, z0 = sr.z - t, z1 = sr.z + sr.d + t, gw = Math.min(3.2, (doorOnX ? sr.d : sr.w) - 0.8), gh = 6.8;
+  }
+  if (mum) {                                                        // the room itself: walls, a door towards the middle of the roof, a slab on top, a small water tank over it
+    const yR = (U ? STOREY : 0) + H + SLAB, t = 0.45, wh = 8, gh = 6.8;
+    const rcx = mum.rb.x + mum.rb.w / 2, rcz = mum.rb.z + mum.rb.d / 2, fx = (mum.x0 + mum.x1) / 2, fz = (mum.z0 + mum.z1) / 2;
+    const doorOnX = Math.abs(rcx - fx) > Math.abs(rcz - fz) + 2;     // the door goes on the long side unless the middle of the roof is clearly further along
+    const dSign = doorOnX ? Math.sign(rcx - fx) || 1 : Math.sign(rcz - fz) || 1;
+    const x0 = mum.x0 - t, x1 = mum.x1 + t, z0 = mum.z0 - t, z1 = mum.z1 + t, gw = 3.2;
     const wall = (a0, a1, b0, b1) => box(roofG, a0, a1, yR, yR + wh, b0, b1, mExt);
     const gapW = (lo, hi) => { const m = (lo + hi) / 2; return [m - gw / 2, m + gw / 2]; };
     if (doorOnX) {
-      const [g0, g1] = gapW(sr.z, sr.z + sr.d), xs = dSign > 0 ? [x1 - t, x1] : [x0, x0 + t];
-      wall(x0, x1, z0, sr.z); wall(x0, x1, sr.z + sr.d, z1);
-      wall(dSign > 0 ? x0 : x0 + t, dSign > 0 ? x1 - t : x1, sr.z, sr.z + sr.d);
-      wall(xs[0], xs[1], sr.z, g0); wall(xs[0], xs[1], g1, sr.z + sr.d); box(roofG, xs[0], xs[1], yR + gh, yR + wh, g0, g1, mExt);
+      const [g0, g1] = gapW(mum.z0, mum.z1), xs = dSign > 0 ? [x1 - t, x1] : [x0, x0 + t];
+      wall(x0, x1, z0, mum.z0); wall(x0, x1, mum.z1, z1);
+      wall(dSign > 0 ? x0 : x0 + t, dSign > 0 ? x1 - t : x1, mum.z0, mum.z1);
+      wall(xs[0], xs[1], mum.z0, g0); wall(xs[0], xs[1], g1, mum.z1); box(roofG, xs[0], xs[1], yR + gh, yR + wh, g0, g1, mExt);
       box(roofG, xs[0] - 0.1, xs[1] + 0.1, yR, yR + 0.06, g0, g1, mTrim, false);
     } else {
-      const [g0, g1] = gapW(sr.x, sr.x + sr.w), zs = dSign > 0 ? [z1 - t, z1] : [z0, z0 + t];
-      wall(x0, sr.x, z0, z1); wall(sr.x + sr.w, x1, z0, z1);
-      wall(sr.x, sr.x + sr.w, dSign > 0 ? z0 : z0 + t, dSign > 0 ? z1 - t : z1);
-      wall(sr.x, g0, zs[0], zs[1]); wall(g1, sr.x + sr.w, zs[0], zs[1]); box(roofG, g0, g1, yR + gh, yR + wh, zs[0], zs[1], mExt);
+      const [g0, g1] = gapW(mum.x0, mum.x1), zs = dSign > 0 ? [z1 - t, z1] : [z0, z0 + t];
+      wall(x0, mum.x0, z0, z1); wall(mum.x1, x1, z0, z1);
+      wall(mum.x0, mum.x1, dSign > 0 ? z0 : z0 + t, dSign > 0 ? z1 - t : z1);
+      wall(mum.x0, g0, zs[0], zs[1]); wall(g1, mum.x1, zs[0], zs[1]); box(roofG, g0, g1, yR + gh, yR + wh, zs[0], zs[1], mExt);
       box(roofG, g0, g1, yR, yR + 0.06, zs[0] - 0.1, zs[1] + 0.1, mTrim, false);
     }
-    box(roofG, x0 - 0.3, x1 + 0.3, yR + wh, yR + wh + 0.4, z0 - 0.3, z1 + 0.3, mConcrete);
+    const yT = yR + wh + 0.4;
+    box(roofG, x0 - 0.3, x1 + 0.3, yR + wh, yT, z0 - 0.3, z1 + 0.3, mConcrete);                    // the roof slab with its edge
+    box(roofG, x0 - 0.35, x1 + 0.35, yT - 0.12, yT, z0 - 0.35, z1 + 0.35, mTrim, false);
+    // a small round water tank on a plinth, on the mumty roof, towards the far end from the door
+    const tankR = 1.5, tankH = 3.2, tx = doorOnX ? fx - dSign * Math.min(2.5, (mum.x1 - mum.x0) / 4) : fx, tz = doorOnX ? fz : fz - dSign * Math.min(2.5, (mum.z1 - mum.z0) / 4);
+    const mTank = mat('#232a30', { roughness: 0.55 }), mLid = mat('#3a5566', { roughness: 0.45 });
+    box(roofG, tx - tankR - 0.3, tx + tankR + 0.3, yT, yT + 0.45, tz - tankR - 0.3, tz + tankR + 0.3, mConcrete, false);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(tankR * 0.92, tankR, tankH, 28), mTank);
+    body.position.set(tx, yT + 0.45 + tankH / 2, tz); body.castShadow = body.receiveShadow = true; roofG.add(body);
+    for (const k of [0.33, 0.66]) {                                                                // the moulded rings of a plastic tank
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(tankR * (0.93 + 0.07 * k) + 0.05, tankR * (0.93 + 0.07 * k) + 0.05, 0.12, 28), mTank);
+      ring.position.set(tx, yT + 0.45 + tankH * k, tz); roofG.add(ring);
+    }
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(tankR * 0.92, 28, 10, 0, Math.PI * 2, 0, Math.PI / 2.6), mLid);
+    lid.scale.y = 0.55; lid.position.set(tx, yT + 0.45 + tankH, tz); lid.castShadow = true; roofG.add(lid);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16), mLid);
+    cap.position.set(tx, yT + 0.45 + tankH + 0.5, tz); roofG.add(cap);
   }
 
   // ---------- balcony of the first floor (an open space of type balcony in front of the box) ----------
@@ -779,6 +823,38 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     box(world, dx0 - 1.6, dx0, 0, H, B.z - 0.45, B.z - 0.2, mSlats);
     box(world, dx1, dx1 + 1.6, 0, H, B.z - 0.45, B.z - 0.2, mSlats);
     box(world, dx0, dx1, 7.4, H, B.z - 0.45, B.z - 0.2, mSlats);
+  }
+  // front elevation details: a belt course between the floors, corner pilasters, planters and lanterns at the door
+  {
+    const top = U ? STOREY + H : H, fz0 = B.z - 0.55, fz1 = B.z - 0.15, bandM = st.id === 'modern' ? mFrame : st.id === 'spanish' ? mAccent : mTrim;
+    if (U) {                                                      // a band at the first-floor slab, across the front and round both sides
+      box(world, B.x - 0.3, B.x + B.w + 0.3, STOREY - 1.05, STOREY - 0.5, fz0, fz1, bandM, false);
+      box(world, B.x - 0.55, B.x - 0.15, STOREY - 1.05, STOREY - 0.5, B.z - 0.55, B.z + B.d + 0.3, bandM, false);
+      box(world, B.x + B.w + 0.15, B.x + B.w + 0.55, STOREY - 1.05, STOREY - 0.5, B.z - 0.55, B.z + B.d + 0.3, bandM, false);
+    }
+    if (st.id === 'classic') {                                    // raised corner blocks (quoins) up the front corners
+      for (let y = 0.2; y < top - 1; y += 1.7) for (const sd of [0, 1]) {
+        const w = (Math.floor(y / 1.7) % 2 ? 1.1 : 0.8), x0 = sd ? B.x + B.w - w + 0.2 : B.x - 0.2;
+        box(world, x0, x0 + w, y, y + 1.5, fz0 - 0.05, fz1, mTrim, false);
+      }
+    }
+    if (st.id === 'spanish') {                                    // a tiled drip course under the roof edge
+      box(world, B.x - 0.3, B.x + B.w + 0.3, top - 0.8, top - 0.45, B.z - 0.7, B.z - 0.15, mRoofTile, false);
+    }
+    const mPot = mat('#9a948a', { roughness: 0.8 });
+    for (const sd of [-1, 1]) {                                   // planters either side of the entrance steps, unless the car porch or the house edge is there
+      const px = mainDoor.at + sd * 3.6;
+      if (px < B.x + 0.8 || px > B.x + B.w - 0.8 || (porch && px > porch.x - 0.8 && px < porch.x + porch.w + 0.8)) continue;
+      box(world, px - 0.8, px + 0.8, 0, 1.3, B.z - 1.5, B.z - 0.65, mPot, false);
+      const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.85, 1), mat('#4d7d36', { roughness: 0.95, flatShading: true }));
+      lf.position.set(px, 1.9, B.z - 1.08); lf.scale.y = 0.85; lf.castShadow = true; world.add(lf);
+    }
+    for (const sd of [-1, 1]) {                                   // a wall lantern each side of the door
+      const lx = mainDoor.at + sd * (mainDoor.w / 2 + 0.9);
+      box(world, lx - 0.18, lx + 0.18, 6.6, 7.4, B.z - 0.5, B.z - 0.2, mFrame, false);
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshStandardMaterial({ color: '#fff2c9', emissive: '#ffd98a', emissiveIntensity: 0.9 }));
+      glow.position.set(lx, 7.0, B.z - 0.65); world.add(glow);
+    }
   }
   // front steps up to the entrance
   box(world, mainDoor.at - 2.4, mainDoor.at + 2.4, 0, 0.35, B.z - 1.6, B.z - 0.35, mStone, false);

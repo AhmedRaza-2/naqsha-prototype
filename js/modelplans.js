@@ -316,12 +316,19 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
     items = await ladder('without', 3);
     if (!items.length) { items = await ladder('with', 3); if (items.length) note = 'No first floor without a terrace fitted over this ground floor, so these have one.'; }
   } else items = await ladder(mode === 'any' ? null : mode, 3);
+  const oks = (cs) => cs.filter((c) => c.level === 'ok').length;
   items = items.map((it) => {                                    // the walls of the first floor are the walls of the ground floor
-    const p = refitBox(it.plan, fb.box);
-    if (p === it.plan) return it;
-    const rects = treeRects(p), checks = treeCheck(p, prefs.beds);
-    if (outlineGap(rects, ground.rects) > outlineGap(it.rects, ground.rects)) return it;      // only when it brings the walls closer to the ground floor's
-    return checks.some((c) => c.level === 'err') || checks.filter((c) => c.level === 'ok').length < it.checks.filter((c) => c.level === 'ok').length ? it : { ...it, plan: p, rects, checks, grid: undefined };
+    let cur = it;
+    const attempt = (p) => {                                       // a changed plan is kept only if it breaks no rule, passes no fewer, and does not move the walls away from the ground floor's
+      if (!p || p === cur.plan) return;
+      const rects = treeRects(p), checks = treeCheck(p, prefs.beds);
+      if (outlineGap(rects, ground.rects) > outlineGap(cur.rects, ground.rects)) return;
+      if (checks.some((c) => c.level === 'err') || oks(checks) < oks(cur.checks)) return;
+      cur = { ...cur, plan: p, rects, checks, grid: undefined };
+    };
+    attempt(refitBox(it.plan, fb.box));
+    for (const t of prefs.upOmit || []) attempt(dropRoom(cur.plan, t));       // rooms that are not offered (store, study) are left out upstairs too, when the plan still passes without them
+    return cur;
   });
   const out = items.map((it, i) => {
     const L = Object.assign(planToLayout(it, i), { terrace: Math.round(terraceArea(it.rects)) });

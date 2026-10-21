@@ -1,3 +1,4 @@
+import { dim, fmtLen } from './units.js';
 // plan colours: the landing page's plan palette (Earth ink on off-white paper), the same in light and dark mode
 const FILL = {
   drawing: '#e6decf', lobby: '#f6f2e9', lounge: '#ebe5d9', dining: '#dce4e0',
@@ -80,7 +81,7 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
       if (r.parent) { tx = X(r.x + r.w / 2); ty = Y(r.z + r.d / 2); }
       else if (r.att) { ty = Y(r.z + r.d / 2) + (r.att.z > r.z + r.d / 2 ? 0 : 0); tx = X(r.x + (r.att.x > r.x ? (r.w - r.att.w) / 2 : r.att.w + (r.w - r.att.w) / 2)); }
       const maxPx = across * s - 4;
-      const size = `${fmtFt(r.w)}' x ${fmtFt(r.d)}'`;
+      const size = dim(r.w, r.d);
       const [nx, ny] = off(tx, ty, 0, nameDy), [zx, zy] = off(tx, ty, 0, nameDy + (r.parent ? 8 : 10));
       txt += `<text x="${nx}" y="${ny}" font-size="${fit(nm, fs, maxPx)}" text-anchor="middle" fill="#222" font-weight="${r.parent ? 500 : 600}" ${halo}>${nm}</text>`;
       // every room shows its size, washrooms and the kitchen included
@@ -88,13 +89,13 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
     }
     for (const p of open) {
       const cx = X(p.x + p.w / 2), cy = Y(p.z + p.d / 2), maxPx = (frame.turn ? p.d : p.w) * s - 4, [sx, sy] = off(cx, cy, 0, 10);
-      const nm = p.type === 'porch' ? (p.w >= 9.5 ? `Car porch (${p.w >= 25.5 ? 3 : p.w >= 17.5 ? 2 : 1} car${p.w >= 17.5 ? 's' : ''})` : 'Small porch') : p.type === 'terrace' ? 'Terrace' : p.type === 'balcony' ? 'Balcony' : 'Light well', size = `${fmtFt(p.w)}' x ${fmtFt(p.d)}'`;
+      const nm = p.type === 'porch' ? (p.w >= 9.5 ? `Car porch (${p.w >= 25.5 ? 3 : p.w >= 17.5 ? 2 : 1} car${p.w >= 17.5 ? 's' : ''})` : 'Small porch') : p.type === 'terrace' ? 'Terrace' : p.type === 'balcony' ? 'Balcony' : 'Light well', size = dim(p.w, p.d);
       txt += `<text x="${cx}" y="${cy}" font-size="${fit(nm, 8.5, maxPx)}" text-anchor="middle" fill="#6f6b5e" font-weight="600" ${halo}>${nm}</text>`;
       txt += `<text x="${sx}" y="${sy}" font-size="${fit(size, 7.2, maxPx)}" text-anchor="middle" fill="#6f6b5e" ${halo}>${size}</text>`;
     }
   }
-  txt += `<text x="${X(W / 2)}" y="${Y(0) + 13}" font-size="9" text-anchor="middle" fill="#666">${W} ft</text>`;
-  txt += `<text x="${X(0) - 10}" y="${Y(D / 2)}" font-size="9" text-anchor="middle" fill="#666" transform="rotate(-90 ${X(0) - 10} ${Y(D / 2)})">${D} ft</text>`;
+  txt += `<text x="${X(W / 2)}" y="${Y(0) + 13}" font-size="9" text-anchor="middle" fill="#666">${fmtLen(W)}</text>`;
+  txt += `<text x="${X(0) - 10}" y="${Y(D / 2)}" font-size="9" text-anchor="middle" fill="#666" transform="rotate(-90 ${X(0) - 10} ${Y(D / 2)})">${fmtLen(D)}</text>`;
   o += `<rect x="${X(-3)}" y="${vh - 9}" width="${W * s + 6 * s}" height="6" fill="#8d8d8d"/>`;
   if (!frame.turn) txt += `<text x="${X(W / 2)}" y="${vh - 3.6}" font-size="5.5" fill="#fff" text-anchor="middle" letter-spacing="2">ROAD</text>`;
   if (frame.turn) txt = txt.replace(/<text x="([-\d.]+)" y="([-\d.]+)"(?![^>]*transform=)/g, '<text x="$1" y="$2" transform="rotate(-90 $1 $2)"');

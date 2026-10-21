@@ -262,7 +262,7 @@ export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
   const count = {};
   for (const r of rects) if (r.parent === undefined) count[r.t] = (count[r.t] || 0) + 1;
   const nb = (count.bed || 0) + (count.master || 0);
-  for (const need of ['kitchen', 'drawing']) if (!count[need]) { add('err', `missing ${need}`); errs++; }   // a lobby is optional
+  for (const need of ['kitchen', 'drawing']) if (!count[need] && !(need === 'drawing' && plan.noDrawing)) { add('err', `missing ${need}`); errs++; }   // a lobby is optional
   if ((plan.storeys || 1) >= 2 && !count.stairs) { add('err', 'stairs', 'a two-storey house needs stairs'); errs++; }
   // check stair dimensions: standard residential stairs are 3-4 ft wide, with ~20 steps max in one flight
   const stairs = rects.filter((r) => r.t === 'stairs');
@@ -326,7 +326,7 @@ export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
   add(lost.length ? 'warn' : 'ok', 'every room reachable', lost.join(','));
   const isBed = (i) => BEDS.has(byi.get(i).t) || (byi.get(i).t === 'bath' && BEDS.has(byi.get(byi.get(i).parent).t));
   const guest = bfs(isBed);
-  add(mains.some((r) => r.t === 'drawing' && guest.has(r.i)) ? 'ok' : 'warn', 'guest privacy');
+  add(plan.noDrawing || mains.some((r) => r.t === 'drawing' && guest.has(r.i)) ? 'ok' : 'warn', 'guest privacy');
   const kit = mains.filter((r) => r.t === 'kitchen');
   const kitIds = new Set(kit.map((k) => k.i));
   const bk = lk.some(([a, b]) => (kitIds.has(a) && isBed(b)) || (kitIds.has(b) && isBed(a)));

@@ -345,6 +345,7 @@ export function dropRoom(plan, type) {
   if (!cand.length) return plan;
   const j = cand[0], np = parts.slice();
   np[j] += np[i]; np.splice(i, 1); node.kids.splice(i, 1);
+  if (type === 'drawing') p.noDrawing = true;                          // the visitor asked for no drawing room: the rule that wants one is lifted
   node.sizes = np.slice(0, -1).map((v) => Math.round(v * 100) / 100);
   p.tree = collapse(p.tree);
   return p;

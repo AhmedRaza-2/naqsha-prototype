@@ -11,6 +11,9 @@ import { check, score, serialize } from './bands.js';
 import { check as treeCheck, serialize as treeSerialize } from './tree.js';
 import { mountEditor } from './editor.js';
 import { onModelState, preloadModel } from './model.js';
+import { pickColor, closeWheel } from './colorwheel.js';
+import { UNITS, getUnit, setUnit, fromFt, toFt, num, fmtLen, fmtArea, localize } from './units.js';
+import { mountFloorForm, refreshForms, readFloor } from './floorform.js';
 import { canListen, loadSpeechModel, startListening, transcribe, readAnswer } from './voice.js';
 
 const $ = (id) => document.getElementById(id);
@@ -34,8 +37,12 @@ function readPlot() {
   const w = +$('pw').value, d = +$('pd').value;
   const marla = (w * d) / MARLA;
   const r = ruleFor(w, d);
-  $('psbf').placeholder = `standard ${r.front}`; $('psbb').placeholder = `standard ${r.rear}`; $('psbs').placeholder = `standard ${r.side}`;
-  $('plotinfo').textContent = `${w} x ${d} ft = ${(w * d).toLocaleString()} sq ft = ${marla.toFixed(1)} marla. Buildable area about ${(w - 2 * r.side)} x ${(d - r.front - r.rear)} ft after setbacks.`;
+  const U = getUnit();
+  if (document.activeElement !== $('pwu')) $('pwu').value = num(w);                          // the visible fields are in the visitor's unit; the plan is always in feet
+  if (document.activeElement !== $('pdu')) $('pdu').value = num(d);
+  $('psbf').placeholder = `standard ${num(r.front)}`; $('psbb').placeholder = `standard ${num(r.rear)}`; $('psbs').placeholder = `standard ${num(r.side)}`;
+  $('plotinfo').textContent = `${fmtLen(w)} x ${fmtLen(d)} = ${fmtArea(w * d)} = ${marla.toFixed(1)} marla. Buildable area about ${num(w - 2 * r.side)} x ${fmtLen(d - r.front - r.rear)} after setbacks.`
+    + (U === 'ft' ? '' : ` (${w} x ${d} ft)`);
   document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', +c.dataset.w === w && +c.dataset.d === d));
   // every choice stays open; each is labelled by how well it suits this plot
   const cap = maxBedsFor(w, d), lo = minBedsFor(w, d), rec = recBedsFor(w, d);
@@ -49,6 +56,7 @@ function readPlot() {
     ? ` One floor here fits ${cap} bedroom${cap > 1 ? 's' : ''} comfortably; with ${beds} the model shows the closest layouts that fit.`
     : ` Recommended for this plot: ${rec} bedroom${rec > 1 ? 's' : ''}.`;
   if (typeof syncBaths === 'function') syncBaths();
+  refreshForms();
   return { w, d };
 }
 PRESETS.forEach((p) => {
@@ -57,7 +65,24 @@ PRESETS.forEach((p) => {
   b.onclick = () => { $('pw').value = p.w; $('pd').value = p.d; readPlot(); };
   $('presets').appendChild(b);
 });
-['pw', 'pd'].forEach((id) => $(id).addEventListener('input', readPlot));
+// the visitor types in their own unit; the plan keeps feet
+function applyUnit() {
+  const U = UNITS[getUnit()];
+  $('punit').value = getUnit();
+  $('lpw').textContent = `Width (${U.len})`; $('lpd').textContent = `Depth (${U.len})`;
+  document.querySelectorAll('.u').forEach((el) => { el.textContent = U.len; });
+  for (const id of ['psbf', 'psbb', 'psbs']) { const el = $(id); el.step = getUnit() === 'ft' ? '0.5' : '0.1'; el.max = String(Math.round(fromFt(+el.dataset.maxft || 40) * 10) / 10); }
+}
+['psbf', 'psbb', 'psbs'].forEach((id) => { $(id).dataset.maxft = $(id).max; });
+$('punit').addEventListener('change', () => {
+  const old = getUnit(), next = $('punit').value;
+  for (const id of ['psbf', 'psbb', 'psbs']) { const el = $(id); if (el.value !== '') el.value = String(Math.round(fromFt(toFt(+el.value, old), next) * 10) / 10); }
+  setUnit(next); applyUnit(); readPlot(); renderAdvice();
+});
+$('pwu').addEventListener('input', () => { const v = +$('pwu').value; if (v > 0) $('pw').value = String(toFt(v)); readPlot(); });
+$('pdu').addEventListener('input', () => { const v = +$('pdu').value; if (v > 0) $('pd').value = String(toFt(v)); readPlot(); });
+$('fseg').addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) { $('pfloors').value = b.dataset.f; $('pfloors').dispatchEvent(new Event('change', { bubbles: true })); } });
+mountFloorForm($('ffhost'), 'tabs');
 
 // the sentence reader (nlp.js): "10 marla double storey 4 bed car porch, front 12 ft" fills the form; what it understood is shown below
 const NL_CHIPS = $('nlsaid');
@@ -73,7 +98,7 @@ function applyParsed(r) {
   if (r.cars) { $('pcars').value = String(r.cars); $('prefs').open = true; }
   if (r.family) { $('pfamily').value = r.family; $('prefs').open = true; }
   if (r.setbacks) {
-    for (const [k, id] of [['front', 'psbf'], ['rear', 'psbb'], ['side', 'psbs']]) if (r.setbacks[k] != null) $(id).value = String(r.setbacks[k]);
+    for (const [k, id] of [['front', 'psbf'], ['rear', 'psbb'], ['side', 'psbs']]) if (r.setbacks[k] != null) $(id).value = num(r.setbacks[k]);
     $('prefs').open = true;
   }
   if (r.stairs) { $('pstairs').value = r.stairs; $('prefs').open = true; }
@@ -97,7 +122,7 @@ $('nl').addEventListener('input', () => {
 const ADV = $('advice');
 const answered = {}, asked = {};                                  // question id -> the answer chosen / the question as last asked
 let plotTouched = false, floorsTouched = false;
-['pw', 'pd'].forEach((id) => $(id).addEventListener('input', () => { plotTouched = true; }));
+['pwu', 'pdu'].forEach((id) => $(id).addEventListener('input', () => { plotTouched = true; }));
 $('presets').addEventListener('click', () => { plotTouched = true; });
 $('pfloors').addEventListener('change', () => { floorsTouched = true; });
 const PORCH_NEED = [10, 18, 26];                                  // ft across for 1, 2, 3 cars side by side
@@ -115,7 +140,7 @@ function questions() {
     if (!r.floors && !floorsTouched && shown) qs.push({ id: 'floors', kind: 'missing', text: 'One floor or two?', opts: [{ label: 'One floor', apply: () => { setField('pfloors', 1); syncFloors(); } }, { label: 'Two floors', apply: () => { setField('pfloors', 2); syncFloors(); } }] });
   }
   if (cars >= 2 && porchOn) {                                     // a porch for several cars
-    const need = PORCH_NEED[cars - 1], front = +$('psbf').value || rule.front;
+    const need = PORCH_NEED[cars - 1], front = toFt(+$('psbf').value) || rule.front;
     if (w < need + 3) {
       const fit = w - 3 >= 26 ? 3 : w - 3 >= 18 ? 2 : 1;                // cars that fit across, leaving a little lawn at each end
       qs.push({ id: 'cars-width', kind: 'conflict', text: `${cars} cars side by side need about ${need} ft across, and the frontage is ${w} ft. How should I park them?`, opts: [
@@ -136,10 +161,6 @@ function questions() {
       ] });
     }
   }
-  if (two && shown) qs.push({ id: 'updraw', kind: 'ask', text: 'The first floor has a family lounge. Do you want a drawing room up there too?', opts: [
-    { label: 'Yes, add a drawing room', apply: () => setField('pupdraw', 'yes') },
-    { label: 'No, the lounge is enough', apply: () => setField('pupdraw', 'no') },
-  ] });
   return qs;
 }
 function renderAdvice() {
@@ -149,7 +170,7 @@ function renderAdvice() {
   const draw = (q, done, canChange = true) => {
     const el = document.createElement('div');
     el.className = `ask ${q.kind}${done ? ' done' : ''}`;
-    const p = document.createElement('p'); p.textContent = q.text; el.appendChild(p);
+    const p = document.createElement('p'); p.textContent = localize(q.text); el.appendChild(p);
     const row = document.createElement('div'); row.className = 'asks';
     if (done) {
       const t = document.createElement('span'); t.className = 'asked'; t.textContent = done; row.appendChild(t);
@@ -159,20 +180,20 @@ function renderAdvice() {
         row.appendChild(b);
       }
     } else q.opts.forEach((o) => {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'ask-opt'; b.textContent = o.label;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'ask-opt'; b.textContent = localize(o.label);
       b.onclick = () => { o.apply(); answered[q.id] = o.label; asked[q.id] = q; readPlot(); renderAdvice(); };
       row.appendChild(b);
     });
     el.appendChild(row);
     ADV.appendChild(el);
   };
-  for (const q of qs) { asked[q.id] = q; if (!(q.id === 'updraw' && $('pupdraw').value === 'yes' && !answered.updraw)) draw(q, answered[q.id]); }
+  for (const q of qs) { asked[q.id] = q; draw(q, answered[q.id]); }
   for (const [id, label] of gone) if (asked[id]) draw(asked[id], label, false);
   return qs;
 }
 /** A clash the visitor has not answered yet (shown under the text box): Generate waits for the answer. */
 const openConflict = () => questions().find((q) => q.kind === 'conflict' && !answered[q.id]);
-['nl', 'pw', 'pd'].forEach((id) => $(id).addEventListener('input', renderAdvice));
+['nl', 'pwu', 'pdu'].forEach((id) => $(id).addEventListener('input', renderAdvice));
 ['pfloors', 'pcars', 'pporch', 'pb'].forEach((id) => $(id).addEventListener('change', renderAdvice));
 
 // ---------- voice: speak the request; the words are read like typed text and the visitor confirms before anything is drafted ----------
@@ -270,6 +291,7 @@ setShown($('floorsrow'), false);                                   // shown once
 function syncFloors() {
   const two = floors() === 2;
   setShown($('pupl'), two); setShown($('pupbl'), two); setShown($('pterrl'), two);
+  document.querySelectorAll('#fseg [data-f]').forEach((b) => { const on = +b.dataset.f === (two ? 2 : 1); b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
   $('pbl').childNodes[0].nodeValue = two ? 'Bedrooms downstairs\n            ' : 'Bedrooms\n            ';
   const ub = +$('pup').value, sel = $('pupbaths'), keep = +sel.value;
   sel.innerHTML = '';
@@ -285,10 +307,12 @@ $('pfloors').addEventListener('change', syncFloors);
 $('pup').addEventListener('change', syncFloors);
 // washrooms: one per bedroom + a guest washroom, + a common one off the lounge above 6 marla (same as max_baths)
 const extraBathsFor = (w, d) => ((w * d) / MARLA <= 6 ? 1 : 2);
+let bathsTouched = false;                                          // once the visitor sets the washrooms, keep them; until then it is one more than the bedrooms
 function syncBaths(want) {
   const beds = +$('pb').value;
   const sel = $('pbaths');
-  const keep = want ?? +sel.value;
+  if (want != null) bathsTouched = true;
+  const keep = want ?? (bathsTouched ? +sel.value : beds + 1);
   const plot = { w: +$('pw').value, d: +$('pd').value };
   const opts = [[beds, 'attached only'], [beds + 1, 'attached + guest'], [beds + 2, 'attached + guest + common']];
   const fits = beds + extraBathsFor(plot.w, plot.d);
@@ -301,6 +325,7 @@ function syncBaths(want) {
   sel.value = opts.some(([n]) => n === keep) ? keep : beds + 1;
 }
 $('pb').addEventListener('change', () => { userBeds = true; readPlot(); });
+$('pbaths').addEventListener('change', () => { bathsTouched = true; });
 syncBaths();
 
 /** Returns an error message, or '' when the request is fine. Also nudges the bedroom count to what the plot can hold. */
@@ -331,8 +356,8 @@ preloadModel().then(() => knowsStoreys()).then((ok) => { knowsStoreysNow = ok; s
   .catch((err) => console.warn('Naqsha model could not load.', err));
 
 /** Draft layouts with the model for S.plot / S.prefs. regen = different layouts from the ones already shown. */
-async function generate(regen) {
-  const btn = $(regen ? 'regen' : 'gen'), label = btn.textContent;
+async function generate(regen, btnId) {
+  const btn = $(btnId || (regen ? 'regen' : 'gen')), label = btn.textContent;
   btn.disabled = true;
   waitingBtn = btn;
   S.note = '';
@@ -404,10 +429,11 @@ async function generate(regen) {
   waitingBtn = null;
   btn.disabled = false;
   btn.textContent = label;
+  hint();
   if (!layouts.length) {
     const msg = failure || (regen ? 'No new layout passed the checks this time. Press Regenerate again.'
       : `The model could not draft a layout that passes the checks for ${S.plot.w} x ${S.plot.d} ft with ${S.beds} bedroom${S.beds > 1 ? 's' : ''}. Try fewer bedrooms or washrooms, or another plot size.`);
-    if (regen) { S.note = msg; renderLayouts(); } else { $('formerr').textContent = msg; $('formerr').hidden = false; }
+    if (regen) { S.note = msg; renderLayouts(); } else { $('formerr').textContent = localize(msg); $('formerr').hidden = false; }
     return;
   }
   layouts.forEach((L) => S.seen.add(L.text));
@@ -422,46 +448,77 @@ async function generate(regen) {
   show(2);
 }
 
+/** Everything the form asks for, as the planner wants it. Store and study are never drafted: they are not offered. */
+function readPrefs() {
+  const sbv = (id) => { const v = $(id).value.trim(); return v === '' ? undefined : Math.max(0, toFt(+v)); };
+  const setbacks = Object.fromEntries(Object.entries({ front: sbv('psbf'), rear: sbv('psbb'), side: sbv('psbs') }).filter(([, v]) => Number.isFinite(v)));
+  const omit = [...new Set([...document.querySelectorAll('input[name=omit]:checked')].map((c) => c.value).concat(['store', 'study']))];
+  return { beds: +$('pb').value, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, cars: +$('pcars').value, family: $('pfamily').value,
+    setbacks: Object.keys(setbacks).length ? setbacks : null, entrance: $('pentr').value, stairs: $('pstairs').value,
+    lawn: $('plawn').value, omit,
+    storeys: floors(), upBeds: +$('pup').value, upBaths: +$('pupbaths').value, terrace: $('pterr').value, upDrawing: $('pupdraw').value === 'yes' };
+}
+const GROUND = ['beds', 'baths', 'focus', 'porch', 'cars', 'family', 'setbacks', 'entrance', 'stairs', 'lawn', 'omit', 'storeys'];
+const FIRST = ['upBeds', 'upBaths', 'terrace', 'upDrawing'];
+const same = (a, b, keys) => keys.every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k]));
+
 $('gen').onclick = async () => {
   S.plot = readPlot();
   const problem = validateRequest();
   $('formerr').hidden = !problem;
-  $('formerr').textContent = problem;
+  $('formerr').textContent = localize(problem);
   if (problem) return;
   const clash = openConflict();
-  if (clash) { $('formerr').hidden = false; $('formerr').textContent = 'One thing first: ' + clash.text + ' Pick an answer under the text box.'; $('advice').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
-  S.beds = +$('pb').value;
-  const sbv = (id) => { const v = $(id).value.trim(); return v === '' ? undefined : Math.max(0, +v); };
-  const setbacks = Object.fromEntries(Object.entries({ front: sbv('psbf'), rear: sbv('psbb'), side: sbv('psbs') }).filter(([, v]) => Number.isFinite(v)));
-  S.prefs = { beds: S.beds, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, cars: +$('pcars').value, family: $('pfamily').value,
-    setbacks: Object.keys(setbacks).length ? setbacks : null, entrance: $('pentr').value, stairs: $('pstairs').value,
-    lawn: $('plawn').value, omit: [...document.querySelectorAll('input[name=omit]:checked')].map((c) => c.value),
-    storeys: floors(), upBeds: +$('pup').value, upBaths: +$('pupbaths').value, terrace: $('pterr').value, upDrawing: $('pupdraw').value === 'yes' };
+  if (clash) { $('formerr').hidden = false; $('formerr').textContent = localize('One thing first: ' + clash.text + ' Pick an answer under the text box.'); $('advice').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+  S.prefs = readPrefs();
+  S.beds = S.prefs.beds;
   S.site.cars = Math.max(1, S.prefs.cars);                       // how many cars the 3D scene parks
   S.seen = new Set(); S.upperLayouts = []; S.up = null;
   $('uerr').hidden = true;
   await generate(false);
 };
-$('regen').onclick = () => generate(true);
+$('regen').onclick = () => {
+  const now = readPrefs(), changed = !same(now, S.prefs, GROUND);
+  if (changed) {                                                  // a changed request is drafted afresh for the ground floor; the first floor is drafted again when this one is chosen
+    Object.assign(S.prefs, Object.fromEntries(GROUND.map((k) => [k, now[k]])));
+    S.beds = S.prefs.beds; S.seen = new Set(); S.upperLayouts = []; S.up = null; $('uerr').hidden = true;
+  }
+  generate(!changed, 'regen');
+};
+/** The redraft buttons say what they will do: the same request again, or the changes just made. */
+function hint() {
+  if (!S.prefs) return;
+  const g = !same(readPrefs(), S.prefs, GROUND), u = !same(readPrefs(), S.prefs, FIRST);
+  $('regen').textContent = g ? 'Redraft with my changes' : 'Regenerate layouts';
+  $('regen').classList.toggle('primary', g);
+  $('regenhint').textContent = g ? 'Your changes are not applied yet.' : 'Not what you had in mind? Draft three new ones.';
+  $('uregen').textContent = u ? 'Redraft with my changes' : 'Regenerate first floors';
+  $('uregen').classList.toggle('primary', u);
+  $('uregenhint').textContent = u ? 'Your changes are not applied yet.' : 'Not what you had in mind? Draft three new ones.';
+}
+document.addEventListener('change', () => queueMicrotask(hint));
+document.addEventListener('click', () => queueMicrotask(hint));
+mountFloorForm($('gformhost'), 'ground');
+mountFloorForm($('uformhost'), 'first');
 
 // ---------- step 2 ----------
 const upKeyOf = (L) => JSON.stringify(boxAndStairs(L.rects));
-const terraceTag = (L) => { const t = terraceArea(L.rects); return t >= 40 ? `terrace ${Math.round(t)} sq ft` : 'no terrace'; };
+const terraceTag = (L) => { const t = terraceArea(L.rects); return t >= 40 ? `terrace ${fmtArea(t)}` : 'no terrace'; };
 /** The card of a ground-floor layout: with its first floor beside it once that is drafted. */
 function layoutCard(L, i) {
   const warn = L.checks.length - L.score;
   const U = S.prefs.storeys === 2 && L.uppers ? L.uppers[L.upPick ?? 0] : null;
-  if (!U) return `${planSVG(L)}<h4>${L.label}: ${L.tag}</h4><p>${L.covered.toLocaleString()} sq ft covered</p>${S.prefs.storeys === 2 ? '<p class="fine">The first floor is drafted when you choose this one.</p>' : ''}<span class="badge ${warn ? 'w' : ''}">${L.score}/${L.checks.length} checks passed</span>`;
+  if (!U) return `${planSVG(L)}<h4>${L.label}: ${L.tag}</h4><p>${fmtArea(L.covered)} covered</p>${S.prefs.storeys === 2 ? '<p class="fine">The first floor is drafted when you choose this one.</p>' : ''}<span class="badge ${warn ? 'w' : ''}">${L.score}/${L.checks.length} checks passed</span>`;
   const uw = U.checks.length - U.score;
   return `<div class="duo"><figure><figcaption>Ground floor</figcaption>${planSVG(L, { maxW: 200, maxH: 330, labels: false })}</figure><figure><figcaption>First floor</figcaption>${planSVG(U, { maxW: 200, maxH: 330, labels: false })}</figure></div>`
-    + `<h4>House ${'ABCDEF'[i]}: ${L.tag}</h4><p>${L.covered.toLocaleString()} + ${U.covered.toLocaleString()} sq ft covered, ${terraceTag(U)}</p>${L.upNote ? `<p class="fine">${L.upNote}</p>` : ''}`
+    + `<h4>House ${'ABCDEF'[i]}: ${L.tag}</h4><p>${fmtArea(L.covered)} + ${fmtArea(U.covered)} covered, ${terraceTag(U)}</p>${L.upNote ? `<p class="fine">${L.upNote}</p>` : ''}`
     + `<span class="badge ${warn || uw ? 'w' : ''}">${L.score}/${L.checks.length} and ${U.score}/${U.checks.length} checks passed</span>`;
 }
 function renderLayouts() {
   const L0 = S.layouts[0], two = S.prefs.storeys === 2, houses = two && S.layouts.some((L) => L.uppers);
   $('s2').querySelector('h2').textContent = houses ? 'Choose your house' : two ? 'Choose the ground floor' : 'Choose a layout';
   $('to3').textContent = houses ? 'Use this house' : two ? 'Use this ground floor' : 'Use this layout';
-  $('s2sub').textContent = `${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedroom${L0.beds === 1 ? '' : 's'}${two ? ' downstairs' : ''}${houses ? ` and ${S.layouts.find((L) => L.uppers).uppers[0].beds} upstairs. Each option shows the ground floor and the first floor drafted over it, side by side` : two ? '. The stairs are placed for the first floor, which comes next' : ''}. Drafted by the Naqsha model and rule-checked. Pick one to adjust its walls.${S.note ? ` ${S.note}` : ''}`;
+  $('s2sub').textContent = localize(`${S.plot.w} x ${S.plot.d} ft plot, ${L0.beds} bedroom${L0.beds === 1 ? '' : 's'}${two ? ' downstairs' : ''}${houses ? ` and ${S.layouts.find((L) => L.uppers).uppers[0].beds} upstairs. Each option shows the ground floor and the first floor drafted over it, side by side` : two ? '. The stairs are placed for the first floor, which comes next' : ''}. Drafted by the Naqsha model and rule-checked. Pick one to adjust its walls.${S.note ? ` ${S.note}` : ''}`);
   const host = $('layouts');
   host.innerHTML = '';
   S.layouts.forEach((L, i) => {
@@ -481,7 +538,7 @@ const editState = new Map();                                    // per layout: {
 function showChecks() {
   $('chkscore').textContent = `(${S.sel.score}/${S.sel.checks.length})`;
   $('checks').innerHTML = S.sel.checks.map((c) =>
-    `<li><span class="ico ${c.level}">${c.level === 'ok' ? '&#10003;' : '&#9888;'}</span><div><b>${c.title}</b><span>${c.detail}</span></div></li>`).join('');
+    `<li><span class="ico ${c.level}">${c.level === 'ok' ? '&#10003;' : '&#9888;'}</span><div><b>${localize(c.title)}</b><span>${localize(c.detail)}</span></div></li>`).join('');
   $('areas').innerHTML = areaTable([['Ground floor', S.sel]]);
 }
 function select(id) {
@@ -542,12 +599,12 @@ $('to3').onclick = async () => {
 function areaTable(floors) {
   const L0 = floors[0][1], plot = L0.plot.w * L0.plot.d, rule = L0.rule;
   const f = (v) => Math.round(v).toLocaleString();
-  const rows = [['Plot', `${f(plot)} sq ft (${(plot / MARLA).toFixed(1)} marla)`]];
+  const rows = [['Plot', `${fmtArea(plot)} (${(plot / MARLA).toFixed(1)} marla)`]];
   let total = 0;
-  for (const [name, L] of floors) { if (!L) continue; rows.push([`${name} covered`, `${f(L.covered)} sq ft`]); total += L.covered; }
+  for (const [name, L] of floors) { if (!L) continue; rows.push([`${name} covered`, fmtArea(L.covered)]); total += L.covered; }
   const cov = (L0.covered / plot) * 100;
   rows.push(['Ground coverage', `${cov.toFixed(0)}% <small>(limit about ${rule.cover}%)</small>`]);
-  if (floors.length > 1 && floors[1][1]) rows.push(['Built area, both floors', `${f(total)} sq ft`]);
+  if (floors.length > 1 && floors[1][1]) rows.push(['Built area, both floors', fmtArea(total)]);
   const beds = floors.reduce((a, [, L]) => a + (L ? L.beds : 0), 0), baths = floors.reduce((a, [, L]) => a + (L ? L.rooms.filter((r) => r.parent).length : 0), 0);
   rows.push(['Bedrooms, washrooms', `${beds}, ${baths}`]);
   return '<table>' + rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('') + '</table><p class="fine">Setbacks and coverage limits are indicative; confirm with your development authority.</p>';
@@ -566,7 +623,7 @@ async function upperFor(ground, { regen, quick = false }, onStatus) {
     onStatus(String(m).replace(q[0], `(${shownPct}%)`));
   };
   for (const [beds, baths, msg] of quick ? tries.slice(0, 1) : tries) {                // quick: the houses are drafted without the step-downs
-    const layouts = await upperLayouts(ground, { beds, baths, terrace, upDrawing }, status,
+    const layouts = await upperLayouts(ground, { beds, baths, terrace, upDrawing, upOmit: ['store', 'study'] }, status,
       { exclude: regen ? S.seenUp : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12, quick });
     if (layouts.length) return { layouts, note: [msg, layouts.note].filter(Boolean).join(' ') };
     if (regen) break;                                            // Regenerate keeps the request; only the first try relaxes it
@@ -592,8 +649,8 @@ async function withUppers(layouts, btn) {
   layouts.filter((L) => L.uppers).forEach((L, i) => { L.upPick = i % L.uppers.length; });    // houses show different first floors (with and without a terrace)
   return layouts;
 }
-async function draftUpper(regen) {
-  const btn = $(regen ? 'uregen' : 'to3'), label = btn.textContent;
+async function draftUpper(regen, btnId) {
+  const btn = $(btnId || (regen ? 'uregen' : 'to3')), label = btn.textContent;
   btn.disabled = true;
   $('uerr').hidden = true;
   let layouts = [], note = '';
@@ -604,6 +661,7 @@ async function draftUpper(regen) {
   }
   btn.disabled = false;
   btn.textContent = label;
+  hint();
   if (!layouts.length) {
     $('uerr').textContent = regen ? 'No new first floor passed the checks this time. Press Regenerate again.'
       : 'The model could not draft a first floor over this ground floor. Pick another ground floor or press Regenerate layouts.';
@@ -619,11 +677,11 @@ async function draftUpper(regen) {
 }
 const upEditState = new Map();
 let upEditor = null, upIdx = -1;
-const upCard = (L) => `${planSVG(L)}<h4>${L.label}${L.tag === 'First floor, edited' ? ', edited' : ''}</h4><p>${L.beds} bedroom${L.beds === 1 ? '' : 's'}, ${L.covered.toLocaleString()} sq ft covered, ${terraceTag(L)}</p><span class="badge ${L.checks.length - L.score ? 'w' : ''}">${L.score}/${L.checks.length} checks passed</span>`;
+const upCard = (L) => `${planSVG(L)}<h4>${L.label}${L.tag === 'First floor, edited' ? ', edited' : ''}</h4><p>${L.beds} bedroom${L.beds === 1 ? '' : 's'}, ${fmtArea(L.covered)} covered, ${terraceTag(L)}</p><span class="badge ${L.checks.length - L.score ? 'w' : ''}">${L.score}/${L.checks.length} checks passed</span>`;
 function showUpperChecks() {
   const L = S.up;
   $('uchkscore').textContent = `(${L.score}/${L.checks.length})`;
-  $('uchecks').innerHTML = L.checks.map((c) => `<li><span class="ico ${c.level}">${c.level === 'ok' ? '&#10003;' : '&#9888;'}</span><div><b>${c.title}</b><span>${c.detail}</span></div></li>`).join('');
+  $('uchecks').innerHTML = L.checks.map((c) => `<li><span class="ico ${c.level}">${c.level === 'ok' ? '&#10003;' : '&#9888;'}</span><div><b>${localize(c.title)}</b><span>${localize(c.detail)}</span></div></li>`).join('');
   $('uareas').innerHTML = areaTable([['Ground floor', S.sel], ['First floor', L]]);
   drawPair();
 }
@@ -661,8 +719,8 @@ function drawPair(host = $('pair')) {
   host.innerHTML = half('Ground floor', S.sel) + half('First floor', S.up);
 }
 function renderUpper() {
-  $('usub').textContent = `Over the ${S.sel.beds}-bedroom ground floor, the stairs come up in the same place. Drafted by the Naqsha model and rule-checked. The open roof of the floor below, where the first floor does not cover it, is the terrace.${S.upNote ? ` ${S.upNote}` : ''}`;
-  $('uterr').value = S.prefs.terrace || 'both';
+  $('usub').textContent = localize(`Over the ${S.sel.beds}-bedroom ground floor, the stairs come up in the same place. Drafted by the Naqsha model and rule-checked. The open roof of the floor below, where the first floor does not cover it, is the terrace.${S.upNote ? ` ${S.upNote}` : ''}`);
+  refreshForms(); hint();
   const host = $('ulayouts');
   host.innerHTML = '';
   S.upperLayouts.forEach((L, i) => {
@@ -678,33 +736,43 @@ function renderUpper() {
   $('uchecks').innerHTML = '<li><span></span><span>Select a first floor to see its rule check and the areas of both floors.</span></li>';
   $('uareas').innerHTML = ''; $('uchkscore').textContent = '';
 }
-$('uregen').onclick = () => draftUpper(true);
-$('uterr').onchange = () => {                                      // the terrace choice changes the first floors drafted
-  S.prefs.terrace = $('uterr').value; $('pterr').value = $('uterr').value;
-  S.seenUp = new Set();
-  draftUpper(true);
+$('uregen').onclick = () => {
+  const now = readPrefs(), changed = !same(now, S.prefs, FIRST);
+  Object.assign(S.prefs, Object.fromEntries(FIRST.map((k) => [k, now[k]])));
+  if (changed) S.seenUp = new Set();                               // a new request: the first floors are not "different from the ones shown"
+  draftUpper(!changed, 'uregen');
 };
 $('uto3').onclick = () => { renderStyles(); show(3); };
 
 // ---------- step 3 ----------
 // colours a Pakistani house is commonly finished in; null keeps the style's own colour
-const WALLS = [[null, 'Style colour'], ['#f3f1ec', 'White'], ['#eadfca', 'Cream'], ['#e2cfa9', 'Sand'], ['#cfcfca', 'Light grey'], ['#c9d1bf', 'Sage'], ['#d9a98a', 'Terracotta']];
-const TRIMS = [[null, 'Style colour'], ['#2b2f33', 'Charcoal'], ['#fbf8f0', 'White'], ['#6b4a32', 'Walnut'], ['#8a8f93', 'Steel']];
-const INTERIORS = [[null, 'Style colour'], ['#f8f6f1', 'Off-white'], ['#efe6d6', 'Warm beige'], ['#e3e8e4', 'Mint grey'], ['#ece2dc', 'Blush']];
-const WALLC = [[null, 'Same as the house'], ['#f3f1ec', 'White'], ['#eadfca', 'Cream'], ['#d9a98a', 'Terracotta'], ['#9aa59a', 'Sage grey'], ['#6b6f73', 'Slate'], ['#b8956a', 'Sand stone']];
+const WALLS = [[null, 'Style colour'], ['#f3f1ec', 'White'], ['#eadfca', 'Cream'], ['#e2cfa9', 'Sand'], ['#cfcfca', 'Light grey'], ['#c9d1bf', 'Sage'], ['#d9a98a', 'Terracotta'], ['#f4e7b8', 'Soft yellow'], ['#f3cfb3', 'Peach'], ['#d8b3ae', 'Dusty rose'], ['#cfe0ea', 'Sky blue'], ['#a7a56a', 'Olive'], ['#b5553a', 'Brick red'], ['#4a4f54', 'Charcoal']];
+const TRIMS = [[null, 'Style colour'], ['#2b2f33', 'Charcoal'], ['#fbf8f0', 'White'], ['#6b4a32', 'Walnut'], ['#8a8f93', 'Steel'], ['#a8744c', 'Teak'], ['#c49a4a', 'Brass'], ['#2f5d50', 'Deep green'], ['#8c2f2f', 'Brick red']];
+const INTERIORS = [[null, 'Style colour'], ['#f8f6f1', 'Off-white'], ['#efe6d6', 'Warm beige'], ['#e3e8e4', 'Mint grey'], ['#ece2dc', 'Blush'], ['#e8eef3', 'Pale blue'], ['#f1ecc9', 'Pale yellow'], ['#dfe6d3', 'Pale green'], ['#d9d4cf', 'Stone grey']];
+const WALLC = [[null, 'Same as the house'], ['#f3f1ec', 'White'], ['#eadfca', 'Cream'], ['#d9a98a', 'Terracotta'], ['#9aa59a', 'Sage grey'], ['#6b6f73', 'Slate'], ['#b8956a', 'Sand stone'], ['#c5c9cc', 'Light grey'], ['#8a4a3a', 'Brick red'], ['#3f4448', 'Charcoal']];
 const FLOORS_L = [[null, 'Style floor'], ['marble', 'White marble'], ['marble-warm', 'Warm marble'], ['terracotta', 'Terracotta'], ['wood', 'Light wood'], ['wood-dark', 'Dark wood']];
 const FLOORS_B = [[null, 'Style floor'], ['wood', 'Light wood'], ['wood-dark', 'Dark wood'], ['marble', 'White marble'], ['marble-warm', 'Warm marble'], ['terracotta', 'Terracotta']];
-const ACCENTS = [[null, 'Style colour'], ['#a8744c', 'Teak'], ['#6b4a32', 'Walnut'], ['#2f5d50', 'Deep green'], ['#8c2f2f', 'Brick red'], ['#c49a4a', 'Brass'], ['#2b2f33', 'Charcoal']];
+const ACCENTS = [[null, 'Style colour'], ['#a8744c', 'Teak'], ['#6b4a32', 'Walnut'], ['#2f5d50', 'Deep green'], ['#8c2f2f', 'Brick red'], ['#c49a4a', 'Brass'], ['#2b2f33', 'Charcoal'], ['#4a6a8a', 'Slate blue'], ['#e8e2d4', 'Ivory'], ['#7a3b3b', 'Maroon']];
 S.colors = { wall: null, trim: null, accent: null };
 S.site = { ...SITE_DEFAULT };
 // what a floor material looks like in its swatch (the swatch colour is a CSS colour; a floor is named by its material)
 const FLOOR_LOOK = { marble: '#ece9e2', 'marble-warm': '#e8dcc4', terracotta: '#c9774c', wood: '#c99b62', 'wood-dark': '#6b4529' };
 function swatches(host, list, cur, onPick, look = null) {
-  host.innerHTML = list.map(([c, name]) => `<button type="button" role="radio" aria-checked="${c === cur}" title="${name}" aria-label="${name}" data-c="${c || ''}" class="swatch${c ? '' : ' auto'}"${c ? ` style="--c:${(look && look[c]) || c}"` : ''}></button>`).join('');
-  host.querySelectorAll('button').forEach((b) => (b.onclick = () => {
+  const custom = !look;                                              // colours get a wheel for any other colour; floors are materials
+  const inList = list.some(([c]) => c === cur);
+  host.innerHTML = list.map(([c, name]) => `<button type="button" role="radio" aria-checked="${c === cur}" title="${name}" aria-label="${name}" data-c="${c || ''}" class="swatch${c ? '' : ' auto'}"${c ? ` style="--c:${(look && look[c]) || c}"` : ''}></button>`).join('')
+    + (custom ? `<button type="button" role="radio" aria-checked="${!!cur && !inList}" title="Pick any colour" aria-label="Pick any colour" class="swatch custom${cur && !inList ? ' picked' : ''}"${cur && !inList ? ` style="--c:${cur}"` : ''}></button>` : '');
+  host.querySelectorAll('button:not(.custom)').forEach((b) => (b.onclick = () => {
+    closeWheel();
     host.querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
     onPick(b.dataset.c || null);
   }));
+  const cb = host.querySelector('.custom');
+  if (cb) cb.onclick = () => pickColor(cb, cb.style.getPropertyValue('--c') || cur || list.find(([c]) => c)?.[0], (hex) => {
+    host.querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(x === cb)));
+    cb.classList.add('picked'); cb.style.setProperty('--c', hex);
+    onPick(hex);
+  });
 }
 let renderTicket = 0;
 /** The three style cards: a 3D render of the house from the street (drawn one after another so the page stays responsive). */
@@ -834,7 +902,7 @@ function planSheet(styleId) {
     + `<text x="${x + fw / 2}" y="${top + H + 24}" text-anchor="middle" font-size="15" fill="#3a2f2c">Front of the house, ${STYLES[styleId].name}</text>`;
   x += fw + gap;
   const W = x;
-  const t = `${S.plot.w} x ${S.plot.d} ft plot, ${S.up ? 'two storeys' : 'single storey'}, ${S.sel.beds}${S.up ? ' + ' + S.up.beds : ''} bedrooms`;
+  const t = localize(`${S.plot.w} x ${S.plot.d} ft plot, ${S.up ? 'two storeys' : 'single storey'}, ${S.sel.beds}${S.up ? ' + ' + S.up.beds : ''} bedrooms`);
   return { W, Ht: top + H + 50, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${top + H + 50}" font-family="Geist, Arial, sans-serif">`
     + `<rect width="100%" height="100%" fill="#fbf8f1"/><text x="${gap}" y="34" font-size="22" font-weight="600" fill="#3a2f2c">Naqsha AI house plan</text>`
     + `<text x="${gap}" y="56" font-size="14" fill="#6b5f5a">${t}. Concept only, not a stamped drawing.</text>${body}</svg>` };
@@ -922,6 +990,7 @@ $('vback').onclick = () => {
   $('viewer').hidden = true; document.body.style.overflow = '';
 };
 
+applyUnit();
 syncFloors();
 show(1);
 
