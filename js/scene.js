@@ -405,9 +405,9 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         along((o0 + o1) / 2 - 0.06, (o0 + o1) / 2 + 0.06, p.sill, p.top, 0.12, mFrame);
         if (outer) {
           const out = outSide * (t / 2 + 0.25);
-          along(o0 - 0.45, o1 + 0.45, p.sill - 0.25, p.sill, 0.28, st.id === 'modern' ? mFrame : mTrim, out * 0.6);        // sill
-          along(o0 - 0.7, o1 + 0.7, p.top + 0.35, p.top + 0.62, 0.85, st.id === 'spanish' ? mRoofTile : mTrim, outSide * (t / 2 + 0.85));   // chajja (sunshade)
-          if (st.id === 'classic') {                               // moulded surround
+          along(o0 - 0.45, o1 + 0.45, p.sill - 0.25, p.sill, 0.28, st.family === 'modern' ? mFrame : mTrim, out * 0.6);        // sill
+          along(o0 - 0.7, o1 + 0.7, p.top + 0.35, p.top + 0.62, 0.85, st.family === 'spanish' ? mRoofTile : mTrim, outSide * (t / 2 + 0.85));   // chajja (sunshade)
+          if (st.family === 'classic') {                               // moulded surround
             along(o0 - 0.55, o0 - 0.2, p.sill, p.top + 0.35, 0.12, mTrim, outSide * (t / 2 + 0.06));
             along(o1 + 0.2, o1 + 0.55, p.sill, p.top + 0.35, 0.12, mTrim, outSide * (t / 2 + 0.06));
           }
@@ -446,7 +446,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         // the leaf: hinged at the doorway, it swings into the room it belongs to (click it, or press F, to open and close)
         const into = outer ? inDir : sideOf(p.room, o, c);
         const leafLen = p.w - 0.1, th = 0.15, hgt = p.top - 0.08;
-        const m = p.main ? (st.id === 'modern' ? mSlats : mDoor) : p.room?.startsWith('bath') ? mat('#e9e6df', { roughness: 0.5 }) : mDoor;
+        const m = p.main ? (st.family === 'modern' ? mSlats : mDoor) : p.room?.startsWith('bath') ? mat('#e9e6df', { roughness: 0.5 }) : mDoor;
         const pivot = new THREE.Group();
         if (o === 'h') pivot.position.set(o0 + 0.04, 0.04, c); else pivot.position.set(c, 0.04, o0 + 0.04);
         const leafMesh = new THREE.Mesh(o === 'h' ? new THREE.BoxGeometry(leafLen, hgt, th) : new THREE.BoxGeometry(th, hgt, leafLen), m);
@@ -464,7 +464,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         leafMesh.userData.door = door;
         doorList.push(door);
         curColl.push(door.col);
-        if (outer) along(o0 - 0.8, o1 + 0.8, p.top + 0.45, p.top + 0.72, 0.9, st.id === 'spanish' ? mRoofTile : mTrim, outSide * (t / 2 + 0.9));
+        if (outer) along(o0 - 0.8, o1 + 0.8, p.top + 0.45, p.top + 0.72, 0.9, st.family === 'spanish' ? mRoofTile : mTrim, outSide * (t / 2 + 0.9));
         if (p.main) {                                             // lights beside the entrance
           const lm = mat('#fff3d0', { emissive: '#ffd890', emissiveIntensity: 1.2 });
           along(o0 - 0.75, o0 - 0.45, 6.2, 6.8, 0.12, lm, outSide * (t / 2 + 0.12));
@@ -528,7 +528,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   // ---------- roof ----------
   // slab over a storey (with a stairwell hole when the storey above reaches it), a parapet round it, a cornice, a water tank
   const ov = 0.45;
-  const pm = st.id === 'spanish' ? mExt : st.id === 'modern' ? mTrim : mExt;
+  const pm = st.family === 'spanish' ? mExt : st.family === 'modern' ? mTrim : mExt;
   // cover: rooms of the storey above; the parapet runs only where the roof edge is open (the terrace), not under its walls
   const hipRoof = (parent, bx0, bx1, bz0, bz1, y, rise) => {         // a four-sided roof, the ridge along the longer side
     const w = bx1 - bx0, dd = bz1 - bz0, along = w >= dd, inset = Math.min(w, dd) / 2 - 0.01, xc = (bx0 + bx1) / 2, zc = (bz0 + bz1) / 2;
@@ -568,17 +568,17 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       hipRoof(parent, B.x - 1.6, B.x + B.w + 1.6, B.z - 1.6, B.z + B.d + 1.6, y + SLAB, Math.min(B.w, B.d) * 0.27 + 1.2);
       return;
     }
-    const capM = st.id === 'spanish' ? mRoofTile : mTrim;                                       // coping on the parapet
+    const capM = st.family === 'spanish' ? mRoofTile : mTrim;                                       // coping on the parapet
     const y0 = y + SLAB, y1 = y + SLAB + ph, c1 = y1 + 0.22;
     for (const [a, b] of freeSpans('h', B.z, x0, x1)) { box(parent, a, b, y0, y1, z0, z0 + pt, pm); box(parent, a - 0.1, b + 0.1, y1, c1, z0 - 0.1, z0 + pt + 0.1, capM); }
     for (const [a, b] of freeSpans('h', B.z + B.d, x0, x1)) { box(parent, a, b, y0, y1, z1 - pt, z1, pm); box(parent, a - 0.1, b + 0.1, y1, c1, z1 - pt - 0.1, z1 + 0.1, capM); }
     for (const [a, b] of freeSpans('v', B.x, z0, z1)) { box(parent, x0, x0 + pt, y0, y1, a, b, pm); box(parent, x0 - 0.1, x0 + pt + 0.1, y1, c1, a, b, capM); }
     for (const [a, b] of freeSpans('v', B.x + B.w, z0, z1)) { box(parent, x1 - pt, x1, y0, y1, a, b, pm); box(parent, x1 - pt - 0.1, x1 + 0.1, y1, c1, a, b, capM); }
-    if (st.id === 'spanish' && freeSpans('h', B.z, x0, x1).length) {                                     // a sloping tiled hood along the front, under the parapet
+    if (st.family === 'spanish' && freeSpans('h', B.z, x0, x1).length) {                                     // a sloping tiled hood along the front, under the parapet
       const tilt = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 + 1, 0.25, 2.2), mRoofTile);
       tilt.position.set((x0 + x1) / 2, y + SLAB + ph * 0.45, z0 - 0.7); tilt.rotation.x = -0.45; tilt.castShadow = true; parent.add(tilt);
     }
-    if (st.id === 'classic') {
+    if (st.family === 'classic') {
       box(parent, B.x - 1, B.x + B.w + 1, y + SLAB + ph, y + 0.4 + ph + SLAB, B.z - 1, B.z + B.d + 1, mTrim);
       const c0 = 0.9, ct = 0.6, cx0 = B.x - c0, cx1 = B.x + B.w + c0, cz0 = B.z - c0, cz1 = B.z + B.d + c0;
       box(parent, cx0, cx1, y - 0.7, y, cz0, cz0 + ct, mTrim); box(parent, cx0, cx1, y - 0.7, y, cz1 - ct, cz1, mTrim);
@@ -801,7 +801,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     }
   };
   const slab = (x0, x1, z0, z1, y) => {                          // a flat roof with a fascia, tiled on the Mediterranean style
-    box(world, x0, x1, y, y + 0.5, z0, z1, st.id === 'spanish' ? mRoofTile : mConcrete);
+    box(world, x0, x1, y, y + 0.5, z0, z1, st.family === 'spanish' ? mRoofTile : mConcrete);
     box(world, x0 - 0.1, x1 + 0.1, y - 0.15, y + 0.65, z0 - 0.1, z0 + 0.15, mTrim);
   };
   const carportAtFront = porch && !innerPorch;
@@ -826,19 +826,19 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   }
   // front elevation details: a belt course between the floors, corner pilasters, planters and lanterns at the door
   {
-    const top = U ? STOREY + H : H, fz0 = B.z - 0.55, fz1 = B.z - 0.15, bandM = st.id === 'modern' ? mFrame : st.id === 'spanish' ? mAccent : mTrim;
+    const top = U ? STOREY + H : H, fz0 = B.z - 0.55, fz1 = B.z - 0.15, bandM = st.family === 'modern' ? mFrame : st.family === 'spanish' ? mAccent : mTrim;
     if (U) {                                                      // a band at the first-floor slab, across the front and round both sides
       box(world, B.x - 0.3, B.x + B.w + 0.3, STOREY - 1.05, STOREY - 0.5, fz0, fz1, bandM, false);
       box(world, B.x - 0.55, B.x - 0.15, STOREY - 1.05, STOREY - 0.5, B.z - 0.55, B.z + B.d + 0.3, bandM, false);
       box(world, B.x + B.w + 0.15, B.x + B.w + 0.55, STOREY - 1.05, STOREY - 0.5, B.z - 0.55, B.z + B.d + 0.3, bandM, false);
     }
-    if (st.id === 'classic') {                                    // raised corner blocks (quoins) up the front corners
+    if (st.family === 'classic') {                                    // raised corner blocks (quoins) up the front corners
       for (let y = 0.2; y < top - 1; y += 1.7) for (const sd of [0, 1]) {
         const w = (Math.floor(y / 1.7) % 2 ? 1.1 : 0.8), x0 = sd ? B.x + B.w - w + 0.2 : B.x - 0.2;
         box(world, x0, x0 + w, y, y + 1.5, fz0 - 0.05, fz1, mTrim, false);
       }
     }
-    if (st.id === 'spanish') {                                    // a tiled drip course under the roof edge
+    if (st.family === 'spanish') {                                    // a tiled drip course under the roof edge
       box(world, B.x - 0.3, B.x + B.w + 0.3, top - 0.8, top - 0.45, B.z - 0.7, B.z - 0.15, mRoofTile, false);
     }
     const mPot = mat('#9a948a', { roughness: 0.8 });

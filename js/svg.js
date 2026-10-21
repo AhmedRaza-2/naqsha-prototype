@@ -126,22 +126,22 @@ export function elevationSVG(L, st, U = null) {
   // the top storey: parapet / roof edge, and for a two-storey house the first-floor walls, slab and low terrace parapet
   const T = U ? U.B : B, topH = U ? H + SLAB + H : H;
   const tx = X(T.x), tw = T.w * s;
-  const paraFill = st.id === 'spanish' ? st.roof : st.id === 'modern' ? st.trim : st.wall;
+  const paraFill = st.family === 'spanish' ? st.roof : st.family === 'modern' ? st.trim : st.wall;
   if (U) {
     o += `<rect x="${bx - 4}" y="${Y(H + SLAB + 3)}" width="${bw + 8}" height="${3 * s}" fill="${paraFill}" stroke="#00000022"/>`;     // parapet round the open terrace
     o += `<rect x="${bx - 6}" y="${Y(H + SLAB)}" width="${bw + 12}" height="${SLAB * s}" fill="${st.trim}" stroke="#00000033"/>`;          // slab edge
     o += `<rect x="${tx}" y="${Y(topH)}" width="${tw}" height="${H * s}" fill="${st.wall}" stroke="#00000022"/>`;
   }
   o += `<rect x="${tx - 4}" y="${Y(topH + 2.6)}" width="${tw + 8}" height="${2.6 * s}" fill="${paraFill}" stroke="#00000022"/>`;
-  if (st.id === 'classic') o += `<rect x="${tx - 7}" y="${Y(topH + 3.1)}" width="${tw + 14}" height="6" fill="${st.trim}" stroke="#00000033"/><rect x="${tx - 6}" y="${Y(topH)}" width="${tw + 12}" height="7" fill="${st.trim}" stroke="#00000033"/>`;
-  if (st.id === 'spanish') for (let i = 0; i < tw; i += 8) o += `<rect x="${tx - 4 + i}" y="${Y(topH + 2.6)}" width="4" height="${2.6 * s}" fill="#00000018"/>`;
+  if (st.family === 'classic') o += `<rect x="${tx - 7}" y="${Y(topH + 3.1)}" width="${tw + 14}" height="6" fill="${st.trim}" stroke="#00000033"/><rect x="${tx - 6}" y="${Y(topH)}" width="${tw + 12}" height="7" fill="${st.trim}" stroke="#00000033"/>`;
+  if (st.family === 'spanish') for (let i = 0; i < tw; i += 8) o += `<rect x="${tx - 4 + i}" y="${Y(topH + 2.6)}" width="4" height="${2.6 * s}" fill="#00000018"/>`;
   const windows = (layout, lift) => {
     for (const p of layout.openings.filter((q) => q.o === 'h' && Math.abs(q.c - layout.B.z) < 0.01)) {
       const x0 = X(p.at - p.w / 2), w = p.w * s;
       if (p.kind === 'window') {
         o += `<rect x="${x0}" y="${Y(p.top + lift)}" width="${w}" height="${(p.top - p.sill) * s}" fill="${st.glass}" stroke="${st.frame}" stroke-width="2.5"/>`;
         o += `<line x1="${x0 + w / 2}" x2="${x0 + w / 2}" y1="${Y(p.top + lift)}" y2="${Y(p.sill + lift)}" stroke="${st.frame}" stroke-width="1.5"/>`;
-        if (st.id !== 'modern') o += `<rect x="${x0 - 3}" y="${Y(p.sill + lift)}" width="${w + 6}" height="4" fill="${st.trim}" stroke="#00000033"/>`;
+        if (st.family !== 'modern') o += `<rect x="${x0 - 3}" y="${Y(p.sill + lift)}" width="${w + 6}" height="4" fill="${st.trim}" stroke="#00000033"/>`;
       }
     }
   };
@@ -149,11 +149,11 @@ export function elevationSVG(L, st, U = null) {
   if (U) windows(U, H + SLAB);
   const door = L.openings.find((p) => p.main);                  // may be set back behind the car porch
   const dx = X(door.at - door.w / 2), dw = door.w * s;
-  if (st.id === 'modern') o += `<rect x="${dx - 12}" y="${Y(H)}" width="${dw + 24}" height="${H * s}" fill="${st.accent}" opacity=".92"/>`;
-  if (st.id === 'spanish') o += `<path d="M${dx} ${Y(0)} V${Y(6)} A${dw / 2} ${dw / 2} 0 0 1 ${dx + dw} ${Y(6)} V${Y(0)} Z" fill="${st.frame}"/>`;
-  else o += `<rect x="${dx}" y="${Y(7.2)}" width="${dw}" height="${7.2 * s}" fill="${st.id === 'classic' ? '#7a5a36' : '#5b4030'}" stroke="${st.frame}" stroke-width="2"/>`;
+  if (st.family === 'modern') o += `<rect x="${dx - 12}" y="${Y(H)}" width="${dw + 24}" height="${H * s}" fill="${st.accent}" opacity=".92"/>`;
+  if (st.family === 'spanish') o += `<path d="M${dx} ${Y(0)} V${Y(6)} A${dw / 2} ${dw / 2} 0 0 1 ${dx + dw} ${Y(6)} V${Y(0)} Z" fill="${st.frame}"/>`;
+  else o += `<rect x="${dx}" y="${Y(7.2)}" width="${dw}" height="${7.2 * s}" fill="${st.family === 'classic' ? '#7a5a36' : '#5b4030'}" stroke="${st.frame}" stroke-width="2"/>`;
   // porch canopy and pillars
-  o += `<rect x="${bx - 6}" y="${Y(9.8)}" width="${bw + 12}" height="${0.6 * s}" fill="${st.id === 'spanish' ? st.roof : st.trim}" stroke="#00000033"/>`;
+  o += `<rect x="${bx - 6}" y="${Y(9.8)}" width="${bw + 12}" height="${0.6 * s}" fill="${st.family === 'spanish' ? st.roof : st.trim}" stroke="#00000033"/>`;
   const n = Math.max(2, Math.round(B.w / 12) + 1);
   for (let i = 0; i < n; i++) {
     const px = bx + 6 + (i * (bw - 12)) / (n - 1);
