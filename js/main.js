@@ -125,7 +125,7 @@ let plotTouched = false, floorsTouched = false;
 ['pwu', 'pdu'].forEach((id) => $(id).addEventListener('input', () => { plotTouched = true; }));
 $('presets').addEventListener('click', () => { plotTouched = true; });
 $('pfloors').addEventListener('change', () => { floorsTouched = true; });
-const PORCH_NEED = [10, 18, 26];                                  // ft across for 1, 2, 3 cars side by side
+const PORCH_NEED = [10, 18, 26, 26, 26, 26];                                  // ft across for 1, 2, 3 cars side by side
 const setField = (id, v) => { $(id).value = String(v); };
 const omitOn = (kind) => document.querySelectorAll('input[name=omit]').forEach((c) => { if (c.value === kind) c.checked = true; });
 function questions() {
@@ -139,7 +139,15 @@ function questions() {
     if (!r.beds && !userBeds) qs.push({ id: 'beds', kind: 'missing', text: 'How many bedrooms do you need?', opts: [2, 3, 4, 5].map((n) => ({ label: `${n} bedrooms`, apply: () => { setField('pb', n); userBeds = true; } })) });
     if (!r.floors && !floorsTouched && shown) qs.push({ id: 'floors', kind: 'missing', text: 'One floor or two?', opts: [{ label: 'One floor', apply: () => { setField('pfloors', 1); syncFloors(); } }, { label: 'Two floors', apply: () => { setField('pfloors', 2); syncFloors(); } }] });
   }
-  if (cars >= 2 && porchOn) {                                     // a porch for several cars
+  if (cars >= 1) {                                                // cars that cannot all stand inside the plot
+    const front0 = toFt(+$('psbf').value) || rule.front;
+    const bays = porchOn ? (w - 3 >= 26 ? 3 : w - 3 >= 18 ? 2 : w - 3 >= 10 ? 1 : 0) : 0, lawn = front0 >= 9.5 ? Math.max(0, Math.floor((w - 1) / 15)) : 0, inside = bays + lawn;
+    if (cars > inside) qs.push({ id: 'cars-room', kind: 'conflict', text: `${cars} cars will not all fit inside this ${w} ft wide plot (about ${inside} can: ${bays} under the porch, ${lawn} on the lawn). What should I do with the other ${cars - inside}?`, opts: [
+      { label: `Park them on the footpath outside the gate`, apply: () => {} },
+      { label: `Only ${Math.max(1, inside)} car${inside > 1 ? 's' : ''}`, apply: () => setField('pcars', Math.max(1, inside)) },
+    ] });
+  }
+  if (cars >= 2 && cars <= 3 && porchOn) {                        // a porch for several cars
     const need = PORCH_NEED[cars - 1], front = toFt(+$('psbf').value) || rule.front;
     if (w < need + 3) {
       const fit = w - 3 >= 26 ? 3 : w - 3 >= 18 ? 2 : 1;                // cars that fit across, leaving a little lawn at each end
@@ -472,7 +480,7 @@ $('gen').onclick = async () => {
   if (clash) { $('formerr').hidden = false; $('formerr').textContent = localize('One thing first: ' + clash.text + ' Pick an answer under the text box.'); $('advice').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
   S.prefs = readPrefs();
   S.beds = S.prefs.beds;
-  S.site.cars = Math.max(1, S.prefs.cars);                       // how many cars the 3D scene parks
+  S.site.cars = Math.max(1, S.prefs.cars); S.site.carsAsked = S.prefs.cars;                       // how many cars the 3D scene parks
   S.seen = new Set(); S.upperLayouts = []; S.up = null;
   $('uerr').hidden = true;
   await generate(false);
@@ -941,14 +949,15 @@ function openViewer() {
   $('vfloor').textContent = 'Go upstairs';
   $('vview').value = 'walk';
   $('vdoors').textContent = 'Close doors';
-  let doorsOpen = true;
+  let doorsOpen = true, carNote = '';
   S.viewer = createViewer($('vhost'), S.sel, S.style, {
     onRoom: (n) => ($('hudroom').textContent = n),
+    onCars: (c) => { carNote = c && c.want > c.inside + c.outside ? `Only ${c.inside + c.outside} of ${c.want} cars could be parked.` : c && c.outside ? `${c.inside} car${c.inside === 1 ? '' : 's'} inside the plot, ${c.outside} on the footpath outside the gate.` : ''; $('hudhint').textContent = (carNote ? carNote + ' ' : '') + (VIEW_HINT[S.viewer ? S.viewer.mode : 'walk'] || ''); },
     onFloor: (f) => ($('vfloor').textContent = f ? 'Go downstairs' : 'Go upstairs'),
     onTour: (on) => { if (!on && S.viewer && S.viewer.mode === 'tour') { $('vview').value = 'follow'; S.viewer.setMode('follow'); } },
     onRoomStop: (n) => ($('hudroom').textContent = n),
     onNearDoor: (d) => {
-      const base = VIEW_HINT[S.viewer ? S.viewer.mode : 'walk'];
+      const base = (carNote ? carNote + ' ' : '') + VIEW_HINT[S.viewer ? S.viewer.mode : 'walk'];
       $('hudhint').textContent = d && S.viewer && ['walk', 'follow'].includes(S.viewer.mode) ? `${d.open ? 'Press F to close' : 'Press F to open'} the door. ${base}` : base;
     },
     onMode: (mode, roof) => {
@@ -957,7 +966,7 @@ function openViewer() {
       $('vreset').hidden = !['walk', 'follow', 'tour'].includes(mode);
       $('vcutl').hidden = !(S.up && ['orbit', 'top', 'street', 'showcase'].includes(mode));
       $('vdoors').hidden = !['walk', 'follow', 'tour'].includes(mode);
-      $('hudhint').textContent = VIEW_HINT[mode] || '';
+      $('hudhint').textContent = (carNote ? carNote + ' ' : '') + (VIEW_HINT[mode] || '');
     },
   }, S.up, S.colors, S.site);
   $('vpalette').hidden = true;

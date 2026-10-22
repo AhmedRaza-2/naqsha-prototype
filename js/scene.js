@@ -965,8 +965,9 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   // car: parked where it leaves the way from the gate to the front door open. Spots are tried in turn (in the porch
   // away from the door, in the porch's middle, along the front lawn) and a flood fill over the collision boxes checks
   // that a visitor can still walk from the gateway to a step inside the front door
-  if (site.car !== 'none' && (rule.front >= 10 || (porch && porch.w >= 8))) {
-    const RW = 0.42;
+  let carsInfo = { want: 0, inside: 0, outside: 0 };
+  if (site.car !== 'none') {
+    const RW = 0.42, roomInside = rule.front >= 10 || (porch && porch.w >= 8);
     const hitAt = (x, z, extra) => colliders.some((c) => x > c.x0 - RW && x < c.x1 + RW && z > c.z0 - RW && z < c.z1 + RW)
       || extra.some((c) => x > c.x0 - RW && x < c.x1 + RW && z > c.z0 - RW && z < c.z1 + RW);
     const doorReach = (extra) => {
@@ -999,13 +1000,16 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     if (B.z >= 9.5) {                                              // across the front lawn, parallel to the road
       const z = Math.max(3.8, Math.min(B.z - 4.2, 6.5));
       for (const x of [W * 0.72, W * 0.28, W / 2]) cands.push({ x, z, along: false });
+      for (let x = 8; x < W - 7; x += 15) cands.push({ x, z, along: false }, { x: W - x, z, along: false });      // more along the lawn, 15 ft apart
     }
+    if (!roomInside) cands.length = 0;
     const boxOf = (c) => (c.along ? { x0: c.x - 3, x1: c.x + 3, z0: c.z - 7, z1: c.z + 7 } : { x0: c.x - 7, x1: c.x + 7, z0: c.z - 3, z1: c.z + 3 });
     const fits = (c) => { const b = boxOf(c); return b.x0 > 0.4 && b.x1 < W - 0.4 && (c.along || b.z0 > 0.4) && !colliders.some((o) => o.x0 < b.x1 && o.x1 > b.x0 && o.z0 < b.z1 && o.z1 > b.z0); };
     const open0 = doorReach([]);
     // one car per bay of the porch (a porch 10 ft wide holds 1 car, 18 ft 2, 26 ft 3), else one across the lawn
     const bays = porch ? (porch.w >= 25.5 ? 3 : porch.w >= 17.5 ? 2 : 1) : 1;
-    const want = Math.max(1, Math.min(3, site.cars || 1));        // cars the visitor asked for; one per bay of the porch, the rest on the lawn
+    const want = Math.max(1, Math.min(8, site.cars || 1));        // cars the visitor asked for; one per bay of the porch, the rest on the lawn, then outside the gate
+    const asked = (site.carsAsked || 0) >= 1;                      // "Standard" never parks on the street; an explicit number does
     const kind = site.car && CARS[site.car] ? site.car : 'ferrari';
     let placed = 0;
     const put = (pick) => {
@@ -1017,7 +1021,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       furnReady.push(loadCar(kind, site.carColor).then((m) => { if (m) carG.add(m); }));
       placed++;
     };
-    if (porch && bays > 1 && want > 1) {
+    if (roomInside && porch && bays > 1 && want > 1) {
       const z = porch.z + porch.d - 7.2 - (porch.d >= 17 ? 3 : 1.2), n = Math.min(bays, want), slot = porch.w / bays;
       for (let i = 0; i < bays && placed < n; i++) {
         const c = { x: porch.x + slot * (i + 0.5), z, along: true };
@@ -1029,6 +1033,17 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       if (!pick) break;
       put(pick);
     }
+    const inside = placed;
+    if (asked) {                                                    // no room left in the plot: the rest park on the footpath outside the gate, either side of it
+      const spots = [];
+      for (let k = 0; k < 8; k++) spots.push({ x: gateHi + 9 + k * 15, z: -4.2, along: false }, { x: gateLo - 9 - k * 15, z: -4.2, along: false });
+      while (placed < want) {
+        const pick = spots.find((c) => { const b = boxOf(c); return !colliders.some((o) => o.x0 < b.x1 && o.x1 > b.x0 && o.z0 < b.z1 && o.z1 > b.z0); });
+        if (!pick) break;
+        put(pick);
+      }
+    }
+    carsInfo = { want: asked ? want : Math.min(want, inside), inside, outside: placed - inside };
   }
   // street lamps
   for (const lx of [-18, W + 18]) {
@@ -1063,7 +1078,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     if (c.trim) mTrim.color.set(c.trim);
     if (c.accent) mAccent.color.set(c.accent);
   }
-  return { scene, sun, world, roofG, midG, stairsG, storeyG, doors: doorList, colliders, upperColliders, stairs, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, innerPorch, mats, setColors, setFloors, furnReady, site, pieces: { ground: piecesG, upper: piecesU } };
+  return { carsInfo, scene, sun, world, roofG, midG, stairsG, storeyG, doors: doorList, colliders, upperColliders, stairs, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, innerPorch, mats, setColors, setFloors, furnReady, site, pieces: { ground: piecesG, upper: piecesU } };
 }
 
 function disposeScene(scene) {

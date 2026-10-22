@@ -92,6 +92,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     })();
     if (!keepPos) { state.pos.set(start, EYE, 2.5); state.floor = 0; state.hs = 0; state.yaw = Math.PI; state.pitch = 0; }
     applyCutaway();
+    hooks.onCars?.(S.carsInfo);
     if (/[?&]debug3d/.test(location.search)) window.__walk = { tour, planPath: (...a) => planPath(...a), level: () => level(), state, colliders, upperColliders, R, stairs, doors, STOREY, roomAt: (x, z) => roomAt(x, z), rooms: L.rooms, upRooms: U ? U.rooms : null, mainDoor: L.openings.find((o) => o.main), openings: L.openings, B, gateX: S.gateX, gateLo: S.gateLo, gateHi: S.gateHi, start };   // for tests
   }
 

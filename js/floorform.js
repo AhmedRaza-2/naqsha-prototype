@@ -21,7 +21,7 @@ export function readFloor(which) {
     drawing: $('pupdraw').value === 'yes', lounge: true, terrace: $('pterr').value !== 'without' };
 }
 
-const pill = (key, label, on, off = false) => `<label class="pill${on ? ' on' : ''}${off ? ' off' : ''}" data-k="${key}"${off ? ' aria-disabled="true"' : ''}><input type="checkbox" data-k="${key}"${on ? ' checked' : ''}${off ? ' disabled' : ''}><span>${label}</span></label>`;
+const pill = (key, label, on, off = false, why = '') => `<label class="pill${on ? ' on' : ''}${off ? ' off' : ''}" data-k="${key}"${off ? ` aria-disabled="true" title="${why.replace(/"/g, '')}"` : ''}><input type="checkbox" data-k="${key}"${on ? ' checked' : ''}${off ? ' disabled' : ''}><span>${label}</span></label>`;
 const step = (key, label, v) => `<div class="step2" data-k="${key}"><span class="lab">${label}</span><button type="button" class="sb" data-d="-1" aria-label="One fewer ${label.toLowerCase()}">&minus;</button><output>${v}</output><button type="button" class="sb" data-d="1" aria-label="One more ${label.toLowerCase()}">+</button></div>`;
 
 /** scope: 'tabs' (both floors, tabs when there are two), 'ground' or 'first' (just that floor). */
@@ -82,7 +82,7 @@ function render(inst) {
   const tabs = inst.scope === 'tabs' && two
     ? `<div class="fftabs" role="tablist">${[['ground', 'Ground floor'], ['first', 'First floor']].map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${floor === k}" class="${floor === k ? 'on' : ''}">${l}</button>`).join('')}</div>`
     : inst.scope === 'tabs' ? '<div class="ffhead">Rooms you want</div>' : '';
-  const room = (k, label) => pill(k, label, !!cfg[k], !cfg[k] && !a.can[k]);
+  const room = (k, label) => pill(k, label, !!cfg[k], !cfg[k] && !a.can[k], !cfg[k] && !a.can[k] ? whyNot(cfg, k) : '');
   let rooms;
   if (floor === 'ground') {
     rooms = `${room('drawing', 'Drawing room')}${room('lounge', 'TV lounge')}${room('dining', 'Dining room')}${pill('porch', 'Car porch', cfg.porch)}<span class="pill fixed"><span>Kitchen</span></span>`;
