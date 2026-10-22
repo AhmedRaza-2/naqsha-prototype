@@ -156,15 +156,15 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   scene.environment = envFor(renderer);
   scene.fog = new THREE.Fog('#dce6ea', 260, 900);
 
-  scene.add(new THREE.HemisphereLight('#e3f0ff', '#6e6650', 0.9));
-  const sun = new THREE.DirectionalLight('#fff1da', 2.7);
+  scene.add(new THREE.HemisphereLight('#dcecff', '#6e6650', 0.78));
+  const sun = new THREE.DirectionalLight('#fff0d6', 3.0);
   sun.position.set(W * 0.5 - 70, 95, -85);
   sun.target.position.set(W / 2, 0, D / 2);
   scene.add(sun, sun.target);
   sun.castShadow = true;
   const ext = Math.max(W, D) * 0.75 + 25;
   Object.assign(sun.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext, near: 10, far: 400 });
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(4096, 4096);
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.03;
 
@@ -399,9 +399,9 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       const outSide = -inDir;                                    // direction of the outside, for outer walls
       if (p.kind === 'window') {
         along(o0, o1, p.sill, p.top, 0.04, mGlass);
-        along(o0 - fw, o1 + fw, p.top, p.top + fw, 0.22, mFrame);
-        along(o0 - fw, o0, p.sill, p.top, 0.22, mFrame);
-        along(o1, o1 + fw, p.sill, p.top, 0.22, mFrame);
+        along(o0 - fw, o1 + fw, p.top - 0.03, p.top + fw, 0.22, mFrame);       // frame pieces reach 0.03 ft into the opening: flush with the wall's reveal they flickered against it
+        along(o0 - fw, o0 + 0.03, p.sill, p.top, 0.22, mFrame);
+        along(o1 - 0.03, o1 + fw, p.sill, p.top, 0.22, mFrame);
         along((o0 + o1) / 2 - 0.06, (o0 + o1) / 2 + 0.06, p.sill, p.top, 0.12, mFrame);
         if (outer) {
           const out = outSide * (t / 2 + 0.25);
@@ -421,8 +421,8 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         }
       } else if (p.kind === 'door' && p.terrace) {
         // a sliding glass door onto the terrace: a fixed pane and a pane that slides over it
-        along(o0 - fw, o1 + fw, p.top, p.top + fw, 0.3, mFrame);
-        along(o0 - fw, o0, 0, p.top, 0.3, mFrame); along(o1, o1 + fw, 0, p.top, 0.3, mFrame);
+        along(o0 - fw, o1 + fw, p.top - 0.03, p.top + fw, 0.3, mFrame);
+        along(o0 - fw, o0 + 0.03, 0, p.top, 0.3, mFrame); along(o1 - 0.03, o1 + fw, 0, p.top, 0.3, mFrame);
         along(o0, o1, 0, 0.12, 0.3, mFrame);
         const half = (p.w - 0.1) / 2, slide = new THREE.Group();
         const pane = (grp, a0, a1) => { const frame = o === 'h' ? [a1 - a0, p.top - 0.25, 0.08] : [0.08, p.top - 0.25, a1 - a0]; const g = new THREE.Mesh(new THREE.BoxGeometry(...frame), mGlass); g.position.set(o === 'h' ? (a0 + a1) / 2 : 0, (p.top - 0.25) / 2 + 0.12, o === 'h' ? 0 : (a0 + a1) / 2); grp.add(g);
@@ -440,9 +440,9 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         doorList.push(door);
         curColl.push(door.col);
       } else if (p.kind === 'door') {
-        along(o0 - fw, o1 + fw, p.top, p.top + fw, 0.3, mFrame);
-        along(o0 - fw, o0, 0, p.top, 0.3, mFrame);
-        along(o1, o1 + fw, 0, p.top, 0.3, mFrame);
+        along(o0 - fw, o1 + fw, p.top - 0.03, p.top + fw, 0.3, mFrame);
+        along(o0 - fw, o0 + 0.03, 0, p.top, 0.3, mFrame);
+        along(o1 - 0.03, o1 + fw, 0, p.top, 0.3, mFrame);
         // the leaf: hinged at the doorway, it swings into the room it belongs to (click it, or press F, to open and close)
         const into = outer ? inDir : sideOf(p.room, o, c);
         const leafLen = p.w - 0.1, th = 0.15, hgt = p.top - 0.08;
@@ -551,7 +551,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     const near = (a, b) => Math.abs(a - b) < 0.06;
     const freeSpans = (o, c, lo, hi) => {                         // parts of an edge with no room of the storey above on it
       if (!cover) return [[lo, hi]];
-      const cuts = cover.filter((r) => (o === 'h' ? near(r.z, c) || near(r.z + r.d, c) : near(r.x, c) || near(r.x + r.w, c)))
+      const cuts = cover.filter((r) => (o === 'h' ? r.z - 0.06 <= c && r.z + r.d + 0.06 >= c : r.x - 0.06 <= c && r.x + r.w + 0.06 >= c))   // any room of the floor above that touches or crosses this edge line
         .map((r) => (o === 'h' ? [r.x, r.x + r.w] : [r.z, r.z + r.d])).sort((a, b) => a[0] - b[0]);
       const out = []; let cur = lo;
       for (const [a, b] of cuts) { if (a > cur + 0.3) out.push([cur, a]); cur = Math.max(cur, b); }
@@ -579,7 +579,11 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       tilt.position.set((x0 + x1) / 2, y + SLAB + ph * 0.45, z0 - 0.7); tilt.rotation.x = -0.45; tilt.castShadow = true; parent.add(tilt);
     }
     if (st.family === 'classic') {
-      box(parent, B.x - 1, B.x + B.w + 1, y + SLAB + ph, y + 0.4 + ph + SLAB, B.z - 1, B.z + B.d + 1, mTrim);
+      const kz0 = B.z - 1, kz1 = B.z + B.d + 1, kx0 = B.x - 1, kx1 = B.x + B.w + 1, ky0 = y + SLAB + ph, ky1 = y + 0.4 + ph + SLAB, kt = 1.6;     // a cornice ring round the parapet, not a plate over the whole roof (it hung 3 ft above the floor upstairs)
+      if (top) {
+        box(parent, kx0, kx1, ky0, ky1, kz0, kz0 + kt, mTrim); box(parent, kx0, kx1, ky0, ky1, kz1 - kt, kz1, mTrim);
+        box(parent, kx0, kx0 + kt, ky0, ky1, kz0 + kt, kz1 - kt, mTrim); box(parent, kx1 - kt, kx1, ky0, ky1, kz0 + kt, kz1 - kt, mTrim);
+      }
       const c0 = 0.9, ct = 0.6, cx0 = B.x - c0, cx1 = B.x + B.w + c0, cz0 = B.z - c0, cz1 = B.z + B.d + c0;
       box(parent, cx0, cx1, y - 0.7, y, cz0, cz0 + ct, mTrim); box(parent, cx0, cx1, y - 0.7, y, cz1 - ct, cz1, mTrim);
       box(parent, cx0, cx0 + ct, y - 0.7, y, cz0, cz1, mTrim); box(parent, cx1 - ct, cx1, y - 0.7, y, cz0, cz1, mTrim);
@@ -654,6 +658,20 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         bar.position.copy(p0.clone().add(p1).multiplyScalar(0.5)); bar.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), vec.clone().normalize()); bar.castShadow = true; stairsG.add(bar);
       };
       rail(0.28, 0, half, u0, len - ld); rail(wid - 0.28, STOREY, half, u0, len - ld);
+      // the way on up to the roof: the same two flights again, one storey higher. The first floor's door at the foot of the stair meets the
+      // roof flight's first step, and the flight down starts on the other lane, so the way up and the way down are never the same place.
+      const roofUp = site.roof !== 'hip';
+      if (roofUp) {
+        const Y = STOREY, th = 0.6;
+        for (let i = 0; i < n; i++) {
+          bx(u0 + i * tr, u0 + (i + 1) * tr, 0.05, wf, Y + (i + 1) * stepH - th, Y + (i + 1) * stepH, mStep);
+          bx(len - ld - (i + 1) * tr, len - ld - i * tr, wid - wf, wid - 0.05, Y + half + (i + 1) * stepH - th, Y + half + (i + 1) * stepH, mStep);
+        }
+        bx(len - ld, len, 0.05, wid - 0.05, Y + half - 0.5, Y + half, mStep);
+        bx(0, u0, 0.05, wid - 0.05, 2 * STOREY - 0.5, 2 * STOREY, mStep);                                  // the floor of the stair-head room
+        bx(u0, len - ld, wf, wid - wf, STOREY, 2 * STOREY, mExt);                                           // the wall between the flights, up to the roof
+        rail(0.28, Y, Y + half, u0, len - ld); rail(wid - 0.28, 2 * STOREY, Y + half, u0, len - ld);
+      }
       const pushU = (d) => {                                          // a spot just beyond a door, in the room on its other side
         if (!d) return { x: sr.x + sr.w / 2, z: sr.z + sr.d / 2 };
         const away = d.o === 'h' ? (sr.z + sr.d / 2 > d.c ? -1 : 1) : (sr.x + sr.w / 2 > d.c ? -1 : 1);
@@ -667,7 +685,16 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         if (v <= wid / 2) return (Math.min(n - 1, Math.floor((u - u0) / tr)) + 1) * stepH;
         return half + (Math.min(n - 1, Math.floor((len - ld - u) / tr)) + 1) * stepH;
       };
-      return { room: sr, alongX, lo, len, wid, dir, s0: u0, s1: len - ld, n: 2 * n, turn: true, wf, ld, u0, h: () => 0, hxz, entry: [pushU(gd), pushU(ud)] };
+      const hz = (x, z, ref) => {                                     // the walking surface under (x, z) nearest the height the visitor is at
+        const a = alongX ? x - sr.x : z - sr.z, v = alongX ? z - sr.z : x - sr.x, u = dir > 0 ? a : len - a;
+        const ks = roofUp ? [0, 1] : [0];
+        const c = u < u0 ? (roofUp ? [0, STOREY, 2 * STOREY] : [0, STOREY])
+          : u >= len - ld ? ks.map((k) => k * STOREY + half)
+          : v <= wid / 2 ? ks.map((k) => k * STOREY + (Math.min(n - 1, Math.floor((u - u0) / tr)) + 1) * stepH)
+          : ks.map((k) => k * STOREY + half + (Math.min(n - 1, Math.floor((len - ld - u) / tr)) + 1) * stepH);
+        return c.reduce((b2, h2) => (Math.abs(h2 - ref) < Math.abs(b2 - ref) ? h2 : b2));
+      };
+      return { room: sr, alongX, lo, len, wid, dir, s0: u0, s1: len - ld, n: 2 * n, turn: true, wf, ld, u0, h: () => 0, hxz, hz, roofUp, entry: [pushU(gd), pushU(ud)] };
     })();
     if (turned) stairs = turned;
     else {
@@ -716,17 +743,36 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     }
   }
 
-  // ---------- the way up to the roof: the same stairs turn back and climb on to a stair-head room (mumty) on the roof ----------
-  if (U && stairs && upStairs && site.roof !== 'hip') {
-    const sr = upStairs, { alongX, len, dir, s0, s1 } = stairs, yR = STOREY + H + SLAB, rise = yR - STOREY, n2 = 16, tr = (s1 - s0) / n2;
+  // ---------- the way up to the roof ----------
+  // A turning stair carries on with a second pair of flights (built with it). A straight stair turns back over itself: the way up is the
+  // far half of the width and the way down is the near half, split by a wall, so the two are never the same place.
+  if (U && stairs && upStairs && site.roof !== 'hip' && !stairs.turn) {
+    const sr = upStairs, { alongX, len, dir, s0, s1, wid } = stairs, yR = STOREY + H + SLAB, rise = yR - STOREY, n2 = 16, tr = (s1 - s0) / n2;
     const mStep = st.floorLiving.startsWith('marble') ? texMat(st.floorLiving, { roughness: 0.35 }, 4) : mTrim;
     const span = (u0, u1) => (dir > 0 ? [u0, u1] : [len - u1, len - u0]);
-    const lift = 0.55;                                              // the turn: the first step of the second flight sits one rise above the landing
-    for (let i = 0; i < n2; i++) {                                  // the second flight runs back over the first, from the landing end to the far end
-      const [a0, a1] = stairs.turn ? span(s0 + i * tr, s0 + (i + 1) * tr) : span(s1 - (i + 1) * tr, s1 - i * tr), top = STOREY + lift + ((i + 1) / n2) * (rise - lift);
-      if (alongX) box(stairsG, sr.x + a0, sr.x + a1, top - 0.45, top, sr.z + 0.05, sr.z + sr.d - 0.05, mStep, false);
-      else box(stairsG, sr.x + 0.05, sr.x + sr.w - 0.05, top - 0.45, top, sr.z + a0, sr.z + a1, mStep, false);
+    const lift = 0.55, v0 = wid / 2 + 0.2, v1 = wid - 0.05;          // the turn: the first step of the roof flight sits one rise above the landing
+    const put = (a0, a1, va, vb, y0, y1, m) => {
+      if (alongX) box(stairsG, sr.x + a0, sr.x + a1, y0, y1, sr.z + va, sr.z + vb, m, false);
+      else box(stairsG, sr.x + va, sr.x + vb, y0, y1, sr.z + a0, sr.z + a1, m, false);
+    };
+    for (let i = 0; i < n2; i++) {                                  // the roof flight runs back over the first, from the landing end to the far end
+      const [a0, a1] = span(s1 - (i + 1) * tr, s1 - i * tr), top = STOREY + lift + ((i + 1) / n2) * (rise - lift);
+      put(a0, a1, v0, v1, top - 0.45, top, mStep);
     }
+    const [d0, d1] = span(s0, s1);
+    put(d0, d1, wid / 2 - 0.15, wid / 2 + 0.15, 0, 2 * STOREY, mExt);                                       // the wall between the two
+    const dv = alongX ? { x0: sr.x + d0, x1: sr.x + d1, z0: sr.z + wid / 2 - 0.15, z1: sr.z + wid / 2 + 0.15 } : { x0: sr.x + wid / 2 - 0.15, x1: sr.x + wid / 2 + 0.15, z0: sr.z + d0, z1: sr.z + d1 };
+    colliders.push({ ...dv, k: 'rail' }); upperColliders.push({ ...dv, k: 'rail' });
+    if (s0 > 0.3) { const [f0, f1] = span(0, s0); put(f0, f1, 0.05, wid - 0.05, 2 * STOREY - 0.5, 2 * STOREY, mStep); }   // the floor of the stair-head room
+    const hR = (uu) => STOREY + lift + ((n2 - Math.min(n2 - 1, Math.max(0, Math.floor((uu - s0) / tr)))) / n2) * (rise - lift);
+    stairs.roofUp = true;
+    stairs.hz = (x, z, ref) => {
+      const a = alongX ? x - sr.x : z - sr.z, v = alongX ? z - sr.z : x - sr.x, uu = dir > 0 ? a : len - a, hl = stairs.h(a);
+      if (uu > s0 && uu < s1 && v >= wid / 2) return ref >= STOREY - 0.3 ? hR(uu) : hl;
+      if (uu <= s0 && s0 > 0.3) return Math.abs(2 * STOREY - ref) < Math.abs(hl - ref) ? 2 * STOREY : hl;
+      return hl;
+    };
+    stairs.roofLane = (x, z) => { const a = alongX ? x - sr.x : z - sr.z, v = alongX ? z - sr.z : x - sr.x, uu = dir > 0 ? a : len - a; return uu > s0 && uu < s1 && v >= wid / 2; };
   }
   if (mum) {                                                        // the room itself: walls, a door towards the middle of the roof, a slab on top, a small water tank over it
     const yR = (U ? STOREY : 0) + H + SLAB, t = 0.45, wh = 8, gh = 6.8;
@@ -862,19 +908,56 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   // paved walkway to the door
   plane(mainDoor.at - 2, mainDoor.at + 2, 0, B.z, 0.025, mPave);
 
-  const leafMats = ['#4d7d36', '#5c8a3e', '#41702f', '#6a9645'].map((c) => mat(c, { roughness: 0.95, flatShading: true }));
+  // foliage: smooth lumpy blobs (a sphere pushed in and out by a few waves, normals straight from the centre) instead of faceted ico-spheres
+  const leafMats = ['#4d7d36', '#5c8a3e', '#41702f', '#6a9645', '#55853a'].map((c) => mat(c, { roughness: 0.92, envMapIntensity: 0.3 }));
+  const bark = mat('#5e4430', { roughness: 1 });
+  const blob = (r, mi, squash = 1) => {
+    const g = new THREE.SphereGeometry(r, 18, 12), p = g.attributes.position, n = g.attributes.normal, ph = [rnd() * 6, rnd() * 6, rnd() * 6];
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i) / r, y = p.getY(i) / r, z = p.getZ(i) / r;
+      const k = 1 + 0.14 * Math.sin(x * 4.1 + ph[0]) * Math.cos(z * 3.7 + ph[1]) + 0.1 * Math.sin(y * 5.3 + ph[2] + x * 2);
+      p.setXYZ(i, x * r * k, y * r * k * squash, z * r * k);
+      n.setXYZ(i, x, y, z);
+    }
+    const m = new THREE.Mesh(g, leafMats[mi % leafMats.length]);
+    m.castShadow = true; return m;
+  };
+  const limb = (x0, y0, z0, x1, y1, z1, r0, r1) => {                // a tapered branch between two points
+    const a = new THREE.Vector3(x0, y0, z0), b = new THREE.Vector3(x1, y1, z1), len = a.distanceTo(b);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, len, 8), bark);
+    m.position.copy(a).add(b).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    m.castShadow = true; world.add(m);
+  };
+  let treeNo = 0;
   const tree = (x, z, s = 1) => {
-    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * s, 0.38 * s, 5.5 * s, 9), mat('#5e4430', { roughness: 1 }));
-    t.position.set(x, 2.75 * s, z); t.castShadow = true; world.add(t);
-    for (let i = 0; i < 5; i++) {
-      const r = (1.4 + rnd() * 1.1) * s;
-      const l = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leafMats[i % leafMats.length]);
-      l.position.set(x + (rnd() - 0.5) * 2.6 * s, (5.6 + rnd() * 2.2) * s, z + (rnd() - 0.5) * 2.6 * s);
-      l.castShadow = true; world.add(l);
+    const kind = treeNo++ % 3;                                       // round shade tree, tall narrow ashoka, palm
+    if (kind === 1) {
+      limb(x, 0, z, x, 4 * s, z, 0.38 * s, 0.2 * s);
+      for (let i = 0; i < 5; i++) { const b = blob((1.5 - i * 0.18) * s, i); b.scale.set(1, 1.25, 1); b.position.set(x + (rnd() - 0.5) * 0.4 * s, (4.2 + i * 1.7) * s, z + (rnd() - 0.5) * 0.4 * s); world.add(b); }
+    } else if (kind === 2) {
+      const lean = (rnd() - 0.5) * 1.6 * s;
+      limb(x, 0, z, x + lean * 0.5, 4.5 * s, z, 0.4 * s, 0.28 * s); limb(x + lean * 0.5, 4.5 * s, z, x + lean, 8.6 * s, z, 0.28 * s, 0.2 * s);
+      for (let i = 0; i < 9; i++) {
+        const cg = new THREE.ConeGeometry(0.4 * s, 4.4 * s, 6); cg.translate(0, 2.2 * s, 0);       // base at the crown, tip outward
+        const f = new THREE.Mesh(cg, leafMats[i % 3]), pv = new THREE.Group();
+        f.scale.z = 0.3; f.rotation.z = -(Math.PI / 2 + 0.35 + (i % 2) * 0.3); f.castShadow = true;
+        pv.add(f); pv.position.set(x + lean, 8.6 * s, z); pv.rotation.y = (i / 9) * Math.PI * 2; world.add(pv);
+      }
+    } else {
+      limb(x, 0, z, x, 5.2 * s, z, 0.4 * s, 0.22 * s);
+      limb(x, 4.2 * s, z, x - 1.2 * s, 6.2 * s, z + 0.6 * s, 0.14 * s, 0.08 * s); limb(x, 4.6 * s, z, x + 1.1 * s, 6.5 * s, z - 0.7 * s, 0.14 * s, 0.08 * s);
+      for (let i = 0; i < 8; i++) {
+        const b = blob((1.3 + rnd() * 1.0) * s, i, 0.8);
+        b.position.set(x + (rnd() - 0.5) * 3.4 * s, (6.0 + rnd() * 2.6) * s, z + (rnd() - 0.5) * 3.4 * s); world.add(b);
+      }
     }
     colliders.push({ x0: x - 0.4, x1: x + 0.4, z0: z - 0.4, z1: z + 0.4, k: 'tree' });
   };
-  const shrub = (x, z, s = 1) => { const l = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9 * s, 1), leafMats[Math.floor(rnd() * 4)]); l.position.set(x, 0.7 * s, z); l.scale.y = 0.75; l.castShadow = true; world.add(l); };
+  const shrub = (x, z, s = 1) => {
+    const g = new THREE.Group();
+    for (let i = 0; i < 3; i++) { const b = blob((0.55 + rnd() * 0.3) * s, Math.floor(rnd() * 5), 0.85); b.position.set((i - 1) * 0.55 * s, 0.55 * s, (rnd() - 0.5) * 0.4 * s); g.add(b); }
+    g.position.set(x, 0, z); world.add(g);
+  };
   tree(1.5, 1.8); tree(W - 1.5, 1.8);
   if (rule.rear >= 4) tree(W / 2, D - 1.6, 0.9);
   tree(-6, -3, 1.2); tree(W + 6, -3, 1.2);
