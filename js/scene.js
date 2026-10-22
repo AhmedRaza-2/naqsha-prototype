@@ -374,10 +374,31 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       };
       const ops = OPS.filter((p) => p.o === o && eq(p.c, c) && p.at - p.w / 2 >= a - 0.02 && p.at + p.w / 2 <= b + 0.02).sort((p, q) => p.at - q.at);
       let cur = a;
-      const solid = (s0, s1) => piece(s0 === a && capA ? s0 - t / 2 : s0, s1 === b && capB ? s1 + t / 2 : s1, 0, H, true);
+      // an open kitchen: where the kitchen shares a wall with the TV lounge or dining room (and the wall has no door or window), the wall stops at counter height with a stone top
+      const LOW = 3.0, lowSpans = [];
+      if (site.openKitchen && !outer && !upper) {
+        const ext = (r) => (o === 'h' ? [r.x, r.x + r.w] : [r.z, r.z + r.d]);
+        const edge = (r, far) => (o === 'h' ? (far ? r.z + r.d : r.z) : (far ? r.x + r.w : r.x));
+        for (const k of L.rooms.filter((r) => r.type === 'kitchen' && !r.parent)) for (const m of L.rooms.filter((r) => (r.type === 'lounge' || r.type === 'dining') && !r.parent)) {
+          if (!((eq(edge(k, 0), c) && eq(edge(m, 1), c)) || (eq(edge(k, 1), c) && eq(edge(m, 0), c)))) continue;
+          const s0 = Math.max(ext(k)[0], ext(m)[0], a), s1 = Math.min(ext(k)[1], ext(m)[1], b);
+          if (s1 - s0 > 1.5 && !ops.some((p) => p.kind !== 'door' && p.at - p.w / 2 < s1 + 0.1 && p.at + p.w / 2 > s0 - 0.1)) lowSpans.push([s0, s1]);
+        }
+      }
+      const counter = (x0, x1) => (o === 'h' ? box(walls, x0, x1, LOW, LOW + 0.2, c - 0.3, c + 0.3, mStone, false) : box(walls, c - 0.3, c + 0.3, LOW, LOW + 0.2, x0, x1, mStone, false));
+      const solid = (s0, s1) => {
+        const A = s0 === a && capA ? s0 - t / 2 : s0, Z = s1 === b && capB ? s1 + t / 2 : s1;
+        let at = A;
+        for (const [l0, l1] of lowSpans.filter(([l0, l1]) => l1 > A && l0 < Z).sort((x, y) => x[0] - y[0])) {
+          const x0 = Math.max(l0, at), x1 = Math.min(l1, Z);
+          piece(at, x0, 0, H, true); piece(x0, x1, 0, LOW, true); counter(x0, x1); at = x1;
+        }
+        piece(at, Z, 0, H, true);
+      };
       for (const p of ops) {
         const o0 = p.at - p.w / 2, o1 = p.at + p.w / 2;
         solid(cur, o0);
+        if (p.kind === 'door' && lowSpans.some(([l0, l1]) => p.at > l0 && p.at < l1)) { piece(o0, o1, p.top, H, false); cur = o1; continue; }     // the kitchen's door becomes a plain opening beside the counter
         if (p.sill > 0) piece(o0, o1, 0, p.sill, true);
         piece(o0, o1, p.top, H, false);
         decorate(o, c, p, outer, inDir, t);

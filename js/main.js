@@ -480,7 +480,7 @@ $('gen').onclick = async () => {
   if (clash) { $('formerr').hidden = false; $('formerr').textContent = localize('One thing first: ' + clash.text + ' Pick an answer under the text box.'); $('advice').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
   S.prefs = readPrefs();
   S.beds = S.prefs.beds;
-  S.site.cars = Math.max(1, S.prefs.cars); S.site.carsAsked = S.prefs.cars;                       // how many cars the 3D scene parks
+  S.site.cars = Math.max(1, S.prefs.cars); S.site.carsAsked = S.prefs.cars; S.site.openKitchen = $('popenk').value === 'yes';                       // how many cars the 3D scene parks
   S.seen = new Set(); S.upperLayouts = []; S.up = null;
   $('uerr').hidden = true;
   await generate(false);

@@ -15,7 +15,7 @@ export function readFloor(which) {
   const w = +$('pw').value, d = +$('pd').value, twoFloors = floorsNow() === 2;
   if (which === 'ground') {
     return { w, d, twoFloors, ground: true, beds: +$('pb').value, baths: +$('pbaths').value || +$('pb').value + 1,
-      drawing: !omitBox('drawing').checked, lounge: !omitBox('lounge').checked, dining: !omitBox('dining').checked, porch: $('pporch').value !== 'no' };
+      drawing: !omitBox('drawing').checked, lounge: !omitBox('lounge').checked, dining: !omitBox('dining').checked, porch: $('pporch').value !== 'no', openk: $('popenk').value === 'yes' };
   }
   return { w, d, twoFloors: true, ground: false, beds: +$('pup').value, baths: +$('pupbaths').value || +$('pup').value + 1,
     drawing: $('pupdraw').value === 'yes', lounge: true, terrace: $('pterr').value !== 'without' };
@@ -51,6 +51,7 @@ const floorOf = (inst) => (inst.scope === 'tabs' ? (floorsNow() === 2 ? inst.tab
 function tick(floor, k, on, quiet = false) {
   if (floor === 'ground') {
     if (k === 'porch') setVal('pporch', on ? 'yes' : 'no');
+    else if (k === 'openk') setVal('popenk', on ? 'yes' : 'no');
     else { const b = omitBox(k); if (b) { b.checked = !on; fire(b); } }
   } else if (k === 'drawing') setVal('pupdraw', on ? 'yes' : 'no');
   else if (k === 'terrace') setVal('pterr', on ? 'with' : 'without');
@@ -85,7 +86,7 @@ function render(inst) {
   const room = (k, label) => pill(k, label, !!cfg[k], !cfg[k] && !a.can[k], !cfg[k] && !a.can[k] ? whyNot(cfg, k) : '');
   let rooms;
   if (floor === 'ground') {
-    rooms = `${room('drawing', 'Drawing room')}${room('lounge', 'TV lounge')}${room('dining', 'Dining room')}${pill('porch', 'Car porch', cfg.porch)}<span class="pill fixed"><span>Kitchen</span></span>`;
+    rooms = `${room('drawing', 'Drawing room')}${room('lounge', 'TV lounge')}${room('dining', 'Dining room')}${pill('porch', 'Car porch', cfg.porch)}<span class="pill fixed"><span>Kitchen</span></span>${pill('openk', 'Open kitchen (counter, no wall)', cfg.openk)}`;
   } else {
     rooms = `<span class="pill fixed"><span>Family lounge</span></span>${room('drawing', 'Drawing room')}${room('terrace', 'Open terrace')}`;
   }
