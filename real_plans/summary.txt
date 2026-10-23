@@ -1,0 +1,60 @@
+clean plans: 1147   (train 959, val 115, test 73)
+tiers: {'likely': 264, 'strong': 883}
+multi-plan sheets (need splitting): 114
+review pile (near-misses): 597
+by group:
+  10_marla                     51
+  12_marla                     22
+  14_marla                     6
+  16_marla                     8
+  20_marla                     64
+  3_marla                      78
+  4_marla                      55
+  5_marla                      29
+  6_marla                      43
+  7_marla                      23
+  8_marla                      15
+  9_marla                      21
+  area_islamabad               92
+  area_karachi                 20
+  area_lahore                  21
+  area_other                   59
+  area_rawalpindi              4
+  ft_20x40                     42
+  ft_20x50                     32
+  ft_22x45                     29
+  ft_25x40                     28
+  ft_25x45                     26
+  ft_25x50                     23
+  ft_25x60                     7
+  ft_27x50                     26
+  ft_30x40                     26
+  ft_30x50                     20
+  ft_30x60                     26
+  ft_30x70                     17
+  ft_32x60                     15
+  ft_35x60                     19
+  ft_35x65                     17
+  ft_35x70                     10
+  ft_36x70                     8
+  ft_40x60                     13
+  ft_40x70                     19
+  ft_40x80                     10
+  ft_45x90                     17
+  ft_50x100                    17
+  ft_50x80                     10
+  ft_50x90                     23
+  ft_60x90                     6
+  type_3_bedroom               2
+  type_4_bedroom               4
+  type_5_bedroom               5
+  type_duplex                  7
+  type_narrow_plot             1
+  type_north_facing            3
+  type_rental_portion          1
+  type_west_facing             4
+  type_with_basement           2
+  type_with_courtyard          5
+  type_with_garage             2
+  type_with_servant_quarter    2
+  urdu                         12

@@ -1,0 +1,132 @@
+{
+ "plans_used": 275,
+ "plans_total": 1147,
+ "table": {
+  "small<=6/bed": {
+   "real_n": 155,
+   "real_w": 11.0,
+   "real_d": 13.0,
+   "synth_w": 10.5,
+   "synth_d": 13.5
+  },
+  "small<=6/bath": {
+   "real_n": 126,
+   "real_w": 5.0,
+   "real_d": 7.0,
+   "synth_w": 5.0,
+   "synth_d": 7.0
+  },
+  "small<=6/kitchen": {
+   "real_n": 65,
+   "real_w": 8.0,
+   "real_d": 11.0,
+   "synth_w": 7.0,
+   "synth_d": 12.0
+  },
+  "small<=6/lounge": {
+   "real_n": 73,
+   "real_w": 11.5,
+   "real_d": 15.5,
+   "synth_w": 11.5,
+   "synth_d": 14.0
+  },
+  "small<=6/drawing": {
+   "real_n": 44,
+   "real_w": 11.0,
+   "real_d": 13.75,
+   "synth_w": 10.0,
+   "synth_d": 19.5
+  },
+  "small<=6/dining": {
+   "real_n": 14,
+   "real_w": 9.0,
+   "real_d": 12.416666666666668,
+   "synth_w": 7.5,
+   "synth_d": 11.0
+  },
+  "mid 6-14/bed": {
+   "real_n": 73,
+   "real_w": 12.0,
+   "real_d": 14.0,
+   "synth_w": 11.5,
+   "synth_d": 15.5
+  },
+  "mid 6-14/bath": {
+   "real_n": 56,
+   "real_w": 5.0,
+   "real_d": 7.583333333333334,
+   "synth_w": 5.0,
+   "synth_d": 7.0
+  },
+  "mid 6-14/kitchen": {
+   "real_n": 28,
+   "real_w": 9.0,
+   "real_d": 12.0,
+   "synth_w": 8.5,
+   "synth_d": 14.0
+  },
+  "mid 6-14/lounge": {
+   "real_n": 39,
+   "real_w": 13.25,
+   "real_d": 18.0,
+   "synth_w": 13.5,
+   "synth_d": 16.0
+  },
+  "mid 6-14/drawing": {
+   "real_n": 20,
+   "real_w": 12.5,
+   "real_d": 15.75,
+   "synth_w": 11.5,
+   "synth_d": 16.0
+  },
+  "mid 6-14/dining": {
+   "real_n": 7,
+   "real_w": 10.0,
+   "real_d": 14.0,
+   "synth_w": 8.5,
+   "synth_d": 14.0
+  },
+  "large>14/bed": {
+   "real_n": 28,
+   "real_w": 12.375,
+   "real_d": 14.0,
+   "synth_w": 11.5,
+   "synth_d": 16.0
+  },
+  "large>14/bath": {
+   "real_n": 25,
+   "real_w": 6.25,
+   "real_d": 8.0,
+   "synth_w": 5.0,
+   "synth_d": 7.5
+  },
+  "large>14/kitchen": {
+   "real_n": 11,
+   "real_w": 9.0,
+   "real_d": 12.0,
+   "synth_w": 10.5,
+   "synth_d": 14.5
+  },
+  "large>14/lounge": {
+   "real_n": 6,
+   "real_w": 12.5,
+   "real_d": 14.958333333333332,
+   "synth_w": 14.0,
+   "synth_d": 21.0
+  },
+  "large>14/drawing": {
+   "real_n": 11,
+   "real_w": 13.0,
+   "real_d": 16.25,
+   "synth_w": 11.5,
+   "synth_d": 21.0
+  },
+  "large>14/dining": {
+   "real_n": 7,
+   "real_w": 10.25,
+   "real_d": 15.0,
+   "synth_w": 11.0,
+   "synth_d": 14.5
+  }
+ }
+}

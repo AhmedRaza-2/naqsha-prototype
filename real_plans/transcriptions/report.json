@@ -1,0 +1,94 @@
+{
+ "read": 400,
+ "kept_silver": 13,
+ "train": 11,
+ "val": 1,
+ "test_silver": 1,
+ "test_gold": 9,
+ "rejected": {
+  "invalid: missing drawing": 93,
+  "sizes far from the plot size": 75,
+  "no washroom": 74,
+  "invalid: missing kitchen": 50,
+  "plot size not readable": 39,
+  "fewer than 2 rows": 17,
+  "rows do not fit the plot depth": 14,
+  "no bedroom": 6,
+  "not JSON": 6,
+  "disagrees with printed sizes": 5
+ },
+ "vision_model_vs_gold": [
+  {
+   "id": "ba39a5e4e2c1cad2",
+   "parsed": true,
+   "room_type_f1": 0.77,
+   "beds_right": true,
+   "rows": [
+    5,
+    6
+   ]
+  },
+  {
+   "id": "904738473e837fb1",
+   "parsed": true,
+   "room_type_f1": 0.67,
+   "beds_right": true,
+   "rows": [
+    5,
+    10
+   ]
+  },
+  {
+   "id": "eb95b7a840637525",
+   "parsed": true,
+   "room_type_f1": 0.67,
+   "beds_right": false,
+   "rows": [
+    6,
+    2
+   ]
+  },
+  {
+   "id": "ea3be03e83c37285",
+   "parsed": true,
+   "room_type_f1": 0.67,
+   "beds_right": true,
+   "rows": [
+    6,
+    12
+   ]
+  },
+  {
+   "id": "eb9b619e5ca46485",
+   "parsed": true,
+   "room_type_f1": 0.62,
+   "beds_right": true,
+   "rows": [
+    6,
+    59
+   ]
+  },
+  {
+   "id": "eb9de2449d429cca",
+   "parsed": true,
+   "room_type_f1": 0.95,
+   "beds_right": true,
+   "rows": [
+    6,
+    8
+   ]
+  }
+ ],
+ "silver_mean_score": 0.42,
+ "silver_beds": {
+  "2": 8,
+  "1": 1,
+  "3": 4
+ },
+ "silver_marla": {
+  "7": 8,
+  "5": 3,
+  "8": 1,
+  "11": 1
+ }
+}
