@@ -603,9 +603,9 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     for (const [a, b] of freeSpans('h', B.z + B.d, x0, x1)) { box(parent, a, b, y0, y1, z1 - pt, z1, pm); box(parent, a - 0.1, b + 0.1, y1, c1, z1 - pt - 0.1, z1 + 0.1, capM); }
     for (const [a, b] of freeSpans('v', B.x, z0, z1)) { box(parent, x0, x0 + pt, y0, y1, a, b, pm); box(parent, x0 - 0.1, x0 + pt + 0.1, y1, c1, a, b, capM); }
     for (const [a, b] of freeSpans('v', B.x + B.w, z0, z1)) { box(parent, x1 - pt, x1, y0, y1, a, b, pm); box(parent, x1 - pt - 0.1, x1 + 0.1, y1, c1, a, b, capM); }
-    if (st.family === 'spanish' && freeSpans('h', B.z, x0, x1).length) {                                     // a sloping tiled hood along the front, under the parapet
-      const tilt = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 + 1, 0.25, 2.2), mRoofTile);
-      tilt.position.set((x0 + x1) / 2, y + SLAB + ph * 0.45, z0 - 0.7); tilt.rotation.x = -0.45; tilt.castShadow = true; parent.add(tilt);
+    if (st.family === 'spanish') for (const [a, b] of freeSpans('h', B.z, x0, x1)) {                          // a sloping tiled hood along the open part of the front, under the parapet
+      const tilt = new THREE.Mesh(new THREE.BoxGeometry(b - a + 0.6, 0.25, 2.2), mRoofTile);
+      tilt.position.set((a + b) / 2, y + SLAB + ph * 0.45, z0 - 0.7); tilt.rotation.x = -0.45; tilt.castShadow = true; parent.add(tilt);
     }
     if (st.family === 'classic') {
       const kz0 = B.z - 1, kz1 = B.z + B.d + 1, kx0 = B.x - 1, kx1 = B.x + B.w + 1, ky0 = y + SLAB + ph, ky1 = y + 0.4 + ph + SLAB, kt = 1.6;     // a cornice ring round the parapet, not a plate over the whole roof (it hung 3 ft above the floor upstairs)

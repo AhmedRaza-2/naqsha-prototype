@@ -113,7 +113,7 @@ export function finalize(L) {
         if (longWall) { const target = up ? hi - w / 2 - 0.2 : lo + w / 2 + 0.2; at = Math.max(a2 + w / 2, Math.min(b2 - w / 2, target)); if (b2 - a2 < w) at = (a2 + b2) / 2; dist = Math.abs(at - target); }
         else { at = (a2 + b2) / 2; const endWall = alongX ? s0.c : s0.c; dist = Math.abs(endWall - (up ? hi : lo)) < 0.3 ? 0 : 60; }
         const rank = order.indexOf(q.type) < 0 ? 9 : order.indexOf(q.type);
-        const key = dist * 10 + rank;
+        const key = (L.upper && rank > 1 ? 1000 : 0) + dist * 10 + rank;                // on a first floor the stairs open onto the lounge or the terrace before any other room
         if (!best || key < best.key) best = { q, s: { ...s0, lo: a2, hi: b2 }, at, key, w: Math.min(w, Math.max(2.2, b2 - a2 - 0.2)) };
       }
       if (best) {

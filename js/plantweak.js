@@ -388,11 +388,29 @@ export function scaleTerrace(plan, k) {
   return p;
 }
 
-/** A drawing room on the first floor: the study, else the family lounge, is made the drawing room. */
-export function upperDrawing(plan) {
+/** A drawing room on the first floor: the study becomes it; failing that a smaller terrace is made and part of it built over as the drawing room
+ *  (mode 'terrace' does only that, so the family lounge stays); failing that the family lounge is made the drawing room. */
+export function upperDrawing(plan, mode = 'auto') {
   if (!plan.tree || hasType(plan.tree, 'drawing')) return plan;
   const p = clone(plan);
-  const f = locate(p, (n) => n.t === 'study') || locate(p, (n) => n.t === 'lounge');
+  const study = mode === 'auto' && locate(p, (n) => n.t === 'study');
+  if (study) { study.leaf.t = 'drawing'; p.upDrawing = true; return p; }
+  const t = locate(p, (n) => n.t === 'terrace');
+  if (t && t.w * t.d >= 130) {                                          // room for a drawing room of about 10 x 12 ft and still a terrace of 5 ft or more
+    const alongW = t.w >= t.d;                                          // cut across the longer side
+    const long = alongW ? t.w : t.d, short = alongW ? t.d : t.w;
+    if (short >= 10 && long >= 16) {
+      const dr = Math.max(11, Math.min(long - 5, Math.round(long * 0.58 * 2) / 2));
+      t.leaf.k = alongW ? 'V' : 'H';
+      t.leaf.kids = [{ k: 'room', t: 'drawing' }, { k: 'room', t: 'terrace' }];
+      t.leaf.sizes = [dr];
+      delete t.leaf.t;
+      p.upDrawing = true;
+      return p;
+    }
+  }
+  if (mode === 'terrace') return plan;
+  const f = locate(p, (n) => n.t === 'lounge');
   if (!f) return plan;
   f.leaf.t = 'drawing';
   p.upDrawing = true;                                                  // the rule that keeps the drawing room downstairs is lifted for it

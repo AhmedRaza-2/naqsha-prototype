@@ -276,7 +276,7 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
       && (variant !== 'with' || terraceArea(it.rects) >= 40)
       && (variant !== 'without' || (terraceArea(it.rects) < 40 && it.score >= 1)),     // no terrace left, and every rule still passes
     embed: variant === 'without' || scale !== 1 || prefs.upDrawing
-      ? (p) => { let q = variant === 'without' ? dropTerrace(p) : scaleTerrace(p, scale); if (prefs.upDrawing) q = upperDrawing(q); return q; } : null,
+      ? (p) => { let q = variant === 'without' ? dropTerrace(p) : scaleTerrace(p, scale); if (prefs.upDrawing) { const a = upperDrawing(q, 'terrace'); q = a !== q && !treeCheck(a, prefs.beds).some((c) => c.level === 'err') ? a : upperDrawing(q); } return q; } : null,
     hang: (rects) => { const a = supportArea(rects, ground.rects); return a.tot - a.sup; },        // rooms are then pulled back over the ground floor
   });
   // a first floor must stand on the ground floor: rooms hanging over a yard or a car porch are not drawn if an alternative exists
