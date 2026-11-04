@@ -14,7 +14,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
  *   0.66-0.92  walk through the door into the lit hall (the page then flashes to the next section)
  */
 
-const PAL = { earth: 0x3a2f2c, steel: 0x394845, ash: 0xc8d0c8, linen: 0xefeae2, paper: 0xfbf8f1 };
+const PAL = { earth: 0x111d27, steel: 0x174a40, ash: 0xd8dfe4, linen: 0xeaeff1, paper: 0xf4f6f7 };
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 // camera / look-at control points (metres). The house front is the plane z = 0, the door is at x = 3.3.
@@ -73,7 +73,7 @@ export default function HouseScene({ progress, still = false, onReady, onFail })
 
     // ---------- lights ----------
     scene.add(new THREE.HemisphereLight(PAL.paper, PAL.ash, 1.05));
-    const sun = new THREE.DirectionalLight(0xffe2bd, 2.7);
+    const sun = new THREE.DirectionalLight(0xfff3e4, 2.7);
     sun.position.set(-15, 22, 20);
     sun.castShadow = true;
     const sm = small ? 1024 : 2048;
@@ -91,7 +91,7 @@ export default function HouseScene({ progress, still = false, onReady, onFail })
     const M = {
       paper: mat(PAL.paper), linen: mat(PAL.linen), ash: mat(PAL.ash), steel: mat(PAL.steel, 0.7), earth: mat(PAL.earth, 0.8),
       lawn: mat(0xa9b9aa, 1), hedge: mat(0x6d8577, 1), leaf: mat(0x7d9585, 1), leaf2: mat(0x93a998, 1),
-      road: mat(0xb7beb7, 1), kerb: mat(0xdcd8cd, 1), hall: mat(0xeee6d8, 0.95), hill: mat(0xb9c4bc, 1), hill2: mat(0xa8b6ae, 1),
+      road: mat(0xb7beb7, 1), kerb: mat(0xd6dad8, 1), hall: mat(0xeceae4, 0.95), hill: mat(0xb9c4bc, 1), hill2: mat(0xa8b6ae, 1),
       glass: new THREE.MeshStandardMaterial({ color: 0x2f423e, roughness: 0.12, metalness: 0.65 }),
       glow: new THREE.MeshBasicMaterial({ color: 0xfff1d6, fog: false }),
       lamp: new THREE.MeshBasicMaterial({ color: 0xffd9a0 }),

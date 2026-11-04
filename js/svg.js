@@ -1,11 +1,11 @@
 import { dim, fmtLen } from './units.js';
-// plan colours: the landing page's plan palette (Earth ink on off-white paper), the same in light and dark mode
+// plan colours: cool drafting-sheet tints (public rooms sand-grey, bedrooms blue-grey, wet rooms teal), the same in light and dark mode
 const FILL = {
-  drawing: '#e6decf', lobby: '#f6f2e9', lounge: '#ebe5d9', dining: '#dce4e0',
-  kitchen: '#cfdad5', bed: '#e3e8e1', bath: '#bfcbc7', gbath: '#bfcbc7', stairs: '#ddd8cd',
-  passage: '#f3efe6', store: '#e2ddd2', dress: '#dfe4dd', servant: '#e4ded3', study: '#e6e3d6', prayer: '#ece6d8', other: '#e8e4da',
+  drawing: '#e7e5df', lobby: '#f4f5f4', lounge: '#ecebe6', dining: '#dde7e4',
+  kitchen: '#d0dfe0', bed: '#dfe8ee', bath: '#bdd0d6', gbath: '#bdd0d6', stairs: '#dcdedf',
+  passage: '#f2f4f4', store: '#e1e3e1', dress: '#dde6ea', servant: '#e3e5e2', study: '#e5e8e4', prayer: '#eaebe6', other: '#e7e9e6',
 };
-const PAPER = '#fbf8f1', YARD = '#efeae2', INK = '#3a2f2c', WINDOW = '#6f8f96';
+const PAPER = '#ffffff', YARD = '#edf1f0', INK = '#14212b', WINDOW = '#4f8a96';
 
 /** Drawing scale of a plan: feet -> SVG units (x across, z from the road, which is at the bottom of the plan as drawn).
  *  The plan is shown turned on its side (`landscape`, the road on the left) so a long plot lies across the screen; the box

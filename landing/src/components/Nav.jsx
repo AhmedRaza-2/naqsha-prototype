@@ -13,8 +13,8 @@ const LINKS = [
   { id: 'results', label: 'Results' },
 ];
 const REPO = 'https://github.com/AhmedRaza-2/naqsha-prototype';
-const HERO_INK = { color: '#3a2f2c' };
-const HERO_SOFT = { color: 'rgb(58 47 44 / 0.78)' };
+const HERO_INK = { color: '#111d27' };
+const HERO_SOFT = { color: 'rgb(17 29 39 / 0.78)' };
 
 function Mark() {
   return (
@@ -48,7 +48,7 @@ export default function Nav() {
         className={`pointer-events-auto relative flex h-14 w-full items-center justify-between gap-3 overflow-hidden rounded-full pl-4 pr-2 transition-[max-width,background-color,border-color,box-shadow] duration-500 ease-out-expo ${
           top
             ? 'max-w-7xl border border-transparent'
-            : `border border-line bg-glass shadow-[0_10px_30px_-18px_rgba(58,47,44,0.45)] backdrop-blur-xl ${compact ? 'max-w-[20.5rem] md:max-w-[17.5rem]' : 'max-w-3xl'}`
+            : `border border-line bg-glass shadow-[0_10px_30px_-18px_rgba(17,29,39,0.45)] backdrop-blur-xl ${compact ? 'max-w-[20.5rem] md:max-w-[17.5rem]' : 'max-w-3xl'}`
         }`}
       >
         <a

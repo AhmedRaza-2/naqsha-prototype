@@ -82,7 +82,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     scene.add(person);
     person.visible = state.mode === 'follow' || state.mode === 'tour';
     // the visitor starts just inside the gate, in line with the front door, or beside it if the car is parked there
-    const hit = (x, z) => colliders.some((c) => x > c.x0 - R && x < c.x1 + R && z > c.z0 - R && z < c.z1 + R && solid(c));
+    const hit = (x, z) => colliders.some((c) => { const m = c.k === 'car' ? 1.6 : R; return x > c.x0 - m && x < c.x1 + m && z > c.z0 - m && z < c.z1 + m && solid(c); });     // a car is wider than its box: start well clear of it
     start = (() => {
       for (let k = 0; k <= 40; k++) for (const sg of [1, -1]) {
         const x = S.gateX + sg * k * 0.5;
@@ -93,7 +93,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     if (!keepPos) { state.pos.set(start, EYE, 2.5); state.floor = 0; state.hs = 0; state.yaw = Math.PI; state.pitch = 0; }
     applyCutaway();
     hooks.onCars?.(S.carsInfo);
-    if (/[?&]debug3d/.test(location.search)) window.__walk = { tour, planPath: (...a) => planPath(...a), level: () => level(), state, colliders, upperColliders, R, stairs, doors, STOREY, roomAt: (x, z) => roomAt(x, z), rooms: L.rooms, upRooms: U ? U.rooms : null, mainDoor: L.openings.find((o) => o.main), openings: L.openings, B, gateX: S.gateX, gateLo: S.gateLo, gateHi: S.gateHi, start };   // for tests
+    if (/[?&]debug3d/.test(location.search)) window.__walk = { carsInfo: S.carsInfo, tour, planPath: (...a) => planPath(...a), level: () => level(), state, colliders, upperColliders, R, stairs, doors, STOREY, roomAt: (x, z) => roomAt(x, z), rooms: L.rooms, upRooms: U ? U.rooms : null, mainDoor: L.openings.find((o) => o.main), openings: L.openings, B, gateX: S.gateX, gateLo: S.gateLo, gateHi: S.gateHi, start };   // for tests
   }
 
   const orbit = new OrbitControls(camera, renderer.domElement);

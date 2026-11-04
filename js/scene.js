@@ -177,6 +177,8 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const texMat = (kind, o = {}, tile = 8) => { const m = new THREE.MeshStandardMaterial({ map: makeTex(kind), roughness: 0.9, envMapIntensity: 0.35, ...o }); m.userData.tile = tile; return m; };
   const mExt = texMat('plaster', { color: st.wall, bumpMap: makeTex('plaster'), bumpScale: 0.02, roughness: 0.95 }, 9);
   const mInt = texMat('plaster-fine', { color: st.interior, roughness: 0.92, envMapIntensity: 0.55 }, 9);
+  const mDownlight = new THREE.MeshBasicMaterial({ color: '#fff4d6' });
+  const mSkirt = mat('#f1f2f0', { roughness: 0.55 });
   const mTrim = mat(st.trim, { roughness: 0.7 }), mAccent = mat(st.accent, { roughness: 0.75 });
   const mGlass = new THREE.MeshStandardMaterial({ color: '#4f6d7d', metalness: 0.25, roughness: 0.04, transparent: true, opacity: 0.42, envMapIntensity: 1.6 });
   const mFrame = mat(st.frame, { roughness: 0.45, metalness: 0.3 });
@@ -366,10 +368,12 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
           box(walls, s0, s1, y0, y1, c - t / 2, c + t / 2, outer ? outerMat : mInt, collide);
           if (outer) box(walls, s0, s1, y0, y1, inDir > 0 ? c + t / 2 : c - t / 2 - 0.04, inDir > 0 ? c + t / 2 + 0.04 : c - t / 2, mInt, false, false);
           if (outer && !upper && y0 === 0) box(walls, s0, s1, 0, Math.min(plinthH, y1), inDir > 0 ? outFace - 0.07 : outFace, inDir > 0 ? outFace : outFace + 0.07, mStone, false, false);
+          if (y0 === 0 && y1 > 3) for (const sd of outer ? [inDir] : [-1, 1]) { const f = c + sd * t / 2 + (outer ? sd * 0.04 : 0); box(walls, s0, s1, 0, 0.42, sd > 0 ? f : f - 0.05, sd > 0 ? f + 0.05 : f, mSkirt, false, false); }       // skirting board
         } else {
           box(walls, c - t / 2, c + t / 2, y0, y1, s0, s1, outer ? mExt : mInt, collide);
           if (outer) box(walls, inDir > 0 ? c + t / 2 : c - t / 2 - 0.04, inDir > 0 ? c + t / 2 + 0.04 : c - t / 2, y0, y1, s0, s1, mInt, false, false);
           if (outer && !upper && y0 === 0) box(walls, inDir > 0 ? outFace - 0.07 : outFace, inDir > 0 ? outFace : outFace + 0.07, 0, Math.min(plinthH, y1), s0, s1, mStone, false, false);
+          if (y0 === 0 && y1 > 3) for (const sd of outer ? [inDir] : [-1, 1]) { const f = c + sd * t / 2 + (outer ? sd * 0.04 : 0); box(walls, sd > 0 ? f : f - 0.05, sd > 0 ? f + 0.05 : f, 0, 0.42, s0, s1, mSkirt, false, false); }
         }
       };
       const ops = OPS.filter((p) => p.o === o && eq(p.c, c) && p.at - p.w / 2 >= a - 0.02 && p.at + p.w / 2 <= b + 0.02).sort((p, q) => p.at - q.at);
@@ -509,7 +513,11 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       if (!r.type.endsWith('bath') && r.type !== 'kitchen') { fl.userData.floorFor = r.type === 'bed' ? 'bed' : 'living'; floorMeshes.push({ mesh: fl, w: r.w, d: r.d }); }
     });
     // a ceiling under every slab (the roof's underside), so rooms look finished from inside
-    for (const r of L.rooms) if (!r.parent) { const cp = plane(r.x, r.x + r.w, r.z, r.z + r.d, H - 0.02, mat('#f6f4ef', { roughness: 0.95, emissive: '#3b3934' }), walls); cp.rotation.x = Math.PI / 2; }
+    for (const r of L.rooms) if (!r.parent) { const cp = plane(r.x, r.x + r.w, r.z, r.z + r.d, H - 0.02, mat('#f6f4ef', { roughness: 0.95, emissive: '#3b3934' }), walls); cp.rotation.x = Math.PI / 2;
+      if (r.type !== 'stairs' && r.w > 5 && r.d > 5) {                           // recessed downlights: one in a small room, two in a long one
+        const spots = r.w > 15 || r.d > 15 ? (r.w >= r.d ? [[0.3, 0.5], [0.7, 0.5]] : [[0.5, 0.3], [0.5, 0.7]]) : [[0.5, 0.5]];
+        for (const [fx, fz] of spots) { const dl = new THREE.Mesh(new THREE.CircleGeometry(0.34, 20), mDownlight); dl.rotation.x = Math.PI / 2; dl.position.set(r.x + r.w * fx, H - 0.05, r.z + r.d * fz); walls.add(dl); }
+      } }
 
     const pieces = L.furniture || furnish(L);
     curColl.push(...furnitureColliders(pieces));
@@ -1015,7 +1023,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     const doorX = mainDoor.o === 'h' ? mainDoor.at : mainDoor.c;
     const cands = [];
     if (porch) {
-      const z = porch.z + porch.d - 7.2 - (porch.d >= 17 ? 3 : 1.2);
+      const z = porch.z + porch.d - 7.15 - (porch.d >= 17 ? 3 : 0);     // nose toward the house (up to the wall behind the porch), tail towards the gate
       cands.push({ x: doorX > porch.x + porch.w / 2 ? porch.x + 3.3 : porch.x + porch.w - 3.3, z, along: true }, { x: porch.x + porch.w / 2, z, along: true });
     }
     if (B.z >= 9.5) {                                              // across the front lawn, parallel to the road
@@ -1024,8 +1032,8 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       for (let x = 8; x < W - 7; x += 15) cands.push({ x, z, along: false }, { x: W - x, z, along: false });      // more along the lawn, 15 ft apart
     }
     if (!roomInside) cands.length = 0;
-    const boxOf = (c) => (c.along ? { x0: c.x - 3, x1: c.x + 3, z0: c.z - 7, z1: c.z + 7 } : { x0: c.x - 7, x1: c.x + 7, z0: c.z - 3, z1: c.z + 3 });
-    const fits = (c) => { const b = boxOf(c); return b.x0 > 0.4 && b.x1 < W - 0.4 && (c.along || b.z0 > 0.4) && !colliders.some((o) => o.x0 < b.x1 && o.x1 > b.x0 && o.z0 < b.z1 && o.z1 > b.z0); };
+    const boxOf = (c) => (c.along ? { x0: c.x - 3, x1: c.x + 3, z0: c.z - 6.7, z1: c.z + 6.7 } : { x0: c.x - 7, x1: c.x + 7, z0: c.z - 3, z1: c.z + 3 });
+    const fits = (c) => { const b = boxOf(c); return b.x0 > 0.2 && b.x1 < W - 0.2 && (c.along || b.z0 > 0.4) && !colliders.some((o) => o.x0 < b.x1 && o.x1 > b.x0 && o.z0 < b.z1 && o.z1 > b.z0); };
     const open0 = doorReach([]);
     // one car per bay of the porch (a porch 10 ft wide holds 1 car, 18 ft 2, 26 ft 3), else one across the lawn
     const bays = porch ? (porch.w >= 25.5 ? 3 : porch.w >= 17.5 ? 2 : 1) : 1;

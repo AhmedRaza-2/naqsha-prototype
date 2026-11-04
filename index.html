@@ -6,9 +6,9 @@
   <title>Naqsha AI - Plot to 3D Walkthrough</title>
   <link rel="preload" href="fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
-  <meta name="theme-color" content="#fbf8f1">
+  <meta name="theme-color" content="#f4f6f7">
   <script>try{document.documentElement.dataset.theme=localStorage.getItem("naqsha-theme")==="dark"?"dark":"light"}catch(e){document.documentElement.dataset.theme="light"}</script>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23394845'/%3E%3Cpath d='M9 23V9h14M9 16h8v7' fill='none' stroke='%23FBF8F1' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill=%27%23111d27%27/%3E%3Cpath d='M9 23V9h14M9 16h8v7' fill='none' stroke=%27%23ffffff%27 stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <script type="importmap">
     { "imports": {
       "three": "./vendor/three/three.module.min.js",
@@ -160,7 +160,7 @@
       <div class="work">
       <section class="card editor" id="editor" hidden>
         <div class="editor-head">
-          <div><h3>Adjust the layout</h3><p class="fine">Drag a wall to resize the rooms on both sides, a gold dot to slide a door, a blue dot to slide a window. Drag furniture to move it; click a piece to turn or remove it, or click an empty floor to change what the room is. Sizes snap to half a foot and the rule check updates as you go.</p></div>
+          <div><h3>Adjust the layout</h3><ul class="legend" aria-label="How to edit"><li><i class="lg wall"></i>Drag a wall to resize the rooms on both sides</li><li><i class="lg door"></i>Gold dot: slide a door</li><li><i class="lg win"></i>Blue dot: slide a window</li><li><i class="lg furn"></i>Drag furniture, or click it to turn or remove it</li><li><i class="lg room"></i>Click an empty floor to change what the room is</li></ul></div>
           <div class="editor-actions"><button class="btn" id="edfurn">Hide furniture</button><button class="btn" id="edundo" disabled>Undo</button><button class="btn" id="edreset" disabled>Reset</button></div>
         </div>
         <div id="edhost" class="edhost"></div>
@@ -191,7 +191,7 @@
       <div class="work">
       <section class="card editor" id="ueditor" hidden>
         <div class="editor-head">
-          <div><h3>Adjust the first floor</h3><p class="fine">Drag a wall to resize the rooms on both sides, a gold dot to slide a door, a blue dot to slide a window. Drag furniture to move it; click a piece to turn or remove it, or click an empty floor to change what the room is. Walls beside the stairs stop where the stairs below end, so the two floors stay joined.</p></div>
+          <div><h3>Adjust the first floor</h3><ul class="legend" aria-label="How to edit"><li><i class="lg wall"></i>Drag a wall to resize the rooms on both sides</li><li><i class="lg door"></i>Gold dot: slide a door</li><li><i class="lg win"></i>Blue dot: slide a window</li><li><i class="lg furn"></i>Drag furniture, or click it to turn or remove it</li><li><i class="lg room"></i>Click an empty floor to change what the room is</li><li><i class="lg stair"></i>Walls beside the stairs stop where the stairs below end, so the two floors stay joined</li></ul></div>
           <div class="editor-actions"><button class="btn" id="uedfurn">Hide furniture</button><button class="btn" id="uedundo" disabled>Undo</button><button class="btn" id="uedreset" disabled>Reset</button></div>
         </div>
         <div id="uedhost" class="edhost"></div>

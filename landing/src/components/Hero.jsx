@@ -39,7 +39,7 @@ export default function Hero() {
         {/* poster: paints instantly, covered once the scene has rendered */}
         <div
           className="absolute inset-0"
-          style={{ background: 'radial-gradient(120% 70% at 20% 0%, #fbf0dc 0%, rgba(251,240,220,0) 55%), linear-gradient(#c8d0c8 0%, #efeae2 58%, #b3c0b4 58.2%, #a9b9aa 100%)' }}
+          style={{ background: 'radial-gradient(120% 70% at 20% 0%, #e9f2f0 0%, rgba(251,240,220,0) 55%), linear-gradient(#d8dfe4 0%, #eaeff1 58%, #b3c0b4 58.2%, #a9b9aa 100%)' }}
         />
         <div className={`absolute inset-0 transition-opacity duration-700 ${ready ? 'opacity-100' : 'opacity-0'}`}>
           <SceneBoundary onFail={onFail}>
@@ -51,9 +51,9 @@ export default function Hero() {
 
         {/* what the visitor sees while the 3D scene loads, or if it cannot start */}
         {scene !== 'ready' && (
-          <p role="status" className="hero-ink absolute inset-x-0 bottom-8 mx-auto flex w-fit max-w-[90vw] items-center gap-3 rounded-full bg-[#fbf8f1]/80 px-5 py-2.5 text-sm backdrop-blur">
+          <p role="status" className="hero-ink absolute inset-x-0 bottom-8 mx-auto flex w-fit max-w-[90vw] items-center gap-3 rounded-full bg-[#f4f6f7]/80 px-5 py-2.5 text-sm backdrop-blur">
             {scene === 'loading' ? (
-              <><span className="relative h-1.5 w-20 overflow-hidden rounded-full bg-[#c8d0c8]"><span className="absolute inset-y-0 left-0 w-1/2 animate-[load_1.2s_ease-in-out_infinite] rounded-full bg-[#394845]" /></span>Loading the house</>
+              <><span className="relative h-1.5 w-20 overflow-hidden rounded-full bg-[#d8dfe4]"><span className="absolute inset-y-0 left-0 w-1/2 animate-[load_1.2s_ease-in-out_infinite] rounded-full bg-[#0b6b57]" /></span>Loading the house</>
             ) : '3D is not available in this browser. You can still scroll down to plan your house.'}
           </p>
         )}
@@ -65,13 +65,13 @@ export default function Hero() {
           <h1 className="display max-w-[13ch] text-[2.65rem] sm:text-6xl md:max-w-[15ch] md:text-[clamp(2.75rem,9vh,4.5rem)]">
             Walk into the house before you build it.
           </h1>
-          <p className="mt-4 max-w-[34ch] text-base leading-relaxed text-[#3a2f2c]/80 md:mt-5 md:text-lg">
+          <p className="mt-4 max-w-[34ch] text-base leading-relaxed text-[#111d27]/80 md:mt-5 md:text-lg">
             Enter your plot size. Naqsha drafts room layouts for Pakistani homes, then lets you walk through them in 3D.
           </p>
           <div className="mt-7">
             <a
               href={APP_URL}
-              className="group inline-flex h-12 items-center gap-2 rounded-full bg-[#394845] pl-6 pr-5 text-[0.95rem] font-medium text-[#fbf8f1] transition-transform duration-300 ease-out-expo hover:-translate-y-px active:translate-y-px active:scale-[0.98]"
+              className="group inline-flex h-12 items-center gap-2 rounded-full bg-[#0b6b57] pl-6 pr-5 text-[0.95rem] font-medium text-[#f4f6f7] transition-transform duration-300 ease-out-expo hover:-translate-y-px active:translate-y-px active:scale-[0.98]"
             >
               Plan my house
               <ArrowRight size={18} weight="bold" className="transition-transform duration-300 group-hover:translate-x-0.5" />
@@ -83,7 +83,7 @@ export default function Hero() {
         {!reduce && (
           <motion.div
             aria-hidden="true"
-            style={{ opacity: glow, background: 'radial-gradient(circle at 50% 56%, #fff7e6 0%, #fdf2dc 50%, #fbf8f1 100%)' }}
+            style={{ opacity: glow, background: 'radial-gradient(circle at 50% 56%, #ffffff 0%, #f1f7f6 50%, #f4f6f7 100%)' }}
             className="pointer-events-none absolute inset-0"
           />
         )}

@@ -2,54 +2,53 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 
-/* Palette (from the brief): Earth #3A2F2C, Steel Blue #394845, Ash #C8D0C8, Linen #EFEAE2, Off-white #FBF8F1.
-   One accent (Steel Blue), one theme per mode, one radius system:
-   surfaces (cards, inputs, panels) 14px, interactive controls (buttons, chips, nav) full pill. */
+/* Palette: ink #111d27, cool drafting-paper greys, one green accent. Same tokens as the planner (/app).
+   One radius system: surfaces 12px, buttons 10px, only the floating nav and chips are pills. */
 :root {
-  --bg: #fbf8f1;
-  --bg-alt: #efeae2;
-  --ink: #3a2f2c;
-  --ink-soft: rgb(58 47 44 / 0.74);
-  --line: #c8d0c8;
-  --accent: #394845;
-  --accent-ink: #fbf8f1;
-  --glass: rgb(251 248 241 / 0.72);
-  --err: #a23b2c;
+  --bg: #f4f6f7;
+  --bg-alt: #eaeff1;
+  --ink: #111d27;
+  --ink-soft: rgb(17 29 39 / 0.7);
+  --line: #d8dfe4;
+  --accent: #0b6b57;
+  --accent-ink: #ffffff;
+  --glass: rgb(244 246 247 / 0.78);
+  --err: #b3372b;
   /* plan fills */
-  --p-bed: #e3e8e1;
-  --p-master: #d3dbd3;
-  --p-bath: #bfcbc7;
-  --p-kitchen: #cfdad5;
-  --p-lounge: #ebe5d9;
-  --p-drawing: #e6decf;
-  --p-dining: #dce4e0;
-  --p-lobby: #f6f2e9;
-  --p-lawn: #dbe5d8;
-  --p-line: #3a2f2c;
+  --p-bed: #dfe8ee;
+  --p-master: #cfdce4;
+  --p-bath: #bdd0d6;
+  --p-kitchen: #d0dfe0;
+  --p-lounge: #ecebe6;
+  --p-drawing: #e7e5df;
+  --p-dining: #dde7e4;
+  --p-lobby: #f4f5f4;
+  --p-lawn: #dbe8e1;
+  --p-line: #111d27;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #2b2320;
-    --bg-alt: #342b28;
-    --ink: #efeae2;
-    --ink-soft: rgb(239 234 226 / 0.76);
-    --line: #4d5a56;
-    --accent: #c8d0c8;
-    --accent-ink: #2b2320;
-    --glass: rgb(43 35 32 / 0.72);
-    --err: #f0a898;
-    --p-bed: #3b4541;
-    --p-master: #46524d;
-    --p-bath: #566660;
-    --p-kitchen: #44524d;
-    --p-lounge: #43382f;
-    --p-drawing: #4a3d32;
-    --p-dining: #3d4a49;
-    --p-lobby: #3a322d;
-    --p-lawn: #3a463f;
-    --p-line: #efeae2;
+    --bg: #0e151b;
+    --bg-alt: #151e26;
+    --ink: #e8eef2;
+    --ink-soft: rgb(232 238 242 / 0.74);
+    --line: #26343f;
+    --accent: #3fb899;
+    --accent-ink: #05241c;
+    --glass: rgb(14 21 27 / 0.78);
+    --err: #f2a99c;
+    --p-bed: #1f2e37;
+    --p-master: #27394a;
+    --p-bath: #2f4a52;
+    --p-kitchen: #26424a;
+    --p-lounge: #272f33;
+    --p-drawing: #2c3236;
+    --p-dining: #243b3b;
+    --p-lobby: #20282d;
+    --p-lawn: #1f3a33;
+    --p-line: #e8eef2;
     color-scheme: dark;
   }
 }
@@ -66,7 +65,7 @@
   --color-accent-ink: var(--accent-ink);
   --color-glass: var(--glass);
   --color-err: var(--err);
-  --radius-surface: 0.875rem;
+  --radius-surface: 0.75rem;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -95,7 +94,7 @@ body { margin: 0; min-height: 100dvh; overflow-x: clip; }
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
 /* hero stays a daylight scene in both colour schemes, so its text uses the fixed palette */
-.hero-ink { color: #3a2f2c; }
+.hero-ink { color: #111d27; }
 
 @keyframes load { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
 @keyframes march { to { stroke-dashoffset: -2.4; } }
