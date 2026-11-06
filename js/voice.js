@@ -1,4 +1,5 @@
-// Voice input: speech to text with a deep-learning model (OpenAI Whisper, the English-only "tiny.en" size), run in the
+// Voice input, two ways. Live: the browser's own speech recognition writes the words as they are spoken (Chrome, Edge, Safari).
+// Fallback: speech to text with a deep-learning model (OpenAI Whisper, the English-only "tiny.en" size), run in the
 // visitor's browser with onnxruntime through transformers.js. The audio never leaves the device; only the model files
 // (about 40 MB, kept in the browser cache after the first use) are downloaded, from the Hugging Face hub.
 // English only for now. The text it returns is read by the same sentence reader as typed text (nlp.js).
@@ -76,6 +77,13 @@ export async function startListening({ onLevel, onSilence } = {}) {
   }
   src.connect(node); node.connect(ctx.destination);          // the node writes no output, so nothing is played back
   return {
+    /** The audio so far (16 kHz mono), without stopping: for partial results while the visitor is still speaking. */
+    peek() {
+      const audio = new Float32Array(samples);
+      let o = 0;
+      for (const c of chunks) { audio.set(c, o); o += c.length; }
+      return audio;
+    },
     stop() {
       finished = true;
       stream.getTracks().forEach((t) => t.stop());
@@ -86,6 +94,53 @@ export async function startListening({ onLevel, onSilence } = {}) {
       return { audio, speechMs };
     },
   };
+}
+
+
+// ---- live path: the browser's own speech recognition (Chrome, Edge, Safari). Words arrive while the visitor speaks. ----
+const SR = () => window.SpeechRecognition || window.webkitSpeechRecognition;
+/** True when this browser has its own speech recognition. */
+export const hasLiveSpeech = () => !!SR();
+
+/**
+ * Listen and write the words down as they are spoken. onText(textSoFar) is called on every partial result.
+ * It ends by itself after 2.5 s of quiet following speech (or 9 s with no speech), or when stop() is called.
+ * onEnd({ text, error }) error: 'not-allowed', 'audio-capture', 'no-speech', 'network' or 'unsupported' (use the on-device model instead).
+ */
+export function startLive({ onText, onEnd, lang = 'en-PK' }) {
+  const Rec = SR();
+  let r = null, prefix = '', current = '', err = null, ended = false, stopping = false, retried = false;
+  const t0 = Date.now();
+  let lastAt = Date.now(), gotAny = false;
+  const text = () => `${prefix} ${current}`.replace(/\s+/g, ' ').trim();
+  const finish = () => {
+    if (ended) return;
+    ended = true; clearInterval(watch);
+    const e = err === 'no-speech' || err === 'aborted' ? null : err === 'service-not-allowed' || err === 'language-not-supported' ? 'unsupported' : err;
+    onEnd({ text: text(), error: text() ? null : e || 'no-speech' });
+  };
+  const begin = (lg) => {
+    r = new Rec();
+    r.lang = lg; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    r.onresult = (e) => {
+      current = Array.from(e.results).map((x) => x[0].transcript).join(' ');
+      if (current.trim()) { gotAny = true; lastAt = Date.now(); onText(text()); }
+    };
+    r.onerror = (e) => { err = e.error; };
+    r.onend = () => {
+      if (err === 'language-not-supported' && !retried && lg !== 'en-US') {          // en-PK is not offered everywhere: try plain English
+        retried = true; err = null; prefix = text(); current = ''; begin('en-US'); return;
+      }
+      finish();
+    };
+    try { r.start(); } catch { err = 'service-not-allowed'; finish(); }
+  };
+  const watch = setInterval(() => {
+    const now = Date.now();
+    if (!stopping && ((gotAny && now - lastAt > 2500) || (!gotAny && now - t0 > 9000) || now - t0 > 60000)) { stopping = true; try { r.stop(); } catch { finish(); } }
+  }, 300);
+  begin(lang);
+  return { stop() { stopping = true; try { r.stop(); } catch { finish(); } } };
 }
 
 /** Speech (16 kHz mono) to text, or '' when nothing was said. */

@@ -14,7 +14,7 @@ import { onModelState, preloadModel } from './model.js';
 import { pickColor, closeWheel } from './colorwheel.js';
 import { UNITS, getUnit, setUnit, fromFt, toFt, num, fmtLen, fmtArea, localize } from './units.js';
 import { mountFloorForm, refreshForms, readFloor, onFormChange } from './floorform.js';
-import { canListen, loadSpeechModel, startListening, transcribe, readAnswer } from './voice.js';
+import { canListen, hasLiveSpeech, startLive, loadSpeechModel, startListening, transcribe, readAnswer } from './voice.js';
 
 const $ = (id) => document.getElementById(id);
 const S = { seen: new Set(), seenUp: new Set(), plot: null, beds: 3, layouts: [], sel: null, upperLayouts: [], up: null, style: null, viewer: null };
@@ -244,47 +244,114 @@ const openConflict = () => questions().find((q) => q.kind === 'conflict' && !ans
 ['nl', 'pwu', 'pdu'].forEach((id) => $(id).addEventListener('input', renderAdvice));
 ['pfloors', 'pcars', 'pporch', 'pb'].forEach((id) => $(id).addEventListener('change', renderAdvice));
 
-// ---------- voice: speak the request; the words are read like typed text and the visitor confirms before anything is drafted ----------
+// ---------- voice: speak the request; the words appear (and the form fills in) while you speak, then you confirm before anything is drafted ----------
 const mic = $('mic'), micstat = $('micstat'), meter = $('meter').firstElementChild;
-const MIC_IDLE = 'English only for now. A speech model runs on your device; the first time it downloads about 40 MB.';
+const LIVE = hasLiveSpeech();                                       // Chrome, Edge, Safari: the browser writes the words as they are spoken
+const MIC_IDLE = LIVE
+  ? 'Press Speak and talk: your words appear as you say them and the form fills in. Chrome and Edge send the audio to their speech service to write it down.'
+  : 'Press Speak and talk. A small speech model runs on your device (about 40 MB the first time); the words appear every few seconds.';
 let rec = null, voiceBusy = false, voiceMode = 'request';          // 'request': the first sentence; 'answer': a yes or no
+let whisperOnly = !LIVE;                                           // set when the browser's own speech service cannot be reached
 const say = (t) => { micstat.textContent = t; };
+const quick = $('blk-describe');
 function micState(on) {
   mic.setAttribute('aria-pressed', String(on));
   mic.classList.toggle('on', on);
-  $('miclabel').textContent = on ? 'Stop' : 'Speak instead';
+  quick.classList.toggle('listening', on);
+  $('miclabel').textContent = on ? 'Stop' : 'Speak';
   if (!on) meter.style.width = '0%';
 }
-/** Listen until the visitor stops (or presses the button), then turn the audio into text. -> text or '' */
+const MIC_ERR = {
+  'not-allowed': 'The microphone is blocked. Allow it in the browser (the lock icon by the address), or type the request instead.',
+  'service-not-allowed': 'The microphone is blocked. Allow it in the browser (the lock icon by the address), or type the request instead.',
+  'audio-capture': 'No microphone was found. Plug one in, or type the request instead.',
+  'NotAllowedError': 'The microphone is blocked. Allow it in the browser (the lock icon by the address), or type the request instead.',
+  'NotFoundError': 'No microphone was found. Plug one in, or type the request instead.',
+};
+
+/** Live path: the browser's own speech recognition. Resolves { text, error } when it ends. onText gets every partial result. */
+function listenLive(onText) {
+  return new Promise((resolve) => {
+    let h = null, done = false;
+    const end = (r) => { if (done) return; done = true; rec = null; mic.onclick = onMic; resolve(r); };
+    h = startLive({ onText, onEnd: end });
+    rec = h;
+    mic.onclick = () => { say('Finishing...'); h.stop(); };
+  });
+}
+
+/** Fallback path (no browser speech service): record, and every 2.5 seconds turn what has been said so far into text on this device. */
+async function listenWhisper(onText) {
+  let dl = 0, finished = false, working = false, lastN = 0, text = '';
+  const model = loadSpeechModel((p) => { dl = p; });
+  model.catch(() => {});
+  let r;
+  try { r = await startListening({ onLevel: (v) => { meter.style.width = `${Math.round(v * 100)}%`; }, onSilence: () => { if (!finished) stopNow(); } }); }
+  catch (e) { return { text: '', error: (e && e.name) || 'audio-capture' }; }
+  rec = r;
+  let resolveDone;
+  const done = new Promise((res) => { resolveDone = res; });
+  const stopNow = () => { finished = true; clearInterval(timer); resolveDone(); };
+  mic.onclick = stopNow;
+  const timer = setInterval(async () => {                          // partial text while speaking
+    if (working || finished) return;
+    const a = r.peek();
+    if (a.length < 16000 * 1.2 || a.length > 16000 * 20 || a.length === lastN) return;      // partial text only for the first 20 seconds; the full text comes when you stop
+    working = true; lastN = a.length;
+    try { const t = await transcribe(a, (p) => { dl = p; }); if (!finished && t) { text = t; onText(t); } } catch { /* the next tick tries again */ }
+    working = false;
+  }, 2500);
+  say(dl < 0.995 ? 'Listening. The speech model is still downloading, so words appear a little later.' : 'Listening. Words appear every few seconds.');
+  await done;
+  const out = r.stop(); rec = null; mic.onclick = onMic;
+  if (out.speechMs < 300) return { text: '', error: 'no-speech' };
+  const tick = setInterval(() => say(dl < 0.995 ? `Downloading the speech model: ${Math.round(dl * 100)}%` : 'Writing it down...'), 300);
+  try { return { text: await transcribe(out.audio, (p) => { dl = p; }) || text }; }
+  catch (err) { console.warn('speech to text failed', err); return { text, error: 'model' }; }
+  finally { clearInterval(tick); }
+}
+
+/** Listen once. For the first sentence the words go into the text box as they come, so the form fills in while the visitor speaks. -> text or ''
+ *  With the browser's own recognition, the microphone is also recorded: it drives the level meter and, if the browser's service heard
+ *  nothing although there was speech (it cannot be reached, or is switched off), the recording is written down on this device instead. */
 async function listenOnce() {
   voiceBusy = true;
-  let stopped = null;
-  const finish = () => { if (rec) { const r = rec.stop(); rec = null; micState(false); stopped = r; } };
+  const toBox = voiceMode === 'request';
+  const show = (t) => { if (toBox) { $('nl').value = t; $('nl').dispatchEvent(new Event('input')); } else say(`Hearing: "${t}"`); };
+  let shadow = null;
   try {
-    say('Allow the microphone, then speak. I stop after a long pause, or press Stop when you are done.');
-    let dl = 0;
-    const model = loadSpeechModel((p) => { dl = p; });          // the model downloads while the visitor speaks
-    model.catch(() => {});
-    const done = new Promise((resolve) => {
-      startListening({ onLevel: (v) => { meter.style.width = `${Math.round(v * 100)}%`; }, onSilence: () => { finish(); resolve(); } })
-        .then((r) => { rec = r; micState(true); say('Listening. Say, for example, "ten marla double storey four bedroom with a car porch".'); mic.onclick = () => { finish(); resolve(); }; })
-        .catch((e) => { micState(false); say(e && e.name === 'NotAllowedError' ? 'The microphone is blocked. Allow it in the browser, or type the request instead.' : 'No microphone was found. You can type the request instead.'); resolve(); });
-    });
-    await done;
-    if (!stopped) return '';
-    if (stopped.speechMs < 300) { say('I did not hear anything. Press the button and try again.'); return ''; }
-    const t0 = Date.now();
-    const tick = setInterval(() => say(dl < 0.995 ? `Downloading the speech model: ${Math.round(dl * 100)}%` : 'Turning your speech into text...'), 300);
-    try {
-      const text = await transcribe(stopped.audio, (p) => { dl = p; });
-      console.info('speech to text', Date.now() - t0, 'ms');
-      return text;
-    } finally { clearInterval(tick); }
+    micState(true);
+    say('Allow the microphone if asked, then speak.');
+    let res = { text: '' };
+    if (!whisperOnly) {
+      try { shadow = await startListening({ onLevel: (v) => { meter.style.width = `${Math.round(v * 100)}%`; }, onSilence: () => {} }); }
+      catch (e) { say(MIC_ERR[e && e.name] || MIC_ERR['audio-capture']); return ''; }
+      say('Listening... speak now.');
+      res = await listenLive(show);
+      const out = shadow.stop(); shadow = null;
+      if (res.text) return res.text;
+      if (res.error === 'not-allowed' || res.error === 'audio-capture') { say(MIC_ERR[res.error]); return ''; }
+      if (out.speechMs < 600) { say('I did not hear anything. Press Speak and try again.'); return ''; }
+      whisperOnly = true;                                            // there was speech but the browser wrote nothing: use the model on this device
+      const model = loadSpeechModel(() => {}); model.catch(() => {});
+      let dl = 0;
+      loadSpeechModel((p) => { dl = p; }).catch(() => {});
+      const tick = setInterval(() => say(dl < 0.995 && dl > 0 ? `Downloading the speech model: ${Math.round(dl * 100)}%` : 'Writing it down on this device...'), 300);
+      try { const t = await transcribe(out.audio, (p) => { dl = p; }); if (t) { show(t); return t; } }
+      catch (err) { console.warn('speech to text failed', err); say('The speech model could not load on this connection. You can type the request instead.'); return ''; }
+      finally { clearInterval(tick); }
+      say('I could not make out the words. Press Speak and try again, or type the request.');
+      return '';
+    }
+    res = await listenWhisper(show);
+    if (res.text) return res.text;
+    say(MIC_ERR[res.error] || (res.error === 'model' ? 'The speech model could not load on this connection. You can type the request instead.' : 'I did not hear anything. Press Speak and try again.'));
+    return '';
   } catch (err) {
     console.warn('voice failed', err);
-    say('The speech model could not load on this connection. You can type the request instead.');
+    say('Speech input did not work here. You can type the request instead.');
     return '';
-  } finally { voiceBusy = false; micState(false); mic.onclick = onMic; }
+  } finally { if (shadow) { try { shadow.stop(); } catch { /* already stopped */ } } voiceBusy = false; micState(false); mic.onclick = onMic; }
 }
 async function onMic() {
   if (voiceBusy) return;
@@ -299,13 +366,16 @@ async function onMic() {
   say(MIC_IDLE);
   $('voiceyes').focus();
 }
-if (canListen()) mic.onclick = onMic; else { mic.disabled = true; say('Voice input needs a browser with microphone access (use https). You can type the request instead.'); }
+say(MIC_IDLE);
+if (LIVE || canListen()) mic.onclick = onMic; else { mic.disabled = true; say('Voice input needs a browser with microphone access (use https). You can type the request instead.'); }
 $('voiceyes').onclick = () => { $('voiceok').hidden = true; $('gen').click(); };
 $('voiceedit').onclick = () => { $('voiceok').hidden = true; $('nl').focus(); };
 $('voiceagain').onclick = () => { $('voiceok').hidden = true; mic.click(); };
 $('voicesay').onclick = async () => {                          // answer by voice: "yes" goes ahead, "no" starts again
   if (voiceBusy) return;
+  voiceMode = 'answer';
   const text = await listenOnce();
+  voiceMode = 'request';
   const a = readAnswer(text);
   if (a === 'yes') { $('voiceok').hidden = true; $('gen').click(); }
   else if (a === 'no') { $('voiceok').hidden = true; say('Okay. Say it again, or type the changes.'); mic.click(); }
