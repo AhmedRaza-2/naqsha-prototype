@@ -13,7 +13,7 @@ import { mountEditor } from './editor.js';
 import { onModelState, preloadModel } from './model.js';
 import { pickColor, closeWheel } from './colorwheel.js';
 import { UNITS, getUnit, setUnit, fromFt, toFt, num, fmtLen, fmtArea, localize } from './units.js';
-import { mountFloorForm, refreshForms, readFloor } from './floorform.js';
+import { mountFloorForm, refreshForms, readFloor, onFormChange } from './floorform.js';
 import { canListen, loadSpeechModel, startListening, transcribe, readAnswer } from './voice.js';
 
 const $ = (id) => document.getElementById(id);
@@ -83,6 +83,46 @@ $('pwu').addEventListener('input', () => { const v = +$('pwu').value; if (v > 0)
 $('pdu').addEventListener('input', () => { const v = +$('pdu').value; if (v > 0) $('pd').value = String(toFt(v)); readPlot(); });
 $('fseg').addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) { $('pfloors').value = b.dataset.f; $('pfloors').dispatchEvent(new Event('change', { bubbles: true })); } });
 mountFloorForm($('ffhost'), 'tabs');
+
+// ---- the plot drawn to scale, and a one-line summary beside the Generate button: both read the form's own fields ----
+const sbFt = (id, std) => ($(id).value !== '' && !Number.isNaN(+$(id).value) ? toFt(+$(id).value) : std);
+function renderPlotPreview() {
+  const w = +$('pw').value, d = +$('pd').value, host = $('plotpreview');
+  if (!host || !(w > 0 && d > 0)) return;
+  const r = ruleFor(w, d), side = Math.min(w / 2 - 1, sbFt('psbs', r.side)), front = sbFt('psbf', r.front), rear = sbFt('psbb', r.rear);
+  const k = Math.min(230 / w, 250 / d), pw = w * k, ph = d * k, ox = (300 - pw) / 2 + 8, oy = 34;
+  const bx = ox + side * k, by = oy + rear * k, bw = Math.max(0, (w - 2 * side) * k), bh = Math.max(0, (d - front - rear) * k);
+  const gate = Math.min(8, w * 0.4) * k, gx = ox + pw / 2 - gate / 2, H = oy + ph + 46;
+  host.innerHTML = `<svg viewBox="0 0 316 ${H}" width="100%" role="img" aria-label="Plot ${fmtLen(w)} by ${fmtLen(d)}">`
+    + `<rect class="pv-road" x="0" y="${oy + ph + 6}" width="316" height="26"/><text class="pv-t" x="158" y="${oy + ph + 23}" text-anchor="middle">ROAD</text>`
+    + `<rect class="pv-plot" x="${ox}" y="${oy}" width="${pw}" height="${ph}"/>`
+    + (bw > 0 && bh > 0 ? `<rect class="pv-build" x="${bx}" y="${by}" width="${bw}" height="${bh}"/><text class="pv-t pv-big" x="${bx + bw / 2}" y="${by + bh / 2 - 2}" text-anchor="middle">${num(w - 2 * side)} &times; ${fmtLen(d - front - rear)}</text><text class="pv-t" x="${bx + bw / 2}" y="${by + bh / 2 + 14}" text-anchor="middle">house area</text>` : '')
+    + `<rect class="pv-gate" x="${gx}" y="${oy + ph - 2}" width="${gate}" height="4" rx="2"/>`
+    + `<text class="pv-t pv-dim" x="${ox + pw / 2}" y="${oy - 10}" text-anchor="middle">${fmtLen(w)}</text>`
+    + `<text class="pv-t pv-dim" transform="translate(${ox - 10} ${oy + ph / 2}) rotate(-90)" text-anchor="middle">${fmtLen(d)}</text>`
+    + `<line class="pv-tick" x1="${ox}" y1="${oy - 5}" x2="${ox + pw}" y2="${oy - 5}"/>`
+    + `</svg>`;
+}
+function renderSummary() {
+  const w = +$('pw').value, d = +$('pd').value, el = $('sumline');
+  if (!el || !(w > 0 && d > 0)) return;
+  const two = floors() === 2, cars = Math.max(1, +$('pcars').value || 1), g = readFloor('ground');
+  const beds = two ? `${+$('pb').value} bed down, ${+$('pup').value} up` : `${+$('pb').value} bed`;
+  const bits = [`${((w * d) / MARLA).toFixed(1)} marla`, `${fmtLen(w)} &times; ${fmtLen(d)}`, two ? 'two floors' : 'one floor', beds, `${cars} car${cars > 1 ? 's' : ''}`];
+  el.innerHTML = bits.map((b) => `<span>${b}</span>`).join('');
+  renderPlotPreview();
+}
+onFormChange(renderSummary);
+$('pcars').addEventListener('change', () => refreshForms());
+['psbf', 'psbb', 'psbs'].forEach((id) => $(id).addEventListener('input', renderSummary));
+const EXAMPLES = ['5 marla, 2 floors, 3 bed', '7 marla double storey, 4 bed, car porch', '10 marla, 2 floors, drawing room upstairs', '1 kanal, 5 bed, 3 cars', '30x60, 2 floors'];
+for (const t of EXAMPLES) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'ex'; b.textContent = t;
+  b.onclick = () => { $('nl').value = t; $('nl').dispatchEvent(new Event('input', { bubbles: true })); $('nl').focus(); };
+  $('examples').appendChild(b);
+}
+$('nl').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); $('gen').click(); } });
 
 // the sentence reader (nlp.js): "10 marla double storey 4 bed car porch, front 12 ft" fills the form; what it understood is shown below
 const NL_CHIPS = $('nlsaid');
@@ -477,7 +517,7 @@ $('gen').onclick = async () => {
   $('formerr').textContent = localize(problem);
   if (problem) return;
   const clash = openConflict();
-  if (clash) { $('formerr').hidden = false; $('formerr').textContent = localize('One thing first: ' + clash.text + ' Pick an answer under the text box.'); $('advice').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+  if (clash) { $('formerr').hidden = false; $('formerr').textContent = localize('One thing first: ' + clash.text + ' Pick an answer in "Your house" above.'); $('advice').scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
   S.prefs = readPrefs();
   S.beds = S.prefs.beds;
   S.site.cars = Math.max(1, S.prefs.cars); S.site.carsAsked = S.prefs.cars; S.site.openKitchen = $('popenk').value === 'yes';                       // how many cars the 3D scene parks

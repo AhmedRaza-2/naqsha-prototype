@@ -31,23 +31,22 @@
   <main>
     <section id="s1" class="step">
       <h1>Apna ghar, plot size se shuru</h1>
-      <p class="lead">Enter your plot size, pick a layout, choose a facade style, then walk through the house in 3D.</p>
-      <div class="card form">
-       <div class="fsplit">
-        <div class="fleft">
-        <label class="field wide">Describe your plot (English or Roman Urdu)
-          <input id="nl" placeholder="e.g. 10 marla, 2 floors, 4 bed, car porch" autocomplete="off">
-        </label>
-        <div class="voicebar" id="voicebar">
-          <button class="btn mic" id="mic" type="button" aria-pressed="false">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-            <span id="miclabel">Speak instead</span>
-          </button>
-          <span class="meter" id="meter" aria-hidden="true"><i></i></span>
-          <span class="fine" id="micstat" aria-live="polite">English only for now. A speech model runs on your device; the first time it downloads about 40 MB.</span>
-        </div>
-        <div class="said" id="nlsaid" aria-live="polite"></div>
-        <div class="voiceok" id="voiceok" hidden role="group" aria-label="Check what was heard">
+      <p class="lead">Tell us about your plot and the rooms you want. The layouts, the 3D house and the walk-through all follow from this page.</p>
+      <div class="s1grid">
+        <div class="s1main">
+          <div class="card block quick" id="blk-describe">
+            <label class="blabel" for="nl">Say it in one line <span class="opt-tag">optional, English or Roman Urdu</span></label>
+            <div class="nlrow">
+              <input id="nl" placeholder="e.g. 10 marla, 2 floors, 4 bed, car porch" autocomplete="off" enterkeyhint="go">
+              <button class="btn mic" id="mic" type="button" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+                <span id="miclabel">Speak</span>
+              </button>
+            </div>
+            <div class="examples" id="examples" aria-label="Examples you can tap"><span class="fine">Try</span></div>
+            <div class="voicebar" id="voicebar"><span class="meter" id="meter" aria-hidden="true"><i></i></span><span class="fine" id="micstat" aria-live="polite">Speaking needs a microphone. A small speech model runs on your device (about 40 MB the first time).</span></div>
+            <div class="said" id="nlsaid" aria-live="polite"></div>
+            <div class="voiceok" id="voiceok" hidden role="group" aria-label="Check what was heard">
           <p class="heard">I heard: <q id="heard"></q></p>
           <p class="fine">The fields below are filled from it. Is this what you want?</p>
           <div class="voiceacts">
@@ -56,29 +55,89 @@
             <button class="btn" id="voiceedit" type="button">Let me change it</button>
             <button class="btn" id="voiceagain" type="button">Speak again</button>
           </div>
-        </div>
-        </div>
-        <div class="fright">
-        <div class="presets" id="presets"></div>
-        <div class="row r3 plotrow">
-          <label class="field">Measure in
-            <select id="punit"><option value="ft">Feet</option><option value="gaz">Gaz (yards)</option><option value="m">Metres</option></select>
-          </label>
-          <label class="field"><span id="lpw">Width (ft)</span><input id="pwu" type="number" min="1" step="any" inputmode="decimal" value="25"></label>
-          <label class="field"><span id="lpd">Depth (ft)</span><input id="pdu" type="number" min="1" step="any" inputmode="decimal" value="45"></label>
-        </div>
-        <div class="floorsrow" id="floorsrow">
-          <span class="swlabel">Floors</span>
-          <div class="seg" id="fseg" role="radiogroup" aria-label="Number of floors">
-            <button type="button" role="radio" data-f="1" aria-checked="true" class="on">One floor</button>
-            <button type="button" role="radio" data-f="2" aria-checked="false">Two floors</button>
           </div>
+          </div>
+
+          <div class="card block" id="blk-plot">
+            <h3><span class="n">1</span>Your plot</h3>
+            <div class="presets" id="presets" role="group" aria-label="Common plot sizes"></div>
+            <div class="dimrow">
+              <label class="field"><span id="lpw">Width (ft)</span><input id="pwu" type="number" min="1" step="any" inputmode="decimal" value="25"></label>
+              <span class="times" aria-hidden="true">&times;</span>
+              <label class="field"><span id="lpd">Depth (ft)</span><input id="pdu" type="number" min="1" step="any" inputmode="decimal" value="45"></label>
+              <label class="field unit">Measured in
+                <select id="punit"><option value="ft">Feet</option><option value="gaz">Gaz (yards)</option><option value="m">Metres</option></select>
+              </label>
+            </div>
+            <p class="fine" id="plotinfo"></p>
+          </div>
+
+          <div class="card block" id="blk-house">
+            <h3><span class="n">2</span>Your house</h3>
+            <div class="floorsrow" id="floorsrow">
+              <span class="swlabel">Floors</span>
+              <div class="seg" id="fseg" role="radiogroup" aria-label="Number of floors">
+                <button type="button" role="radio" data-f="1" aria-checked="true" class="on">One floor</button>
+                <button type="button" role="radio" data-f="2" aria-checked="false">Two floors</button>
+              </div>
+            </div>
+            <div id="ffhost"></div>
+            <div class="advice" id="advice" aria-live="polite"></div>
+          </div>
+
+          <details class="prefs" id="prefs">
+            <summary>More choices <span class="fine">open space, layout type, stairs, lawn</span></summary>
+            <h4 class="pgroup">Layout</h4>
+            <div class="row">
+              <label class="field">Give extra space to
+                <select id="pfocus">
+                  <option value="balanced" selected>Nothing in particular</option>
+                  <option value="bedrooms">Bedrooms</option>
+                  <option value="lounge">Hall (lounge)</option>
+                  <option value="kitchen">Kitchen</option>
+                </select>
+              </label>
+              <label class="field">Layout type
+                <select id="pfamily">
+                  <option value="any" selected>Any (three different)</option>
+                  <option value="rows">Classic rows</option>
+                  <option value="corridor">Side corridor</option>
+                  <option value="wing">Bedroom wing</option>
+                  <option value="compact">Compact (small plots)</option>
+                </select>
+              </label>
+              <label class="field">Front lawn
+                <select id="plawn"><option value="yes" selected>Keep a lawn</option><option value="no">No lawn: car porch across the front</option></select>
+              </label>
+            </div>
+            <h4 class="pgroup">Space left around the house <span class="fine">leave blank for the usual setbacks of the plot</span></h4>
+            <div class="row">
+              <label class="field"><span>In front (<span class="u">ft</span>)</span><input id="psbf" type="number" min="0" max="40" step="0.5" placeholder="standard" inputmode="decimal"></label>
+              <label class="field"><span>At the back (<span class="u">ft</span>)</span><input id="psbb" type="number" min="0" max="40" step="0.5" placeholder="standard" inputmode="decimal"></label>
+              <label class="field"><span>At each side (<span class="u">ft</span>)</span><input id="psbs" type="number" min="0" max="20" step="0.5" placeholder="standard" inputmode="decimal"></label>
+            </div>
+            <h4 class="pgroup">Entrance and stairs</h4>
+            <div class="row">
+              <label class="field">Separate entrance room
+                <select id="pentr"><option value="auto" selected>Automatic (separate from 10 marla)</option><option value="never">No separate entrance</option><option value="keep">Keep an entrance room</option></select>
+              </label>
+              <label class="field">Stairs to the roof
+                <select id="pstairs"><option value="auto" selected>Automatic (inside from 6 marla)</option><option value="inside">Keep stairs inside</option><option value="none">No stairs</option></select>
+              </label>
+            </div>
+            <p class="fine" id="prefnote">Whatever you type here is what the plan is built to, so no yard is left empty beyond it.</p>
+          </details>
         </div>
-        <div id="ffhost"></div>
-        <div class="advice" id="advice" aria-live="polite"></div>
-        </div>
-       </div>
-       <div id="legacy" hidden>
+
+        <aside class="s1side" aria-label="Your plot, drawn to scale">
+          <div class="card previewcard">
+            <h3>Plot preview</h3>
+            <div id="plotpreview" class="plotpreview" role="img" aria-label="Plot outline"></div>
+            <ul class="legend plegend" aria-hidden="true"><li><i class="lg plot"></i>Plot</li><li><i class="lg build"></i>Where the house can stand</li></ul>
+          </div>
+        </aside>
+      </div>
+      <div id="legacy" hidden>
           <input id="pw" type="number" value="25"><input id="pd" type="number" value="45">
           <label id="pbl">Bedrooms <select id="pb"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
           <select id="pfloors"><option value="1" selected>1 floor</option><option value="2">2 floors</option></select>
@@ -87,64 +146,20 @@
           <label id="pterrl">Terrace <select id="pterr"><option value="both" selected>both</option><option value="with">with</option><option value="without">without</option></select></label>
           <select id="pupdraw"><option value="no" selected>no</option><option value="yes">yes</option></select>
           <select id="pporch"><option value="yes" selected>yes</option><option value="any">any</option><option value="no">no</option></select>
+          <select id="pcars"><option value="0" selected>Standard (1 car)</option><option value="1">1 car</option><option value="2">2 cars</option><option value="3">3 cars</option><option value="4">4 cars</option><option value="5">5 cars</option><option value="6">6 cars</option></select>
           <select id="popenk"><option value="no" selected>no</option><option value="yes">yes</option></select>
           <select id="pbaths"></select>
           <input type="checkbox" name="omit" value="dining"><input type="checkbox" name="omit" value="drawing"><input type="checkbox" name="omit" value="lounge">
        </div>
-        <details class="prefs" id="prefs">
-          <summary>More preferences</summary>
-          <div class="row">
-            <label class="field">Make bigger
-              <select id="pfocus">
-                <option value="balanced" selected>Nothing in particular</option>
-                <option value="bedrooms">Bedrooms</option>
-                <option value="lounge">Hall (lounge)</option>
-                <option value="kitchen">Kitchen</option>
-              </select>
-            </label>
-            <label class="field">Layout style
-              <select id="pfamily">
-                <option value="any" selected>Any (three different)</option>
-                <option value="rows">Classic rows</option>
-                <option value="corridor">Side corridor</option>
-                <option value="wing">Bedroom wing</option>
-                <option value="compact">Compact (small plots)</option>
-              </select>
-            </label>
-            <label class="field">Cars to park
-              <select id="pcars">
-                <option value="0" selected>Standard (1 car)</option>
-                <option value="1">1 car</option>
-                <option value="2">2 cars</option>
-                <option value="3">3 cars</option>
-                <option value="4">4 cars</option>
-                <option value="5">5 cars</option>
-                <option value="6">6 cars</option>
-              </select>
-            </label>
+      <div class="genbar" id="genbar">
+        <div class="genin">
+          <div class="gensum">
+            <div class="sumline" id="sumline" aria-live="polite"></div>
+            <p class="formerr" id="formerr" role="alert" hidden></p>
+            <p class="fine" id="modelstat" aria-live="polite"></p>
           </div>
-          <div class="row">
-            <label class="field">Front open space (<span class="u">ft</span>)<input id="psbf" type="number" min="0" max="40" step="0.5" placeholder="standard" inputmode="decimal"></label>
-            <label class="field">Back open space (<span class="u">ft</span>)<input id="psbb" type="number" min="0" max="40" step="0.5" placeholder="standard" inputmode="decimal"></label>
-            <label class="field">Side open space (<span class="u">ft</span>)<input id="psbs" type="number" min="0" max="20" step="0.5" placeholder="standard" inputmode="decimal"></label>
-            <label class="field">Entrance room
-              <select id="pentr"><option value="auto" selected>Automatic (separate from 10 marla)</option><option value="never">No separate entrance</option><option value="keep">Keep an entrance room</option></select>
-            </label>
-            <label class="field">Roof stairs
-              <select id="pstairs"><option value="auto" selected>Automatic (inside from 6 marla)</option><option value="inside">Keep stairs inside</option><option value="none">No stairs</option></select>
-            </label>
-          </div>
-          <div class="row">
-            <label class="field">Front lawn
-              <select id="plawn"><option value="yes" selected>Keep a lawn</option><option value="no">No lawn: car porch across the front</option></select>
-            </label>
-          </div>
-          <p class="fine" id="prefnote">Leave the open space blank for the standard setbacks of the plot. Whatever you type is what the plan is built to, so no yard is left empty beyond it.</p>
-        </details>
-        <div class="info" id="plotinfo"></div>
-        <p class="formerr" id="formerr" role="alert" hidden></p>
-        <button class="btn primary" id="gen">Generate layouts</button>
-        <p class="fine" id="modelstat" aria-live="polite"></p>
+          <button class="btn primary" id="gen">Generate layouts</button>
+        </div>
       </div>
     </section>
 

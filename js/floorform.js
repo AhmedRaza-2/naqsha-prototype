@@ -60,7 +60,8 @@ function tick(floor, k, on, quiet = false) {
 function stepper(inst, key, dir) {
   const floor = floorOf(inst);
   if (floor === 'ground') {
-    if (key === 'beds') setVal('pb', Math.min(6, Math.max(1, +$('pb').value + dir)));
+    if (key === 'cars') setVal('pcars', Math.min(6, Math.max(1, Math.max(1, +$('pcars').value) + dir)));
+    else if (key === 'beds') setVal('pb', Math.min(6, Math.max(1, +$('pb').value + dir)));
     else setVal('pbaths', Math.min(+$('pb').value + 2, Math.max(+$('pb').value, +$('pbaths').value + dir)));
   } else if (key === 'beds') setVal('pup', Math.min(4, Math.max(1, +$('pup').value + dir)));
   else setVal('pupbaths', Math.min(+$('pup').value + 1, Math.max(+$('pup').value, +$('pupbaths').value + dir)));
@@ -91,16 +92,18 @@ function render(inst) {
     rooms = `<span class="pill fixed"><span>Family lounge</span></span>${room('drawing', 'Drawing room')}${room('terrace', 'Open terrace')}`;
   }
   const warn = [inst.note, ...a.msgs].filter(Boolean);
-  inst.host.innerHTML = `${tabs}<div class="ffbody"><div class="ffsteps">${step('beds', 'Bedrooms', cfg.beds)}${step('baths', 'Washrooms', cfg.baths)}</div>`
+  inst.host.innerHTML = `${tabs}<div class="ffbody"><div class="ffsteps">${step('beds', 'Bedrooms', cfg.beds)}${step('baths', 'Washrooms', cfg.baths)}${floor === 'ground' ? step('cars', 'Cars to park', Math.max(1, +$('pcars').value)) : ''}</div>`
     + `<div class="ffrooms">${rooms}</div>`
     + `<p class="ffspace">About ${a.space} sq ft of floor on this level. The rooms you chose take about ${a.want}.</p>`
     + `${warn.length ? `<p class="ffwarn" role="status">${warn.join(' ')}</p>` : ''}</div>`;
   inst.host.querySelectorAll('.sb').forEach((b) => {
     const k = b.closest('.step2').dataset.k, v = +b.dataset.d;
-    const lo = k === 'beds' ? 1 : cfg.beds, hi = k === 'beds' ? (floor === 'ground' ? 6 : 4) : cfg.beds + (floor === 'ground' ? 2 : 1), cur = k === 'beds' ? cfg.beds : cfg.baths;
+    const lo = k === 'cars' ? 1 : k === 'beds' ? 1 : cfg.beds, hi = k === 'cars' ? 6 : k === 'beds' ? (floor === 'ground' ? 6 : 4) : cfg.beds + (floor === 'ground' ? 2 : 1), cur = k === 'cars' ? Math.max(1, +$('pcars').value) : k === 'beds' ? cfg.beds : cfg.baths;
     b.disabled = v < 0 ? cur <= lo : cur >= hi;
   });
 }
 
 /** Redraw every copy of the form from the fields. Call after anything else sets the fields. */
-export function refreshForms() { instances.forEach(render); }
+const listeners = [];
+export const onFormChange = (fn) => listeners.push(fn);
+export function refreshForms() { instances.forEach(render); listeners.forEach((fn) => fn()); }
