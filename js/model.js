@@ -144,8 +144,9 @@ export async function knowsStyles() {
 async function sample(request, styles, { temperature = 0.8, maxNew = 170 } = {}, onStatus) {
   await load();                                                     // the prompt depends on the loaded vocabulary
   const groups = new Map();
-  styles.forEach((st) => {
-    const prompt = requestText(request, st);
+  styles.forEach((ent) => {
+    const st = ent && typeof ent === 'object' ? ent.style : ent;                  // an entry may also carry its own FOCUS, to draw different arrangements
+    const prompt = requestText(ent && typeof ent === 'object' && ent.focus ? { ...request, focus: ent.focus } : request, st);
     const ids = [vocab.bos, ...encode(prompt), vocab.nl];
     const key = ids.length;
     if (!groups.has(key)) groups.set(key, []);
@@ -240,7 +241,10 @@ export function cramped(rects) {
 
 export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, exclude = new Set(), onStatus, styles = [null], keep = () => true, hang = null, embed = null, drafts: given = null } = {}) {
   const per = Math.max(1, Math.round(n / styles.length));
-  const want = styles.flatMap((st) => new Array(per).fill(st));
+  // when no bigger room was asked for, the drafts are drawn with different emphasis (balanced, big lounge, big kitchen, big bedrooms): different arrangements, not one house three times
+  const FOCI = ['balanced', 'lounge', 'kitchen', 'bedrooms'];
+  const spread = !request.floor && (request.focus == null || request.focus === 'balanced');
+  const want = styles.flatMap((st) => new Array(per).fill(st)).map((st, i) => (spread ? { style: st, focus: FOCI[i % FOCI.length] } : st));
   const drafts = given || await sample(request, want, { temperature }, onStatus);        // `given`: drafts sampled earlier, shared by several calls
   const seen = new Set(exclude);
   const good = [];
@@ -289,8 +293,8 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
     const rest = good.filter((g) => !picked.includes(g));
     if (!rest.length) break;
     const roomy = Math.min(...rest.filter((g) => g.score >= rest[0].score - 0.05).map((g) => g.cramp));
-    const near = rest.filter((g) => g.score >= rest[0].score - 0.05 && g.cramp <= roomy + 0.25);      // not much more cramped than the roomiest of them
-    const apart = (g) => Math.min(...picked.map((p) => layoutDistance(g, p)));
+    const near = rest.filter((g) => g.score >= rest[0].score - 0.05 && g.cramp <= roomy + 0.35);      // not much more cramped than the roomiest of them
+    const apart = (g) => Math.min(...picked.map((p) => sigDistance(g, p) + 0.5 * layoutDistance(g, p)));     // where the stairs, entrance, kitchen ... stand matters most
     picked.push(picked.length ? near.reduce((a, b) => (apart(b) > apart(a) ? b : a)) : near[0]);
   }
   // the picked plans: rooms grown toward the sizes of real Pakistani plans, without losing any rule the plan passes
@@ -330,6 +334,35 @@ function gridOf(item) {
 }
 
 /** Share of the plot where two plans put a different kind of room, the smaller of as drawn and mirrored. */
+/** How differently two plans arrange the rooms that decide how a house feels: where the stairs, the entrance, the kitchen, the drawing room,
+ *  the lounge, the car porch and the master bedroom stand (a mirror image counts as the same), and which of them exist. 0 = same, about 1 = very different. */
+const KEY_ROOMS = ['stairs', 'kitchen', 'drawing', 'lounge', 'lobby', 'porch', 'master', 'dining'];
+function arrangement(item) {
+  const { w: W, d: D } = item.plan.plot, out = {};
+  for (const t of KEY_ROOMS) {
+    const rs = item.rects.filter((r) => r.t === t && r.parent === undefined);
+    if (!rs.length) continue;
+    const a = rs.reduce((s, r) => s + r.w * r.d, 0);
+    out[t] = [rs.reduce((s, r) => s + (r.x + r.w / 2) * r.w * r.d, 0) / a / W, rs.reduce((s, r) => s + (r.y + r.d / 2) * r.w * r.d, 0) / a / D];
+  }
+  return out;
+}
+function sigDistance(a, b) {
+  const A = a.__arr || (a.__arr = arrangement(a)), B = b.__arr || (b.__arr = arrangement(b));
+  const dist = (flip) => {
+    let s = 0, n = 0;
+    for (const t of KEY_ROOMS) {
+      if (!A[t] && !B[t]) continue;
+      n++;
+      if (!A[t] || !B[t]) { s += 0.7; continue; }                       // one has the room, the other does not
+      const bx = flip ? 1 - B[t][0] : B[t][0];
+      s += Math.hypot(A[t][0] - bx, A[t][1] - B[t][1]);
+    }
+    return n ? s / n : 0;
+  };
+  return Math.min(dist(false), dist(true));
+}
+
 function layoutDistance(a, b) {
   const A = gridOf(a), B = gridOf(b);
   if (A.W !== B.W || A.D !== B.D) return 1;

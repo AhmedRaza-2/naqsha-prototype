@@ -644,3 +644,9 @@ footer { color: var(--ink-soft); }
 .quick.listening .btn.mic { background: var(--err); border-color: var(--err); color: #fff; }
 :root[data-theme="dark"] .quick.listening .btn.mic { color: #1a0d0a; }
 .btn.mic.on svg { animation: micpulse 1.1s ease-in-out infinite; }
+
+/* the door prompt: appears when a door is in front of you */
+.doorprompt { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 12; display: inline-flex; align-items: center; gap: 10px; padding: 9px 16px 9px 10px; border-radius: 12px; border: 1px solid rgb(255 255 255 / 0.18); background: rgb(14 21 27 / 0.78); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: #eaf0f3; font: 500 0.95rem var(--font-sans); cursor: pointer; box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.6); }
+.doorprompt:hover { background: rgb(14 21 27 / 0.92); }
+.doorprompt[hidden] { display: none; }
+.doorprompt kbd { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 7px; background: #eaf0f3; color: #111d27; font: 700 0.85rem var(--font-mono); }

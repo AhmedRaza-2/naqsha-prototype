@@ -491,7 +491,7 @@ async function generate(regen, btnId) {
       btn.textContent = String(msg).replace(m[0], `(${shownPct}%)`);
     };
     const draft = (prefs) => modelLayouts(S.plot, prefs, status,
-      { exclude: regen ? S.seen : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12 });
+      { exclude: regen ? S.seen : new Set(), temperature: regen ? 0.95 : 0.85, n: regen ? 24 : 18 });
     layouts = await draft(S.prefs);
     // nothing valid for the exact request: ask the model again with fewer preferences, and say which one was dropped
     const { beds, baths, focus, porch, family = 'any' } = S.prefs;
@@ -520,7 +520,10 @@ async function generate(regen, btnId) {
     // the visitor's own open space leaves no room for what they asked: keep the bedrooms, use the standard open space, and say so
     if (S.prefs.setbacks && Object.keys(S.prefs.setbacks).length) relax.unshift([{ ...S.prefs, setbacks: null },
       `The open space you asked for leaves no room for ${beds} bedroom${beds > 1 ? 's' : ''} on this plot, so these layouts use the standard open space instead.`]);
-    const perfect = (ls) => ls.some((L) => L.score === L.checks.length);
+    // the visitor's own open space may push the built area over the usual coverage limit, or put a wall on the boundary (no window there): that is their choice, so it does not count against a layout
+    const ownOpen = !!(S.prefs.setbacks && Object.keys(S.prefs.setbacks).length);
+    const passes = (L) => L.checks.every((c) => c.level === 'ok' || (ownOpen && /coverage|natural light|ventilation/i.test(c.title)));
+    const perfect = (ls) => ls.some(passes);
     for (const [prefs, note] of relax) {
       // a two-storey ground floor must pass every rule (the first floor is drafted over it): a near miss is not kept
       // while a step down (a bedroom fewer here, which can go upstairs) still might pass
@@ -556,7 +559,7 @@ async function generate(regen, btnId) {
   }
   layouts.forEach((L) => S.seen.add(L.text));
   // none passes every rule: say so plainly, and point to the fix (two floors hold more bedrooms on the same plot)
-  if (layouts.every((L) => L.score < L.checks.length)) {
+  if (layouts.every((L) => !L.checks.every((c) => c.level === 'ok' || (S.prefs.setbacks && Object.keys(S.prefs.setbacks).length && /coverage|natural light|ventilation/i.test(c.title))))) {
     const two = S.prefs.storeys !== 2 && knowsStoreysNow;
     S.note = `${S.note ? `${S.note} ` : ''}None of these passes every rule (see the rule check of each layout).${two ? ` ${S.beds} bedrooms are tight on one floor of ${S.plot.w} x ${S.plot.d} ft: choose 2 floors to fit them.` : ' Try fewer bedrooms or washrooms.'}`;
   }
@@ -573,10 +576,10 @@ function readPrefs() {
   const omit = [...new Set([...document.querySelectorAll('input[name=omit]:checked')].map((c) => c.value).concat(['store', 'study']))];
   return { beds: +$('pb').value, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, cars: +$('pcars').value, family: $('pfamily').value,
     setbacks: Object.keys(setbacks).length ? setbacks : null, entrance: $('pentr').value, stairs: $('pstairs').value,
-    lawn: $('plawn').value, omit,
+    lawn: $('plawn').value, omit, guestBath: $('pgbath').value,
     storeys: floors(), upBeds: +$('pup').value, upBaths: +$('pupbaths').value, terrace: $('pterr').value, upDrawing: $('pupdraw').value === 'yes' };
 }
-const GROUND = ['beds', 'baths', 'focus', 'porch', 'cars', 'family', 'setbacks', 'entrance', 'stairs', 'lawn', 'omit', 'storeys'];
+const GROUND = ['beds', 'baths', 'focus', 'porch', 'cars', 'family', 'setbacks', 'entrance', 'stairs', 'lawn', 'omit', 'storeys', 'guestBath'];
 const FIRST = ['upBeds', 'upBaths', 'terrace', 'upDrawing'];
 const same = (a, b, keys) => keys.every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k]));
 
@@ -1044,8 +1047,8 @@ $('dl').onclick = downloadSheet;
 
 // ---------- step 4 ----------
 const VIEW_HINT = {
-  walk: 'Drag to look. W/A/S/D or arrows to move, Shift to run, scroll to zoom. Click a door or press F to open and close it.',
-  follow: 'You are the visitor: W/A/S/D to walk, drag to turn the camera. Click a door or press F to open and close it.',
+  walk: 'Drag to look. W/A/S/D or arrows to move, Shift to run. Every door and the gate start shut: walk up to one and press F (or click it) to open or close it.',
+  follow: 'You are the visitor: W/A/S/D to walk, drag to turn the camera. Doors and the gate start shut: press F near one (or click it) to open or close it.',
   tour: 'A guided tour: the visitor walks through every room. Pick another view to take over.',
   orbit: 'Drag to orbit, scroll to zoom, right-drag to pan.',
   top: 'Looking straight down. Scroll to zoom, right-drag to pan.',
@@ -1058,8 +1061,8 @@ function openViewer() {
   $('vfloor').hidden = !S.up;
   $('vfloor').textContent = 'Go upstairs';
   $('vview').value = 'walk';
-  $('vdoors').textContent = 'Close doors';
-  let doorsOpen = true, carNote = '';
+  $('vdoors').textContent = 'Open all doors';
+  let doorsOpen = false, carNote = '';
   S.viewer = createViewer($('vhost'), S.sel, S.style, {
     onRoom: (n) => ($('hudroom').textContent = n),
     onCars: (c) => { carNote = c && c.want > c.inside + c.outside ? `Only ${c.inside + c.outside} of ${c.want} cars could be parked.` : c && c.outside ? `${c.inside} car${c.inside === 1 ? '' : 's'} inside the plot, ${c.outside} on the footpath outside the gate.` : ''; $('hudhint').textContent = (carNote ? carNote + ' ' : '') + (VIEW_HINT[S.viewer ? S.viewer.mode : 'walk'] || ''); },
@@ -1068,7 +1071,10 @@ function openViewer() {
     onRoomStop: (n) => ($('hudroom').textContent = n),
     onNearDoor: (d) => {
       const base = (carNote ? carNote + ' ' : '') + VIEW_HINT[S.viewer ? S.viewer.mode : 'walk'];
-      $('hudhint').textContent = d && S.viewer && ['walk', 'follow'].includes(S.viewer.mode) ? `${d.open ? 'Press F to close' : 'Press F to open'} the door. ${base}` : base;
+      $('hudhint').textContent = base;
+      const show = !!(d && S.viewer && ['walk', 'follow'].includes(S.viewer.mode));
+      $('doorprompt').hidden = !show;
+      if (show) $('doorprompttxt').textContent = `${d.open ? 'Close' : 'Open'} ${d.label}`;
     },
     onMode: (mode, roof) => {
       $('vview').value = mode;
@@ -1097,7 +1103,8 @@ function openViewer() {
   $('vview').onchange = () => { const m = $('vview').value; if (m === 'tour') v.startTour(); else v.setMode(m); };
   $('vcut').value = 'all';
   $('vcut').onchange = () => v.setCutaway($('vcut').value);
-  $('vdoors').onclick = () => { doorsOpen = !doorsOpen; v.setAllDoors(doorsOpen); $('vdoors').textContent = doorsOpen ? 'Close doors' : 'Open doors'; };
+  $('vdoors').onclick = () => { doorsOpen = !doorsOpen; v.setAllDoors(doorsOpen); $('vdoors').textContent = doorsOpen ? 'Close all doors' : 'Open all doors'; };
+  $('doorprompt').onclick = () => v.toggleNearestDoor();
 }
 $('to4').onclick = openViewer;
 $('vcolors').onclick = () => { const p = $('vpalette'); p.hidden = !p.hidden; $('vcolors').setAttribute('aria-expanded', String(!p.hidden)); };

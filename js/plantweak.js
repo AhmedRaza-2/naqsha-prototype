@@ -202,39 +202,159 @@ export function outsetFor(W, D, own) {
   return { w, d, l: cut.s, r: cut.s, f: cut.f, b: cut.r };
 }
 
-/** Trim the outer open strips of a tree plan drawn for the bigger plot, so it fits the real plot (W x D). Throws when a strip is too thin. */
-export function trimGround(plan, W, D, o) {
+/**
+ * The visitor's own open space on any mix of sides: more than the standard in front, less on the sides, and so on. The model draws a
+ * plot of a different size (smaller where open space is added, bigger where it is taken away) and the drawing is then trimmed and/or
+ * wrapped so that every side ends up at exactly the distance asked. -> { w, d, es, ef, er } (the inner plot; the extra open space per
+ * side, negative where open space is taken away) or null when nothing differs from the standard or no such plot can be drawn.
+ */
+export function reshapeFor(W, D, own) {
+  if (!own) return null;
+  const want = (k) => (Number.isFinite(own[k]) ? own[k] : null);
+  if (!['side', 'front', 'rear'].some((k) => want(k) != null)) return null;
+  let w = W, d = D, es = 0, ef = 0, er = 0;
+  const seen = new Set();
+  for (let i = 0; i < 8; i++) {
+    const rl = ruleFor(w, d);
+    es = want('side') != null ? want('side') - rl.side : 0;
+    ef = want('front') != null ? want('front') - rl.front : 0;
+    er = want('rear') != null ? want('rear') - rl.rear : 0;
+    const nw = Math.round(W - 2 * es), nd = Math.round(D - ef - er);
+    if (nw === w && nd === d) break;
+    const key = nw + 'x' + nd;
+    if (seen.has(key)) break;                                          // the size class flips back and forth: settle on this one
+    seen.add(key);
+    w = nw; d = nd;
+  }
+  const rl = ruleFor(w, d);
+  es = want('side') != null ? want('side') - rl.side : 0;
+  ef = want('front') != null ? want('front') - rl.front : 0;
+  er = want('rear') != null ? want('rear') - rl.rear : 0;
+  if (Math.abs(es) < 0.01 && Math.abs(ef) < 0.01 && Math.abs(er) < 0.01 && w === W && d === D) return null;
+  if (Math.abs(W - 2 * es - w) > 0.51 || Math.abs(D - ef - er - d) > 0.51) return null;        // does not close: leave it to the checker
+  if (w < 18 || d < 30) return null;
+  return { w, d, es, ef, er };
+}
+
+/** How much open space a tree plan really leaves round its built box: { l, r, f, b } (the model does not always draw the standard). */
+function marginsOf(plan) {
+  const built = rooms(plan).filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
+  if (!built.length) return null;
+  return {
+    l: Math.min(...built.map((r) => r.x)), r: plan.plot.w - Math.max(...built.map((r) => r.x + r.w)),
+    f: Math.min(...built.map((r) => r.y)), b: plan.plot.d - Math.max(...built.map((r) => r.y + r.d)),
+  };
+}
+
+/** Make a tree plan wider or deeper by `amt` (negative: narrower) by growing (shrinking) the biggest room of every row, never the open strips. */
+function stretch(plan, axis, amt) {
+  if (Math.abs(amt) < 0.01) return;
+  const builtKid = (n) => (n.k === 'room' ? !OPEN.has(n.t) && n.t !== 'bath' : n.kids.some(builtKid));
+  const go = (node, total) => {
+    if (node.k === 'room') return;
+    const along = (node.k === 'V') === (axis === 'x');
+    const sizes = [...node.sizes, total - node.sizes.reduce((a, v) => a + v, 0)], last = node.kids.length - 1;
+    if (!along) {                                                       // across: every part spans the whole extent, so every part stretches
+      node.kids.forEach((k, i) => go(k, total + amt));
+      return;
+    }
+    const hasB = node.kids.some(builtKid);
+    const cand = sizes.map((_, i) => i).filter((i) => (hasB ? builtKid(node.kids[i]) : true));
+    const idx = cand.reduce((a, i) => (sizes[i] > sizes[a] ? i : a), cand[0]);
+    if (idx < last) node.sizes[idx] = Math.round((node.sizes[idx] + amt) * 100) / 100;
+    go(node.kids[idx], sizes[idx] + amt);
+  };
+  go(plan.tree, axis === 'x' ? plan.plot.w : plan.plot.d);
+}
+
+/**
+ * Draw a plan made for the inner plot of reshapeFor onto the real plot W x D. Every side the visitor named is set to exactly the open
+ * space asked for, judged from what the plan really leaves (not the standard): open space that is too much is trimmed off, open space that
+ * is too little is wrapped round, and whatever is left over in the plot size is taken up by the rooms. own: { side, front, rear } in feet.
+ */
+export function applyReshape(plan, W, D, rs, own) {
+  const want = (k) => (Number.isFinite(own && own[k]) ? own[k] : null);
+  const m = marginsOf(plan);
+  if (!m) return plan;
+  const target = { l: want('side'), r: want('side'), f: want('front'), b: want('rear') };
+  const dl = {};
+  for (const k of ['l', 'r', 'f', 'b']) dl[k] = target[k] == null ? 0 : Math.round((target[k] - m[k]) * 2) / 2;
+  const cut = { l: Math.max(0, -dl.l), r: Math.max(0, -dl.r), f: Math.max(0, -dl.f), b: Math.max(0, -dl.b) };
+  const add = { l: Math.max(0, dl.l), r: Math.max(0, dl.r), f: Math.max(0, dl.f), b: Math.max(0, dl.b) };
+  let q = plan;
+  const w0 = plan.plot.w, d0 = plan.plot.d;
+  if (cut.l + cut.r + cut.f + cut.b > 0.001) q = trimGround(q, w0 - cut.l - cut.r, d0 - cut.f - cut.b, { w: w0, d: d0, ...cut }, true);
+  const w1 = q.plot.w, d1 = q.plot.d;
+  // a little too big for the plot: the open space that was asked for in addition gives up to a foot or two rather than squeezing the rooms
+  for (const [axis, sides, over] of [['x', ['l', 'r'], w1 + add.l + add.r - W], ['y', ['f', 'b'], d1 + add.f + add.b - D]]) {
+    let left = Math.min(over, 2);
+    for (const k of sides) { const t = Math.min(left, add[k]); if (t > 0) { add[k] -= t; left -= t; } }
+  }
+  if (add.l + add.r + add.f + add.b > 0.001) q = wrapGround(q, w1 + add.l + add.r, d1 + add.f + add.b, { w: w1, d: d1, l: add.l, r: add.r, f: add.f, b: add.b });
+  const mw = q.plot.w - W, md = q.plot.d - D;
+  if (Math.abs(mw) > 4.01 || Math.abs(md) > 4.01) throw new Error('size mismatch');
+  q = clone(q);
+  stretch(q, 'x', -mw);
+  stretch(q, 'y', -md);
+  q.plot = { w: W, d: D };
+  return q;
+}
+
+/**
+ * Trim the outer open strips of a tree plan drawn for a bigger plot, so it fits the real plot (W x D). o: { w, d } the size it was
+ * drawn for, { l, r, f, b } how much open space goes from the left, right, front and back. Every row (or column) gives the amount up from
+ * its own open strips (void or lawn), the one at the edge first; a strip that is used up is taken out. The front row, which holds the car
+ * porch, may also get shallower down to 9.5 ft. Throws when a side has nothing to give (the caller then skips that draft).
+ */
+export function trimGround(plan, W, D, o, lenient = false) {
   if (!plan.tree) return plan;
   const p = clone(plan);
-  const strip = (n) => n.k === 'room' && (n.t === 'void' || n.t === 'lawn');
-  const walk = (node, cl, cr, cf, cb) => {
-    if (cl + cr + cf + cb < 0.001) return;
-    if (node.k === 'room') throw new Error('no strip to trim');
-    const vert = node.k === 'V', last = node.kids.length - 1;
-    const [a, z] = vert ? [cl, cr] : [cf, cb], [oa, oz] = vert ? [cf, cb] : [cl, cr];
-    const total = (vert ? p.__w : p.__d);
-    const sz = (i) => (i < last ? node.sizes[i] : total - node.sizes.reduce((s, v) => s + v, 0));
-    let ra = a, rz = z;
-    if (ra > 0 && strip(node.kids[0])) { if (sz(0) - ra < 0.5) throw new Error('strip too thin'); node.sizes[0] -= ra; ra = 0; }
-    if (rz > 0 && strip(node.kids[last])) { if (sz(last) - rz < 0.5) throw new Error('strip too thin'); rz = 0; }
-    const mid = node.kids.map((k, i) => i).filter((i) => !strip(node.kids[i]));
-    const need = ra + rz + oa + oz;
-    if (need < 0.001) return;
-    if (mid.length !== 1) throw new Error('cannot trim');
-    const j = mid[0], cut = ra + rz;
-    if (cut > 0 && j < last) node.sizes[j] -= cut;
-    const saveW = p.__w, saveD = p.__d;
-    if (vert) p.__w = saveW - (a - ra) - (z - rz) - cut; else p.__d = saveD - (a - ra) - (z - rz) - cut;
-    const kidArgs = vert ? [ra, rz, oa, oz] : [oa, oz, ra, rz];
-    // the kid spans the (reduced) extent along this node's axis, and the full extent across it
-    const w2 = vert ? saveW - (a - ra) - (z - rz) - cut : saveW, d2 = vert ? saveD : saveD - (a - ra) - (z - rz) - cut;
-    p.__w = w2; p.__d = d2;
-    walk(node.kids[j], ...kidArgs);
-    p.__w = saveW; p.__d = saveD;
+  const EPS = 0.05;
+  const isStrip = (n) => n.k === 'room' && (n.t === 'void' || n.t === 'lawn');
+  const allStrip = (n) => isStrip(n) || (n.k !== 'room' && n.kids.every(allStrip));
+  const allOpen = (n) => (n.k === 'room' ? n.t === 'void' || n.t === 'lawn' || n.t === 'porch' : n.kids.every(allOpen));
+  const hasPorch = (n) => (n.k === 'room' ? n.t === 'porch' : n.kids.some(hasPorch));
+  const sizesOf = (node, total) => [...node.sizes, total - node.sizes.reduce((a, v) => a + v, 0)];
+  /** Take `amt` along the split axis of `node` (total = its extent along it) from its strips: the edge one first. */
+  const cutAlong = (node, side, amt, total) => {
+    let left = amt;
+    const start = side === 'l' || side === 'f';
+    for (let guard = 0; guard < 12 && left > EPS; guard++) {
+      const n = node.kids.length, sz = sizesOf(node, total);
+      const order = [...node.kids.keys()].sort((x, y) => (start ? x - y : y - x));
+      let idx = order.find((i) => allStrip(node.kids[i]) && sz[i] > EPS);
+      let floor = 0;
+      if (idx === undefined) {                                           // no strip: the front row of open space and the car porch may get shallower
+        idx = order.find((i) => (side === 'f' || side === 'b') && allOpen(node.kids[i]) && sz[i] - (hasPorch(node.kids[i]) ? 9.5 : 0.5) > EPS);
+        if (idx === undefined) { if (lenient && (side === 'f' || side === 'b')) break; throw new Error('cannot trim'); }
+        floor = hasPorch(node.kids[idx]) ? 9.5 : 0.5;
+      }
+      const take = Math.min(left, sz[idx] - floor);
+      const last = n - 1;
+      if (floor === 0 && sz[idx] - take < EPS) {                         // the strip is used up: take it out
+        if (idx === last) { node.kids.pop(); node.sizes.pop(); } else { node.kids.splice(idx, 1); node.sizes.splice(idx, 1); }
+      } else if (idx < last) node.sizes[idx] = Math.round((node.sizes[idx] - take) * 100) / 100;
+      total -= take; left -= take;
+    }
+    if (left > EPS && !lenient) throw new Error('strip too thin');
   };
-  p.__w = o.w; p.__d = o.d;
-  walk(p.tree, o.l, o.r, o.f, o.b);
-  delete p.__w; delete p.__d;
+  /** Take `amt` off one side of `node` (W x D now). */
+  const trimSide = (node, side, amt, w, d) => {
+    if (amt < EPS) return;
+    if (node.k === 'room') { if (!isStrip(node)) throw new Error('cannot trim'); return; }   // a strip leaf shrinks with the parent
+    const alongX = side === 'l' || side === 'r';
+    if ((node.k === 'V') === alongX) { cutAlong(node, side, amt, alongX ? w : d); return; }
+    const sz = sizesOf(node, node.k === 'V' ? w : d);                  // across the split axis: every part spans the whole side
+    node.kids.forEach((k, i) => (node.k === 'V' ? trimSide(k, side, amt, sz[i], d) : trimSide(k, side, amt, w, sz[i])));
+  };
+  let w = o.w, d = o.d;
+  try {
+    for (const [side, amt] of [['l', o.l], ['r', o.r], ['f', o.f], ['b', o.b]]) {
+      trimSide(p.tree, side, amt, w, d);
+      if (side === 'l' || side === 'r') w -= amt; else d -= amt;
+    }
+  } catch (e) { if (typeof window !== 'undefined' && window.__S) console.log('[trim tree]', e.message, JSON.stringify(plan.tree)); throw e; }
+  p.tree = collapse(p.tree);
   p.plot = { w: W, d: D };
   return p;
 }
@@ -305,7 +425,7 @@ export function standardStairs(plan) {
   const wide = f.w >= f.d ? 'V' : 'H';                               // the stair runs along its longer side; the other is its width
   const [short, long] = wide === 'V' ? [f.d, f.w] : [f.w, f.d];
   const shortAxis = wide === 'V' ? 'H' : 'V', longAxis = wide === 'V' ? 'V' : 'H';
-  if (long >= 14 && short > 4) resizeLeaf(p, f, shortAxis, 4);
+  if (long >= 9 && short > 4) resizeLeaf(p, f, shortAxis, 4);        // a stair room is 4 ft wide at most (the model sometimes draws one 7 or 8 ft wide)
   if (long > 18) {
     const g = locate(p, (n) => n.t === 'stairs');
     resizeLeaf(p, g, longAxis, 17.5);
@@ -331,6 +451,15 @@ function collapse(node) {
   if (node.k === 'room') return node;
   node.kids = node.kids.map(collapse);
   return node.kids.length === 1 ? node.kids[0] : node;
+}
+/** No washroom in the drawing room: it is taken out and the drawing room keeps the whole space. */
+export function dropGuestBath(plan) {
+  if (!plan.tree) return plan;
+  const p = clone(plan);
+  const f = locate(p, (n) => n.t === 'drawing' && n.bath);
+  if (!f) return plan;
+  delete f.leaf.bath;
+  return p;
 }
 /** Leave a room out: its neighbour (a room before an open strip, never the stairs) takes its space. Returns the plan unchanged when there is no such room. */
 export function dropRoom(plan, type) {

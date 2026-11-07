@@ -5,7 +5,7 @@ import { toRects as treeRects, check as treeCheck } from './tree.js';
 import { finalize, ruleFor } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
 import { tidyRects } from './tidy.js';
-import { balconyRoom, insetFor, wrapGround, dropTerrace, outsetFor, trimGround, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox } from './plantweak.js';
+import { balconyRoom, reshapeFor, applyReshape, dropTerrace, dropGuestBath, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox } from './plantweak.js';
 import { draftPlans, sampleDrafts, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -135,7 +135,7 @@ export function familiesFor(plot, beds) {
 }
 
 export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
-  const { porch = 'any', cars = 0, family = 'any', setbacks = null, entrance = 'auto', stairs = 'auto', omit = [], lawn = 'yes', upDrawing, ...request } = prefs;
+  const { porch = 'any', cars = 0, family = 'any', setbacks = null, entrance = 'auto', stairs = 'auto', omit = [], lawn = 'yes', upDrawing, guestBath = 'yes', ...request } = prefs;
   const marla = (plot.w * plot.d) / MARLA_SQFT;
   // the visitor's own front / back / side open space (only the ones they filled in), judged by the rule checker instead of the standard
   if (setbacks && Object.keys(setbacks).length) request.rule = Object.fromEntries(Object.entries(setbacks).filter(([, v]) => Number.isFinite(v)));
@@ -147,9 +147,8 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
   const wantPorch = porch === 'any' ? null : porch === 'yes';
   // a model trained on layout families drafts each family that fits, so the three layouts differ in arrangement
   // more open space than the standard on a side: the model draws a smaller plot and the drawing is wrapped in the extra strips
-  const ins = request.rule && !request.floor ? insetFor(plot.w, plot.d, request.rule) : null;
-  const outs = request.rule && !request.floor && !ins ? outsetFor(plot.w, plot.d, request.rule) : null;      // less open space than the standard
-  const inner = ins ? { w: ins.w, d: ins.d } : outs ? { w: outs.w, d: outs.d } : plot;
+  const rsh = request.rule && !request.floor ? reshapeFor(plot.w, plot.d, request.rule) : null;      // the visitor's own open space on any mix of sides
+  const inner = rsh ? { w: rsh.w, d: rsh.d } : plot;
   const styles = (await knowsStyles()) ? (family !== 'any' ? [family] : familiesFor(inner, request.beds)) : [null];
   const hasPorch = (it) => it.rects.some((r) => r.t === 'porch' || r.t === 'garage');
   const keep = (it) => (wantPorch === null || hasPorch(it) === wantPorch) && (family === 'any' || !it.style || it.style === family);
@@ -157,9 +156,10 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
     n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles, keep,
     // a ground floor leaves the model with standard stairs (3.5-4 ft wide, 15-18 ft long) and a car porch as wide as the cars asked for
     embed: request.floor ? null : (p) => {
-      let q = ins ? wrapGround(p, plot.w, plot.d, ins) : outs ? trimGround(p, plot.w, plot.d, outs) : p;
+      let q = rsh ? applyReshape(p, plot.w, plot.d, rsh, request.rule) : p;
       q = standardStairs(q);
       for (const t of omit) q = dropRoom(q, t);                      // rooms the visitor chose to leave out (dining, drawing room ...)
+      if (guestBath === 'no') q = dropGuestBath(q);                  // no washroom in the drawing room
       if (lawn === 'no') q = lawnToPorch(q);                          // no lawn: the front strip is all car porch
       return cars > 0 ? sizePorch(q, cars) : q;
     },

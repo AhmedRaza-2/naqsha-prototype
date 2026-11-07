@@ -147,6 +147,7 @@
           <select id="pupdraw"><option value="no" selected>no</option><option value="yes">yes</option></select>
           <select id="pporch"><option value="yes" selected>yes</option><option value="any">any</option><option value="no">no</option></select>
           <select id="pcars"><option value="0" selected>Standard (1 car)</option><option value="1">1 car</option><option value="2">2 cars</option><option value="3">3 cars</option><option value="4">4 cars</option><option value="5">5 cars</option><option value="6">6 cars</option></select>
+          <select id="pgbath"><option value="yes" selected>yes</option><option value="no">no</option></select>
           <select id="popenk"><option value="no" selected>no</option><option value="yes">yes</option></select>
           <select id="pbaths"></select>
           <input type="checkbox" name="omit" value="dining"><input type="checkbox" name="omit" value="drawing"><input type="checkbox" name="omit" value="lounge">
@@ -283,12 +284,13 @@
         <select id="vcut" aria-label="Floors shown"><option value="all">Whole house</option><option value="ground">Ground floor</option><option value="first">First floor</option></select>
       </label>
       <button class="btn sm" id="vfloor" hidden>Go upstairs</button>
-      <button class="btn sm" id="vdoors">Close doors</button>
+      <button class="btn sm" id="vdoors">Open all doors</button>
       <button class="btn sm" id="vcolors" aria-expanded="false">Colours</button>
       <button class="btn sm" id="vroof">Hide roof</button>
       <button class="btn sm" id="vreset">Reset</button>
       <button class="btn sm" id="vback">Exit</button>
     </div>
+    <button type="button" class="doorprompt" id="doorprompt" hidden><kbd>F</kbd><span id="doorprompttxt"></span></button>
     <div class="hud palette" id="vpalette" hidden>
       <div class="swrow"><span class="swlabel">House walls</span><div class="sw" id="vswwall"></div></div>
       <div class="swrow"><span class="swlabel">Walls inside</span><div class="sw" id="vswint"></div></div>
@@ -303,7 +305,7 @@
       <div class="swrow">
         <label class="mini">Car in the porch<select id="vcar"><option value="ferrari">Show a car</option><option value="none">No car</option></select></label>
         <label class="mini">Car colour<select id="vcarc"><option value="white">White</option><option value="silver">Silver</option><option value="black">Black</option><option value="graphite">Graphite</option><option value="maroon">Maroon</option><option value="navy">Navy</option><option value="red">Red</option></select></label></div>
-      <div class="swrow"><label class="mini wide">How wide you see<input type="range" id="vfov" min="40" max="100" value="70"></label></div>
+      <div class="swrow"><label class="mini wide">How wide you see<input type="range" id="vfov" min="45" max="90" value="70"></label></div>
     </div>
   </div>
 

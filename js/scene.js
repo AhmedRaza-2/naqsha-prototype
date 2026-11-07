@@ -192,7 +192,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const mDoorOpen = new Set();
   const world = new THREE.Group(); scene.add(world);
   const roofG = new THREE.Group(); world.add(roofG);
-  const colliders = [], upperColliders = [];
+  const colliders = [], upperColliders = [], roofColliders = [];      // roofColliders: the stair-head room and the open roof above the top floor
   const furnReady = [];                                            // furniture models arrive after the walls: the house is usable at once
   const doorList = [], storeyG = [], floorMeshes = [];             // swing doors, the group of each storey, floors (for live colour changes)
   let curColl = colliders;                                         // where wall boxes register their collision (the storey being built)
@@ -264,8 +264,12 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   };
   cwall(0, gateLo, -cw / 2, cw / 2);
   cwall(gateHi, W, -cw / 2, cw / 2);
-  cwall(0, W, D - cw / 2, D + cw / 2);
-  if (rule.side > 0) { cwall(-cw / 2, cw / 2, 0, D); cwall(W - cw / 2, W + cw / 2, 0, D); }
+  // the boundary walls on the sides and at the back are always built; where the house itself stands on the boundary (no open space asked for there) its wall is the boundary
+  const hugL = B.x < 0.5, hugR = B.x + B.w > W - 0.5, hugB = B.z + B.d > D - 0.5;
+  const sideWall = (x0, x1, hug) => { if (hug) { cwall(x0, x1, 0, B.z); cwall(x0, x1, B.z + B.d, D); } else cwall(x0, x1, 0, D); };
+  if (hugB) { cwall(0, B.x, D - cw / 2, D + cw / 2); cwall(B.x + B.w, W, D - cw / 2, D + cw / 2); } else cwall(0, W, D - cw / 2, D + cw / 2);
+  sideWall(-cw / 2, cw / 2, hugL);
+  sideWall(W - cw / 2, W + cw / 2, hugR);
   if (site.wall !== 'none') [gateLo - 0.4, gateHi + 0.4].forEach((x) => { box(world, x - 0.7, x + 0.7, 0, Math.max(6, ch + 1.5), -0.75, 0.75, mStone, true); box(world, x - 0.85, x + 0.85, Math.max(6, ch + 1.5), Math.max(6, ch + 1.5) + 0.4, -0.9, 0.9, mTrim); });
   if (site.wall !== 'none') {                                       // the gate: a sliding leaf parked beside the gateway, or two swing leaves; it opens and closes like the doors
     const gw = gateHi - gateLo, gh = Math.max(5.3, ch + 0.8);
@@ -274,7 +278,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       for (let x = g0 + 0.25; x < g1; x += 0.45) box(parent, x - 0.04, x + 0.04, 0.2, gh, z0 + 0.03, z1 - 0.03, mGrill, false);
     };
     const gateDoor = (d) => {
-      Object.assign(d, { t: 1, target: 1, upper: false, dy: 0, name: 'Main gate', main: false, z: 0.4 });
+      Object.assign(d, { t: 0, target: 0, upper: false, dy: 0, name: 'Main gate', gate: true, main: false, z: 0.4 });
       d.col.door = d; d.col.k = 'door';
       (d.kind === 'swing' ? d.mesh : d.slide).traverse((q) => { q.userData.door = d; });
       colliders.push(d.col); doorList.push(d);
@@ -285,7 +289,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         const mesh = new THREE.Group(); pivot.add(mesh);
         const x0 = dir > 0 ? 0.05 : -gw / 2 + 0.1, x1 = dir > 0 ? gw / 2 - 0.1 : -0.05;
         leaf(mesh, x0, x1, -0.08, 0.08);
-        pivot.rotation.y = open;
+        pivot.rotation.y = 0;                                         // shut until the visitor opens it
         gateDoor({ kind: 'swing', pivot, open, mesh, x: hx + dir * gw / 4, col: { x0: Math.min(hx, hx + dir * (gw / 2 - 0.1)), x1: Math.max(hx, hx + dir * (gw / 2 - 0.1)), z0: 0.1, z1: 0.7 } });
       });
     } else {
@@ -293,7 +297,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       const slide = new THREE.Group(); world.add(slide);
       leaf(slide, gateLo, gateHi, 0.35, 0.5);                       // drawn across the gateway; slid aside when open
       const travel = g0 - gateLo;
-      slide.position.x = travel;
+      slide.position.x = 0;                                         // shut until the visitor opens it
       gateDoor({ kind: 'slide', slide, axis: 'x', travel, open: 1, x: gateX, col: { x0: gateLo, x1: gateHi, z0: 0.1, z1: 0.75 } });
     }
   }
@@ -458,10 +462,10 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         pane(fixed, o0, o0 + half + 0.05); pane(slide, o0 + half - 0.05, o1);
         walls.add(slide);
         const col = o === 'h' ? { x0: o0, x1: o1, z0: c - 0.25, z1: c + 0.25 } : { x0: c - 0.25, x1: c + 0.25, z0: o0, z1: o1 };
-        const door = { kind: 'slide', slide, axis: o === 'h' ? 'x' : 'z', travel: -(half - 0.1), t: 1, target: 1, open: 1, upper, dy, name: 'Terrace door', x: o === 'h' ? p.at : c, z: o === 'h' ? c : p.at, main: false, col: { ...col, door: null, k: 'door' } };
+        const door = { kind: 'slide', slide, axis: o === 'h' ? 'x' : 'z', travel: -(half - 0.1), t: 0, target: 0, open: 1, upper, dy, name: 'Terrace door', terraceDoor: true, x: o === 'h' ? p.at : c, z: o === 'h' ? c : p.at, main: false, col: { ...col, door: null, k: 'door' } };
         door.col.door = door;
         slide.userData.door = door; slide.traverse((q) => { q.userData.door = door; });
-        slide.position[door.axis] = door.travel;
+        slide.position[door.axis] = 0;
         doorList.push(door);
         curColl.push(door.col);
       } else if (p.kind === 'door') {
@@ -483,9 +487,9 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         walls.add(pivot);
         const open = o === 'h' ? (into > 0 ? -Math.PI / 2 : Math.PI / 2) : (into > 0 ? Math.PI / 2 : -Math.PI / 2);
         const col = o === 'h' ? { x0: o0, x1: o1, z0: c - 0.2, z1: c + 0.2 } : { x0: c - 0.2, x1: c + 0.2, z0: o0, z1: o1 };
-        const door = { kind: 'swing', pivot, open, t: 1, target: 1, upper, dy, mesh: leafMesh, name: p.room, x: o === 'h' ? p.at : c, z: o === 'h' ? c : p.at, main: !!p.main, col: { ...col, door: null, k: 'door' } };
+        const door = { kind: 'swing', pivot, open, t: 0, target: 0, upper, dy, mesh: leafMesh, name: p.room, x: o === 'h' ? p.at : c, z: o === 'h' ? c : p.at, main: !!p.main, col: { ...col, door: null, k: 'door' } };
         door.col.door = door;
-        pivot.rotation.y = open;
+        pivot.rotation.y = 0;                                          // every door starts shut
         leafMesh.userData.door = door;
         doorList.push(door);
         curColl.push(door.col);
@@ -599,10 +603,10 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     }
     const capM = st.family === 'spanish' ? mRoofTile : mTrim;                                       // coping on the parapet
     const y0 = y + SLAB, y1 = y + SLAB + ph, c1 = y1 + 0.22;
-    for (const [a, b] of freeSpans('h', B.z, x0, x1)) { box(parent, a, b, y0, y1, z0, z0 + pt, pm); box(parent, a - 0.1, b + 0.1, y1, c1, z0 - 0.1, z0 + pt + 0.1, capM); }
-    for (const [a, b] of freeSpans('h', B.z + B.d, x0, x1)) { box(parent, a, b, y0, y1, z1 - pt, z1, pm); box(parent, a - 0.1, b + 0.1, y1, c1, z1 - pt - 0.1, z1 + 0.1, capM); }
-    for (const [a, b] of freeSpans('v', B.x, z0, z1)) { box(parent, x0, x0 + pt, y0, y1, a, b, pm); box(parent, x0 - 0.1, x0 + pt + 0.1, y1, c1, a, b, capM); }
-    for (const [a, b] of freeSpans('v', B.x + B.w, z0, z1)) { box(parent, x1 - pt, x1, y0, y1, a, b, pm); box(parent, x1 - pt - 0.1, x1 + 0.1, y1, c1, a, b, capM); }
+    for (const [a, b] of freeSpans('h', B.z, x0, x1)) { box(parent, a, b, y0, y1, z0, z0 + pt, pm, top); box(parent, a - 0.1, b + 0.1, y1, c1, z0 - 0.1, z0 + pt + 0.1, capM); }
+    for (const [a, b] of freeSpans('h', B.z + B.d, x0, x1)) { box(parent, a, b, y0, y1, z1 - pt, z1, pm, top); box(parent, a - 0.1, b + 0.1, y1, c1, z1 - pt - 0.1, z1 + 0.1, capM); }
+    for (const [a, b] of freeSpans('v', B.x, z0, z1)) { box(parent, x0, x0 + pt, y0, y1, a, b, pm, top); box(parent, x0 - 0.1, x0 + pt + 0.1, y1, c1, a, b, capM); }
+    for (const [a, b] of freeSpans('v', B.x + B.w, z0, z1)) { box(parent, x1 - pt, x1, y0, y1, a, b, pm, top); box(parent, x1 - pt - 0.1, x1 + 0.1, y1, c1, a, b, capM); }
     if (st.family === 'spanish') for (const [a, b] of freeSpans('h', B.z, x0, x1)) {                          // a sloping tiled hood along the open part of the front, under the parapet
       const tilt = new THREE.Mesh(new THREE.BoxGeometry(b - a + 0.6, 0.25, 2.2), mRoofTile);
       tilt.position.set((a + b) / 2, y + SLAB + ph * 0.45, z0 - 0.7); tilt.rotation.x = -0.45; tilt.castShadow = true; parent.add(tilt);
@@ -625,14 +629,18 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       for (let i = 0; i < 2; i++) {                                 // AC units along the back parapet, clear of the stair-head room
         const ax0 = B.x + 2 + i * 3.5, ax1 = ax0 + 2.6, az0 = B.z + B.d - 2.6, az1 = B.z + B.d - 1.4;
         if (mum && ax1 > mum.x0 - 0.8 && ax0 < mum.x1 + 0.8 && az1 > mum.z0 - 0.8 && az0 < mum.z1 + 0.8) continue;
-        box(parent, ax0, ax1, y + SLAB, y + SLAB + 1.9, az0, az1, mat('#d9dcdc', { roughness: 0.5, metalness: 0.2 }));
+        box(parent, ax0, ax1, y + SLAB, y + SLAB + 1.9, az0, az1, mat('#d9dcdc', { roughness: 0.5, metalness: 0.2 }), true);
       }
     }
   };
-  if (!U) roofOf(B, H, roofG, 2.6, null, true);
+  curColl = roofColliders;
+  if (!U) { roofOf(B, H, roofG, 2.6, null, true); curColl = colliders; }
   else {
-    roofOf(B, H, midG, 3, stairsRoom, false, U.rooms.filter((r) => !r.parent));   // the ground floor's roof is the upstairs floor, and its open part the terrace
+    curColl = colliders;
+    roofOf(B, H, midG, 3, stairsRoom, false, U.rooms.filter((r) => !r.parent));
+    curColl = roofColliders;
     roofOf(U.B, STOREY + H, roofG, 2.6, upStairs && site.roof !== 'hip' ? upStairs : null, true);      // the stairs go on up through the roof slab
+    curColl = colliders;
     // a guard wall round the terrace edge keeps walkers on the slab
     upperColliders.push({ x0: B.x - 2, x1: B.x - 0.4, z0: B.z - 2, z1: B.z + B.d + 2 }, { x0: B.x + B.w + 0.4, x1: B.x + B.w + 2, z0: B.z - 2, z1: B.z + B.d + 2 },
       { x0: B.x - 2, x1: B.x + B.w + 2, z0: B.z - 2, z1: B.z - 0.4 }, { x0: B.x - 2, x1: B.x + B.w + 2, z0: B.z + B.d + 0.4, z1: B.z + B.d + 2 });
@@ -675,7 +683,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       }
       bx(len - ld, len, 0.05, wid - 0.05, half - 0.5, half, mStep);                                         // the half landing
       bx(0, u0, 0.05, wid - 0.05, STOREY - 0.5, STOREY, mStep);                                              // the floor at the doors' end, over the foot of the stair
-      const wl = bx(u0, len - ld, wf, wid - wf, 0, STOREY, mExt);                                          // the wall between the flights
+      const wl = bx(u0, len - ld, wf, wid - wf, 0, STOREY, mInt);                                          // the wall between the flights
       const dv = alongX ? { x0: sr.x + wl[0], x1: sr.x + wl[1], z0: sr.z + wf, z1: sr.z + wid - wf } : { x0: sr.x + wf, x1: sr.x + wid - wf, z0: sr.z + wl[0], z1: sr.z + wl[1] };
       colliders.push({ ...dv, k: 'rail' }); upperColliders.push({ ...dv, k: 'rail' });
       // a handrail along each flight's outer wall
@@ -691,14 +699,14 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       // roof flight's first step, and the flight down starts on the other lane, so the way up and the way down are never the same place.
       const roofUp = site.roof !== 'hip';
       if (roofUp) {
-        const Y = STOREY, th = 0.6;
+        const Y = STOREY, th = stepH + 0.1;                            // each tread runs down to the one below: closed steps, nothing to see through
         for (let i = 0; i < n; i++) {
           bx(u0 + i * tr, u0 + (i + 1) * tr, 0.05, wf, Y + (i + 1) * stepH - th, Y + (i + 1) * stepH, mStep);
           bx(len - ld - (i + 1) * tr, len - ld - i * tr, wid - wf, wid - 0.05, Y + half + (i + 1) * stepH - th, Y + half + (i + 1) * stepH, mStep);
         }
         bx(len - ld, len, 0.05, wid - 0.05, Y + half - 0.5, Y + half, mStep);
         bx(0, u0, 0.05, wid - 0.05, 2 * STOREY - 0.5, 2 * STOREY, mStep);                                  // the floor of the stair-head room
-        bx(u0, len - ld, wf, wid - wf, STOREY, 2 * STOREY, mExt);                                           // the wall between the flights, up to the roof
+        bx(u0, len - ld, wf, wid - wf, STOREY, 2 * STOREY, mInt);                                           // the wall between the flights, up to the roof
         rail(0.28, Y, Y + half, u0, len - ld); rail(wid - 0.28, 2 * STOREY, Y + half, u0, len - ld);
       }
       const pushU = (d) => {                                          // a spot just beyond a door, in the room on its other side
@@ -786,10 +794,10 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     };
     for (let i = 0; i < n2; i++) {                                  // the roof flight runs back over the first, from the landing end to the far end
       const [a0, a1] = span(s1 - (i + 1) * tr, s1 - i * tr), top = STOREY + lift + ((i + 1) / n2) * (rise - lift);
-      put(a0, a1, v0, v1, top - 0.45, top, mStep);
+      put(a0, a1, v0, v1, top - ((rise - lift) / n2 + 0.1), top, mStep);                                   // closed steps
     }
     const [d0, d1] = span(s0, s1);
-    put(d0, d1, wid / 2 - 0.15, wid / 2 + 0.15, 0, 2 * STOREY, mExt);                                       // the wall between the two
+    put(d0, d1, wid / 2 - 0.15, wid / 2 + 0.15, 0, 2 * STOREY, mTrim);                                      // the spine wall between the two flights, in the trim colour so it reads as part of the stair
     const dv = alongX ? { x0: sr.x + d0, x1: sr.x + d1, z0: sr.z + wid / 2 - 0.15, z1: sr.z + wid / 2 + 0.15 } : { x0: sr.x + wid / 2 - 0.15, x1: sr.x + wid / 2 + 0.15, z0: sr.z + d0, z1: sr.z + d1 };
     colliders.push({ ...dv, k: 'rail' }); upperColliders.push({ ...dv, k: 'rail' });
     if (s0 > 0.3) { const [f0, f1] = span(0, s0); put(f0, f1, 0.05, wid - 0.05, 2 * STOREY - 0.5, 2 * STOREY, mStep); }   // the floor of the stair-head room
@@ -803,32 +811,92 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     };
     stairs.roofLane = (x, z) => { const a = alongX ? x - sr.x : z - sr.z, v = alongX ? z - sr.z : x - sr.x, uu = dir > 0 ? a : len - a; return uu > s0 && uu < s1 && v >= wid / 2; };
   }
-  if (mum) {                                                        // the room itself: walls, a door towards the middle of the roof, a slab on top, a small water tank over it
-    const yR = (U ? STOREY : 0) + H + SLAB, t = 0.45, wh = 8, gh = 6.8;
-    const rcx = mum.rb.x + mum.rb.w / 2, rcz = mum.rb.z + mum.rb.d / 2, fx = (mum.x0 + mum.x1) / 2, fz = (mum.z0 + mum.z1) / 2;
+  // ---------- guards at roof level round the stair opening: the flights are entered from the stair head only, never stepped onto from the side ----------
+  if (stairs && stairs.roofUp && mum) {
+    curColl = roofColliders;
+    const sr = stairs.room, { alongX, len, wid, dir } = stairs, yR = 2 * STOREY;
+    const uv = (ua, ub, va, vb) => { const a = dir > 0 ? [ua, ub] : [len - ub, len - ua]; return alongX ? { x0: sr.x + a[0], x1: sr.x + a[1], z0: sr.z + va, z1: sr.z + vb } : { x0: sr.x + va, x1: sr.x + vb, z0: sr.z + a[0], z1: sr.z + a[1] }; };
+    const u0r = stairs.turn ? stairs.u0 : stairs.s0;                 // where the opening starts, counted from the end the stair is entered from
+    const blocks = stairs.turn ? [uv(u0r, len, 0, wid / 2 + 0.05), uv(len - stairs.ld, len, 0, wid)] : [uv(stairs.s0, stairs.s1, 0, wid / 2 + 0.2), uv(stairs.s1, len, 0, wid)];
+    const edges = [uv(u0r, len, -0.3, 0), uv(u0r, len, wid, wid + 0.3), uv(len, len + 0.3, 0, wid), uv(u0r - 0.3, u0r, 0, wid / 2 + 0.2)];
+    for (const r of [...blocks, ...edges]) if (r.x1 - r.x0 > 0.01 && r.z1 - r.z0 > 0.01) roofColliders.push({ ...r, k: 'rail' });
+    for (const r of edges) {                                         // a rail with posts along each open edge
+      if (r.x1 - r.x0 < 0.01 || r.z1 - r.z0 < 0.01) continue;
+      const lx = r.x1 - r.x0, lz = r.z1 - r.z0, along = lx >= lz, v = along ? { x0: r.x0, x1: r.x1, z0: (r.z0 + r.z1) / 2 - 0.06, z1: (r.z0 + r.z1) / 2 + 0.06 } : { x0: (r.x0 + r.x1) / 2 - 0.06, x1: (r.x0 + r.x1) / 2 + 0.06, z0: r.z0, z1: r.z1 };
+      box(roofG, v.x0, v.x1, yR + 2.9, yR + 3.05, v.z0, v.z1, mFrame, false); box(roofG, v.x0, v.x1, yR + 1.4, yR + 1.5, v.z0, v.z1, mFrame, false);
+      const n = Math.max(2, Math.round((along ? lx : lz) / 2.2));
+      for (let i = 0; i <= n; i++) { const f = i / n; if (along) { const x = v.x0 + (lx - 0.1) * f; box(roofG, x, x + 0.1, yR, yR + 3.05, v.z0, v.z1, mFrame, false); } else { const z = v.z0 + (lz - 0.1) * f; box(roofG, v.x0, v.x1, yR, yR + 3.05, z, z + 0.1, mFrame, false); } }
+    }
+    curColl = colliders;
+  }
+  if (mum) {                                                        // the stair-head room (mumty): walls with windows, a door onto the roof, a floor, a ceiling, a lamp, and a small water tank on its roof
+    curColl = roofColliders;
+    const yR = (U ? STOREY : 0) + H + SLAB, t = 0.45, wh = 8, gh = 6.8, gw = 3.2;
+    const ix0 = mum.x0, ix1 = mum.x1, iz0 = mum.z0, iz1 = mum.z1, fx = (ix0 + ix1) / 2, fz = (iz0 + iz1) / 2;
+    const rcx = mum.rb.x + mum.rb.w / 2, rcz = mum.rb.z + mum.rb.d / 2;
     const doorOnX = Math.abs(rcx - fx) > Math.abs(rcz - fz) + 2;     // the door goes on the long side unless the middle of the roof is clearly further along
     const dSign = doorOnX ? Math.sign(rcx - fx) || 1 : Math.sign(rcz - fz) || 1;
-    const x0 = mum.x0 - t, x1 = mum.x1 + t, z0 = mum.z0 - t, z1 = mum.z1 + t, gw = 3.2;
-    const wall = (a0, a1, b0, b1) => box(roofG, a0, a1, yR, yR + wh, b0, b1, mExt);
-    const gapW = (lo, hi) => { const m = (lo + hi) / 2; return [m - gw / 2, m + gw / 2]; };
-    if (doorOnX) {
-      const [g0, g1] = gapW(mum.z0, mum.z1), xs = dSign > 0 ? [x1 - t, x1] : [x0, x0 + t];
-      wall(x0, x1, z0, mum.z0); wall(x0, x1, mum.z1, z1);
-      wall(dSign > 0 ? x0 : x0 + t, dSign > 0 ? x1 - t : x1, mum.z0, mum.z1);
-      wall(xs[0], xs[1], mum.z0, g0); wall(xs[0], xs[1], g1, mum.z1); box(roofG, xs[0], xs[1], yR + gh, yR + wh, g0, g1, mExt);
-      box(roofG, xs[0] - 0.1, xs[1] + 0.1, yR, yR + 0.06, g0, g1, mTrim, false);
-    } else {
-      const [g0, g1] = gapW(mum.x0, mum.x1), zs = dSign > 0 ? [z1 - t, z1] : [z0, z0 + t];
-      wall(x0, mum.x0, z0, z1); wall(mum.x1, x1, z0, z1);
-      wall(mum.x0, mum.x1, dSign > 0 ? z0 : z0 + t, dSign > 0 ? z1 - t : z1);
-      wall(mum.x0, g0, zs[0], zs[1]); wall(g1, mum.x1, zs[0], zs[1]); box(roofG, g0, g1, yR + gh, yR + wh, zs[0], zs[1], mExt);
-      box(roofG, g0, g1, yR, yR + 0.06, zs[0] - 0.1, zs[1] + 0.1, mTrim, false);
+    const x0 = ix0 - t, x1 = ix1 + t, z0 = iz0 - t, z1 = iz1 + t;
+    // one wall of the room: ax 'x' runs along x (thick in z), 'z' along z; a0..a1 its length, c0..c1 its thickness; room: +1 when the room is on the larger-coordinate side
+    const bxw = (ax, a0, a1, c0, c1, y0, y1, m, collide) => (ax === 'x' ? box(roofG, a0, a1, yR + y0, yR + y1, c0, c1, m, collide) : box(roofG, c0, c1, yR + y0, yR + y1, a0, a1, m, collide));
+    const mwall = (ax, a0, a1, c0, c1, room, op) => {
+      const skin = (q0, q1, y0, y1) => (room > 0 ? bxw(ax, q0, q1, c1 - 0.04, c1, y0, y1, mInt, false) : bxw(ax, q0, q1, c0, c0 + 0.04, y0, y1, mInt, false));
+      const solidPart = (q0, q1, y0, y1, collide) => { if (q1 - q0 < 0.02) return; bxw(ax, q0, q1, c0, c1, y0, y1, mExt, collide); skin(q0, q1, y0, y1); };
+      if (!op) { solidPart(a0, a1, 0, wh, true); return; }
+      solidPart(a0, op.o0, 0, wh, true); solidPart(op.o1, a1, 0, wh, true);
+      if (op.sill > 0) solidPart(op.o0, op.o1, 0, op.sill, true);
+      solidPart(op.o0, op.o1, op.top, wh, false);
+      if (op.window) {                                               // glass in a slim metal frame
+        const cm = (c0 + c1) / 2, y0 = op.sill, y1 = op.top;
+        bxw(ax, op.o0, op.o1, cm - 0.03, cm + 0.03, y0, y1, mGlass, false);
+        bxw(ax, op.o0 - 0.03, op.o0 + 0.15, cm - 0.22, cm + 0.22, y0 - 0.03, y1 + 0.03, mFrame, false); bxw(ax, op.o1 - 0.15, op.o1 + 0.03, cm - 0.22, cm + 0.22, y0 - 0.03, y1 + 0.03, mFrame, false);
+        bxw(ax, op.o0, op.o1, cm - 0.22, cm + 0.22, y1 - 0.15, y1 + 0.03, mFrame, false); bxw(ax, op.o0, op.o1, cm - 0.22, cm + 0.22, y0 - 0.03, y0 + 0.15, mFrame, false);
+        bxw(ax, (op.o0 + op.o1) / 2 - 0.06, (op.o0 + op.o1) / 2 + 0.06, cm - 0.12, cm + 0.12, y0, y1, mFrame, false);
+        bxw(ax, op.o0 - 0.5, op.o1 + 0.5, room > 0 ? c0 - 0.22 : c1, room > 0 ? c0 : c1 + 0.22, y0 - 0.2, y0, mTrim, false);          // the sill, outside
+      }
+    };
+    const opening = (a0, a1, kind) => {                              // an opening in the middle of a wall's length
+      const m = (a0 + a1) / 2;
+      if (kind === 'door') return { o0: m - gw / 2, o1: m + gw / 2, sill: 0, top: gh };
+      const w = Math.min(3.6, a1 - a0 - 4);
+      return w >= 2.4 ? { window: true, o0: m - w / 2, o1: m + w / 2, sill: 3, top: 6.6 } : null;
+    };
+    // west, east (along z), south, north (along x): the door is in the wall that faces the middle of the roof, windows in the others
+    const wants = { w: doorOnX && dSign < 0 ? 'door' : 'window', e: doorOnX && dSign > 0 ? 'door' : 'window', s: !doorOnX && dSign < 0 ? 'door' : 'window', n: !doorOnX && dSign > 0 ? 'door' : 'window' };
+    mwall('z', z0, z1, ix0 - t, ix0, 1, opening(z0, z1, wants.w));
+    mwall('z', z0, z1, ix1, ix1 + t, -1, opening(z0, z1, wants.e));
+    mwall('x', ix0, ix1, iz0 - t, iz0, 1, opening(ix0, ix1, wants.s));
+    mwall('x', ix0, ix1, iz1, iz1 + t, -1, opening(ix0, ix1, wants.n));
+    // the door: a wooden leaf hinged at one side, shut until the visitor opens it
+    {
+      const g = doorOnX ? [(z0 + z1) / 2 - gw / 2, (z0 + z1) / 2 + gw / 2] : [(ix0 + ix1) / 2 - gw / 2, (ix0 + ix1) / 2 + gw / 2];
+      const wc = doorOnX ? (dSign > 0 ? ix1 + t / 2 : ix0 - t / 2) : (dSign > 0 ? iz1 + t / 2 : iz0 - t / 2);
+      const frame = (a0, a1, y0, y1) => bxw(doorOnX ? 'z' : 'x', a0, a1, wc - 0.3, wc + 0.3, y0, y1, mFrame, false);
+      frame(g[0] - 0.2, g[0] + 0.03, 0, gh + 0.2); frame(g[1] - 0.03, g[1] + 0.2, 0, gh + 0.2); frame(g[0] - 0.2, g[1] + 0.2, gh - 0.03, gh + 0.2);
+      const dW = gw - 0.1, dH = gh - 0.1, th = 0.15, pivot = new THREE.Group();
+      const leaf = new THREE.Mesh(doorOnX ? new THREE.BoxGeometry(th, dH, dW) : new THREE.BoxGeometry(dW, dH, th), mDoor);
+      leaf.castShadow = leaf.receiveShadow = true;
+      let open, col;
+      if (doorOnX) { pivot.position.set(wc, yR + 0.05, g[0] + 0.04); leaf.position.set(0, dH / 2, dW / 2); open = dSign > 0 ? -Math.PI / 2 : Math.PI / 2; col = { x0: wc - 0.25, x1: wc + 0.25, z0: g[0], z1: g[1] }; }
+      else { pivot.position.set(g[0] + 0.04, yR + 0.05, wc); leaf.position.set(dW / 2, dH / 2, 0); open = dSign > 0 ? Math.PI / 2 : -Math.PI / 2; col = { x0: g[0], x1: g[1], z0: wc - 0.25, z1: wc + 0.25 }; }
+      pivot.add(leaf); roofG.add(pivot);
+      const door = { kind: 'swing', pivot, open, t: 0, target: 0, upper: true, roof: true, dy: yR, mesh: leaf, name: 'roof', x: doorOnX ? wc : (g[0] + g[1]) / 2, z: doorOnX ? (g[0] + g[1]) / 2 : wc, main: false, col: { ...col, door: null, k: 'door' } };
+      door.col.door = door; leaf.userData.door = door; roofColliders.push(door.col); doorList.push(door);
+    }
+    // the floor (round the stair opening), the ceiling and a lamp
+    {
+      const sr0 = mum.sr, sx0 = Math.max(ix0, sr0.x), sx1 = Math.min(ix1, sr0.x + sr0.w), sz0 = Math.max(iz0, sr0.z), sz1 = Math.min(iz1, sr0.z + sr0.d);
+      const strip = (a0, a1, b0, b1) => { if (a1 - a0 > 0.05 && b1 - b0 > 0.05) plane(a0, a1, b0, b1, yR + 0.03, mStone, roofG); };
+      strip(ix0, ix1, iz0, sz0); strip(ix0, ix1, sz1, iz1); strip(ix0, sx0, sz0, sz1); strip(sx1, ix1, sz0, sz1);
+      const ceil = plane(ix0, ix1, iz0, iz1, yR + wh - 0.03, mat('#f6f4ef', { roughness: 0.95, emissive: '#3b3934' }), roofG); ceil.rotation.x = Math.PI / 2;
+      const lamp = new THREE.PointLight('#ffe7c4', 16, 24, 2); lamp.position.set(fx, yR + wh - 1.4, fz); roofG.add(lamp);
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(0.45, 20), mDownlight); disc.rotation.x = Math.PI / 2; disc.position.set(fx, yR + wh - 0.06, fz); roofG.add(disc);
     }
     const yT = yR + wh + 0.4;
-    box(roofG, x0 - 0.3, x1 + 0.3, yR + wh, yT, z0 - 0.3, z1 + 0.3, mConcrete);                    // the roof slab with its edge
+    box(roofG, x0 - 0.3, x1 + 0.3, yR + wh, yT, z0 - 0.3, z1 + 0.3, mConcrete, false);               // the roof slab with its edge
     box(roofG, x0 - 0.35, x1 + 0.35, yT - 0.12, yT, z0 - 0.35, z1 + 0.35, mTrim, false);
     // a small round water tank on a plinth, on the mumty roof, towards the far end from the door
-    const tankR = 1.5, tankH = 3.2, tx = doorOnX ? fx - dSign * Math.min(2.5, (mum.x1 - mum.x0) / 4) : fx, tz = doorOnX ? fz : fz - dSign * Math.min(2.5, (mum.z1 - mum.z0) / 4);
+    const tankR = 1.5, tankH = 3.2, tx = doorOnX ? fx - dSign * Math.min(2.5, (ix1 - ix0) / 4) : fx, tz = doorOnX ? fz : fz - dSign * Math.min(2.5, (iz1 - iz0) / 4);
     const mTank = mat('#232a30', { roughness: 0.55 }), mLid = mat('#3a5566', { roughness: 0.45 });
     box(roofG, tx - tankR - 0.3, tx + tankR + 0.3, yT, yT + 0.45, tz - tankR - 0.3, tz + tankR + 0.3, mConcrete, false);
     const body = new THREE.Mesh(new THREE.CylinderGeometry(tankR * 0.92, tankR, tankH, 28), mTank);
@@ -841,6 +909,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     lid.scale.y = 0.55; lid.position.set(tx, yT + 0.45 + tankH, tz); lid.castShadow = true; roofG.add(lid);
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16), mLid);
     cap.position.set(tx, yT + 0.45 + tankH + 0.5, tz); roofG.add(cap);
+    curColl = colliders;
   }
 
   // ---------- balcony of the first floor (an open space of type balcony in front of the box) ----------
@@ -1107,7 +1176,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     if (c.trim) mTrim.color.set(c.trim);
     if (c.accent) mAccent.color.set(c.accent);
   }
-  return { carsInfo, scene, sun, world, roofG, midG, stairsG, storeyG, doors: doorList, colliders, upperColliders, stairs, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, innerPorch, mats, setColors, setFloors, furnReady, site, pieces: { ground: piecesG, upper: piecesU } };
+  return { mumty: mum ? { x0: mum.x0, x1: mum.x1, z0: mum.z0, z1: mum.z1 } : null, carsInfo, scene, sun, world, roofG, midG, stairsG, storeyG, doors: doorList, colliders, upperColliders, roofColliders, stairs, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, innerPorch, mats, setColors, setFloors, furnReady, site, pieces: { ground: piecesG, upper: piecesU } };
 }
 
 function disposeScene(scene) {

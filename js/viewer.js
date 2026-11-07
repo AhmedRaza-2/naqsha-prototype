@@ -62,12 +62,13 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   camera.rotation.order = 'YXZ';
 
   // everything that depends on the built scene is rebuilt together when the site (boundary wall, floors ...) changes
-  let S, scene, roofG, colliders, upperColliders, stairs, doors, pool = [], person, lastFloorLevel = 0;
+  let S, scene, roofG, colliders, upperColliders, roofColliders, stairs, doors, pool = [], person, lastFloorLevel = 0;
   const state = { mode: 'walk', yaw: Math.PI, pitch: 0, pos: new THREE.Vector3(0, EYE, 2.5), hs: 0, keys: new Set(), floor: 0, cutaway: 'all', fov: 70, phase: 0, speed: 0, inS: false, lastH: 0 };
   let start = 0;
 
-  const solid = (c) => !c.door || c.door.t < DOOR_OPEN;                  // a wall, or a door that is still (nearly) shut
-  const blocked = (x, z, r, lvl) => (lvl ? upperColliders : colliders).some((c) => x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r && solid(c));
+  let planning = false;                                                  // while the tour is planned every door counts as open (the visitor opens each as it comes near)
+  const solid = (c) => !c.door || (!planning && c.door.t < DOOR_OPEN);   // a wall, or a door that is still (nearly) shut
+  const blocked = (x, z, r, lvl) => (lvl === 2 ? roofColliders : lvl ? upperColliders : colliders).some((c) => x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r && solid(c));
   const inStairs = (x, z) => !!stairs && x > stairs.room.x + 0.05 && x < stairs.room.x + stairs.room.w - 0.05 && z > stairs.room.z + 0.05 && z < stairs.room.z + stairs.room.d - 0.05;
   const heightAt = (x, z, floor) => (inStairs(x, z) ? (stairs.hxz ? stairs.hxz(x, z, floor) : stairs.h(stairs.alongX ? x - stairs.room.x : z - stairs.room.z)) : floor * STOREY);   // the flights between the floors only
   /** The walking surface at the visitor's own height: with the way on up to the roof there are two flights over each other, and the one nearest wins. */
@@ -76,7 +77,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
 
   function bind(newS, keepPos) {
     if (S) { scene.remove(person); disposeScene(S.scene); }
-    S = newS; scene = S.scene; roofG = S.roofG; colliders = S.colliders; upperColliders = S.upperColliders; stairs = S.stairs; doors = S.doors;
+    S = newS; scene = S.scene; roofG = S.roofG; colliders = S.colliders; upperColliders = S.upperColliders; roofColliders = S.roofColliders; stairs = S.stairs; doors = S.doors;
     pool = Array.from({ length: 6 }, () => { const p = new THREE.PointLight('#ffe9c8', 30, 26, 2); scene.add(p); return p; });
     person ||= makePerson();
     scene.add(person);
@@ -90,17 +91,17 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
       }
       return S.gateX;
     })();
-    if (!keepPos) { state.pos.set(start, EYE, 2.5); state.floor = 0; state.hs = 0; state.yaw = Math.PI; state.pitch = 0; }
+    if (!keepPos) { state.pos.set(start, EYE, 2.5); state.floor = 0; state.hs = 0; state.onRoofDeck = false; state.yaw = Math.PI; state.pitch = 0; }
     applyCutaway();
     hooks.onCars?.(S.carsInfo);
-    if (/[?&]debug3d/.test(location.search)) window.__walk = { carsInfo: S.carsInfo, tour, planPath: (...a) => planPath(...a), level: () => level(), state, colliders, upperColliders, R, stairs, doors, STOREY, roomAt: (x, z) => roomAt(x, z), rooms: L.rooms, upRooms: U ? U.rooms : null, mainDoor: L.openings.find((o) => o.main), openings: L.openings, B, gateX: S.gateX, gateLo: S.gateLo, gateHi: S.gateHi, start };   // for tests
+    if (/[?&]debug3d/.test(location.search)) window.__walk = { move: (a, b) => move(a, b), onRoof: () => onRoof(), roofColliders, carsInfo: S.carsInfo, tour, planPath: (...a) => planPath(...a), level: () => level(), state, colliders, upperColliders, R, stairs, doors, STOREY, roomAt: (x, z) => roomAt(x, z), rooms: L.rooms, upRooms: U ? U.rooms : null, mainDoor: L.openings.find((o) => o.main), openings: L.openings, B, gateX: S.gateX, gateLo: S.gateLo, gateHi: S.gateHi, start };   // for tests
   }
 
   const orbit = new OrbitControls(camera, renderer.domElement);
   orbit.enabled = false;
   orbit.target.set(W / 2, 0, D / 2);
   orbit.enableDamping = true; orbit.dampingFactor = 0.09;           // smooth stop instead of a jerk
-  orbit.zoomToCursor = true; orbit.zoomSpeed = 0.8;                 // the wheel zooms toward what the pointer is on
+  orbit.zoomToCursor = false; orbit.zoomSpeed = 0.9;                // the wheel zooms straight in and out of the middle of the view: no sideways drift
   orbit.minDistance = 6; orbit.maxDistance = Math.max(W, D) * 3.2;  // cannot zoom through the house or lose it in the sky
   orbit.panSpeed = 0.9; orbit.rotateSpeed = 0.8; orbit.screenSpacePanning = true;
 
@@ -146,24 +147,33 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   }
   function setRoof(v) { roofG.visible = v; }
   function setCutaway(c) { state.cutaway = c; applyCutaway(); hooks.onMode?.(state.mode, roofG.visible); }
-  function resetWalk() { state.floor = 0; state.hs = 0; state.inS = false; state.pos.set(start, EYE, 2.5); state.yaw = Math.PI; state.pitch = 0; hooks.onFloor?.(0); if (state.mode === 'orbit' || state.mode === 'top' || state.mode === 'street' || state.mode === 'showcase') setMode('walk'); }
+  function resetWalk() { state.floor = 0; state.hs = 0; state.inS = false; state.onRoofDeck = false; state.pos.set(start, EYE, 2.5); state.yaw = Math.PI; state.pitch = 0; hooks.onFloor?.(0); if (state.mode === 'orbit' || state.mode === 'top' || state.mode === 'street' || state.mode === 'showcase') setMode('walk'); }
   /** Climb to the first floor (or come back down): the visitor appears just beyond the door of the stairs. */
   function setFloor(f) {
     if (!U) return;
     const at = stairs ? stairs.entry[f ? 1 : 0] : { x: S.stairsRoom.x + S.stairsRoom.w / 2, z: S.stairsRoom.z + S.stairsRoom.d / 2 };
-    state.floor = f; state.hs = f * STOREY; state.inS = false;
+    state.floor = f; state.hs = f * STOREY; state.inS = false; state.onRoofDeck = false;
     state.pos.set(at.x, EYE + f * STOREY, at.z);
     if (!MOVING.has(state.mode)) setMode('walk');
     placeLights();
     hooks.onFloor?.(f);
   }
-  function setFov(v) { state.fov = Math.max(40, Math.min(100, v)); if (state.mode === 'walk') { camera.fov = state.fov; camera.updateProjectionMatrix(); } }
+  function setFov(v) { state.fov = Math.max(45, Math.min(90, v)); }                  // the loop eases the camera towards it
 
   // ---------- doors ----------
   const hint = () => (state.inS ? (state.lastH > STOREY / 2 ? 1 : 0) : state.floor);   // on a turning stair, the floor at its foot is the one the visitor came from
   const level = () => (inStairs(state.pos.x, state.pos.z) && stairs.hz ? (surfaceAt(state.pos.x, state.pos.z, state.hs) > STOREY / 2 ? 1 : 0) : levelAt(state.pos.x, state.pos.z, hint()));
-  const doorsHere = () => doors.filter((d) => (d.upper ? 1 : 0) === level());
+  const doorsHere = () => doors.filter((d) => (d.roof ? onRoof() : !onRoof() && (d.upper ? 1 : 0) === level()));
   function toggleDoor(d) { d.target = d.target ? 0 : 1; }
+  /** What the visitor calls a door: "Main gate", "Front door", "Terrace door", "Master Bed door". */
+  function doorLabel(d) {
+    if (d.gate) return 'Main gate';
+    if (d.terraceDoor) return 'Terrace door';
+    if (d.roof) return 'Roof room door';
+    if (d.main) return 'Front door';
+    const rm = ((d.upper ? U : L).rooms || []).find((r) => r.id === d.name);
+    return rm && rm.name ? `${rm.name} door` : 'Door';
+  }
   function setAllDoors(open) { for (const d of doors) d.target = open ? 1 : 0; }
   function nearestDoor(maxDist = 7) {
     const fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw);
@@ -218,7 +228,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     if (drag && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 5 && MOVING.has(state.mode)) clickDoor(e);   // a click, not a drag
     drag = null;
   };
-  const onWheel = (e) => { if (state.mode === 'walk') { e.preventDefault(); setFov(state.fov + e.deltaY * 0.04); hooks.onFov?.(state.fov); } };
+  const onWheel = (e) => { if (state.mode === 'walk') { e.preventDefault(); setFov(state.fov + Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 120) * 0.03); hooks.onFov?.(state.fov); } };
   el.addEventListener('pointerdown', onDown);
   el.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
@@ -246,16 +256,23 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   }
 
   // ---------- one step of movement, shared by walking, following and the tour ----------
+  /** On the roof (the stair head, the stair-head room and the open roof): above one and a half storeys. */
+  const onRoof = () => state.hs > STOREY * 1.5;
   function move(dx, dz) {
-    const lvl = level(), top = state.inS && state.hs > STOREY * 1.5;      // at the head of the roof stair the visitor stays in the stair-head room
-    if (!blocked(state.pos.x + dx, state.pos.z, R, lvl) && (!top || inStairs(state.pos.x + dx, state.pos.z))) state.pos.x += dx;
-    if (!blocked(state.pos.x, state.pos.z + dz, R, level()) && (!top || inStairs(state.pos.x, state.pos.z + dz))) state.pos.z += dz;
+    const lvl = onRoof() ? 2 : level();
+    if (!blocked(state.pos.x + dx, state.pos.z, R, lvl)) state.pos.x += dx;
+    if (!blocked(state.pos.x, state.pos.z + dz, R, onRoof() ? 2 : level())) state.pos.z += dz;
     return settle();
   }
   // the height under the visitor: on the flight it follows the steps; leaving the flight at the top lands on the first floor
   function settle() {
-    if (inStairs(state.pos.x, state.pos.z)) { const h = stairs.hz ? surfaceAt(state.pos.x, state.pos.z, state.hs) : heightAt(state.pos.x, state.pos.z, hint()); state.inS = true; state.lastH = h; return h; }
-    if (state.inS) { state.inS = false; const f = state.lastH > STOREY / 2 ? 1 : 0; if (f !== state.floor) { state.floor = f; hooks.onFloor?.(f); } }
+    if (inStairs(state.pos.x, state.pos.z)) { const h = stairs.hz ? surfaceAt(state.pos.x, state.pos.z, state.hs) : heightAt(state.pos.x, state.pos.z, hint()); state.inS = true; state.lastH = h; state.onRoofDeck = false; return h; }
+    if (state.inS) {                                                // left the flight: at the head of the roof stair that is the stair-head room, on the roof
+      state.inS = false;
+      if (state.lastH > STOREY * 1.5) { state.onRoofDeck = true; if (state.floor !== 1) { state.floor = 1; hooks.onFloor?.(1); } return 2 * STOREY; }
+      const f = state.lastH > STOREY / 2 ? 1 : 0; if (f !== state.floor) { state.floor = f; hooks.onFloor?.(f); }
+    }
+    if (state.onRoofDeck) return 2 * STOREY;
     return state.floor * STOREY;
   }
 
@@ -310,7 +327,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     return { pts: thin, target: want.get(found), end: out[out.length - 1] };
   }
   function startTour() {
-    setAllDoors(true);
+    planning = true;
     const rooms = [
       ...L.rooms.filter((r) => !r.parent && r.type !== 'stairs' && r.type !== 'passage').map((r) => ({ l: 0, x: r.x + r.w / 2, z: r.z + r.d / 2, name: r.name })),
       ...(U ? U.rooms.filter((r) => !r.parent && r.type !== 'stairs' && r.type !== 'passage').map((r) => ({ l: 1, x: r.x + r.w / 2, z: r.z + r.d / 2, name: r.name })) : []),
@@ -329,6 +346,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
         group.splice(group.indexOf(res.target), 1);
       }
     }
+    planning = false;
     tour.path = route; tour.i = 0; tour.wait = 0; tour.on = route.length > 0;
     state.mode = 'tour'; person.visible = true; orbit.enabled = false; roofG.visible = true;
     setMode('tour'); tour.on = route.length > 0;
@@ -346,12 +364,13 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   ro.observe(host);
   resize();
 
-  let raf, last = performance.now(), lastRoom = '', lightT = 0, lastNear = null;
+  let raf, last = performance.now(), lastRoom = '', lightT = 0, lastNear = null, lastNearKey = '';
   const head = new THREE.Vector3();
   function loop(now) {
     raf = requestAnimationFrame(loop);
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    if (state.mode === 'walk' && Math.abs(camera.fov - state.fov) > 0.02) { camera.fov += (state.fov - camera.fov) * Math.min(1, dt * 10); camera.updateProjectionMatrix(); }       // smooth zoom
     for (const d of doors) {                                       // doors swing and slide
       if (Math.abs(d.t - d.target) > 0.001) {
         d.t += (d.target - d.t) * Math.min(1, dt * 7);
@@ -363,6 +382,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
       const k = state.keys;
       let fwd = 0, str = 0, sp = 0;
       if (state.mode === 'tour' && tour.on) {
+        for (const d of doors) if (d.target === 0 && Math.hypot(d.x - state.pos.x, d.z - state.pos.z) < 3.6 && (d.upper ? 1 : 0) === level()) d.target = 1;      // the guided visitor opens each door on the way
         const tgt = tour.path[tour.i];
         if (tour.wait > 0) { tour.wait -= dt; state.yaw += dt * 0.6; }
         else if (tgt) {
@@ -403,16 +423,20 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
         const bx = Math.sin(state.yaw), bz = Math.cos(state.yaw), lvl = level();
         let back = 8.5;
         const onS = state.inS;                                      // on the flight the rails are not walls: keep a gentle view from behind
-        const camBlocked = (x, z) => (lvl ? upperColliders : colliders).some((c) => x > c.x0 - 0.3 && x < c.x1 + 0.3 && z > c.z0 - 0.3 && z < c.z1 + 0.3 && solid(c) && !(onS && c.k === 'rail'));
+        const camBlocked = (x, z) => (onRoof() ? roofColliders : lvl ? upperColliders : colliders).some((c) => x > c.x0 - 0.3 && x < c.x1 + 0.3 && z > c.z0 - 0.3 && z < c.z1 + 0.3 && solid(c) && !(onS && c.k === 'rail'));
         for (let t = 1.5; t <= 8.5; t += 0.5) { if (camBlocked(head.x + bx * t, head.z + bz * t)) { back = Math.max(onS ? 3.6 : 2.2, t - 0.8); break; } }
         const up = onS ? 2.4 + back * 0.15 + Math.max(0, 6 - back) * 0.7 + state.pitch * 3
           : 1.8 + back * 0.12 + Math.max(0, 6.5 - back) * 1.5 + state.pitch * 3;        // a wall behind: rise above it and look down
         camera.position.set(head.x + bx * back, head.y + up, head.z + bz * back);
         camera.lookAt(head.x, head.y - 0.4 + state.pitch * 1.5, head.z);
       }
-      const rn = roomAt(state.pos.x, state.pos.z);
+      const mu = S.mumty, rn = onRoof() ? (mu && state.pos.x > mu.x0 && state.pos.x < mu.x1 && state.pos.z > mu.z0 && state.pos.z < mu.z1 ? 'Stair-head room' : inStairs(state.pos.x, state.pos.z) ? 'Stairs' : 'Roof') : roomAt(state.pos.x, state.pos.z);
       if (rn !== lastRoom) { lastRoom = rn; hooks.onRoom?.(rn); }
-      if ((lightT += dt) > 0.3) { lightT = 0; placeLights(); const nd = nearestDoor(5); if ((nd && nd.name) !== (lastNear && lastNear.name) || nd !== lastNear) { lastNear = nd; hooks.onNearDoor?.(nd ? { open: !!nd.target, name: nd.name } : null); } }
+      if ((lightT += dt) > 0.2) {
+        lightT = 0; placeLights();
+        const nd = nearestDoor(4.5), key = nd ? `${nd.name}|${nd.upper}|${nd.target}` : '';
+        if (key !== lastNearKey) { lastNear = nd; lastNearKey = key; hooks.onNearDoor?.(nd ? { open: !!nd.target, label: doorLabel(nd) } : null); }
+      }
     } else orbit.update();
     renderer.render(scene, camera);
   }
