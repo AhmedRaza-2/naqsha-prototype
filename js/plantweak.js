@@ -2,7 +2,7 @@
 // beside it) and a balcony in front of the first floor. Each returns a changed copy of the plan, or null when the plan
 // has no room for the change. The checker and the drawing then work from the changed plan as usual.
 import { OPEN } from './bands.js';
-import { ruleFor } from './layout.js';
+import { ruleFor, turningStair, STAIR_ROOM } from './layout.js';
 
 const clone = (p) => JSON.parse(JSON.stringify(p));
 
@@ -415,21 +415,87 @@ function resizeLeaf(plan, f, axis, target, skip = () => false) {
   return cur + (delta > 0 ? done : -done);
 }
 
-/** Standard stairs: a flight is 3.5 to 4 ft wide and 15 to 18 ft long (about 20 steps); what the model drew beyond that goes back
- *  to the room beside it. Smaller stairs (a turning stair in a small plot) are left alone. Ground floors only. */
-export function standardStairs(plan) {
+/** Stairs the way a house is built. A house with a first floor gets a proper turning stair (two flights of about 3.25 ft side by side, a landing
+ *  between, 9 steps of 7 in with 9 in treads in each) in a room of 7 x 13.5 ft (smaller sizes down to 6.5 x 12.5 when the rooms beside it cannot
+ *  give that much); with `strict` a draft that cannot get one is refused (thrown). Otherwise a straight flight is 3.5 to 4 ft wide and up to
+ *  18 ft long; what the model drew beyond that goes back to the room beside it. Ground floors only. */
+export function standardStairs(plan, strict = false) {
   if (!plan.tree || plan.floor) return plan;
+  const two = (plan.storeys || 1) >= 2;
+  if (two) {                                                          // a house with a first floor gets a proper turning stair, in a room of its own size taken from the rooms around
+    const best = turningStairRoom(plan);
+    if (best) return best;
+    if (strict) throw new Error('the rooms beside the stairs cannot give room for a proper stair');      // strict: this draft is skipped (a straight stair in this little room is steep)
+  }
   const p = clone(plan);
   const f = locate(p, (n) => n.t === 'stairs');
   if (!f) return p;
   const wide = f.w >= f.d ? 'V' : 'H';                               // the stair runs along its longer side; the other is its width
   const [short, long] = wide === 'V' ? [f.d, f.w] : [f.w, f.d];
   const shortAxis = wide === 'V' ? 'H' : 'V', longAxis = wide === 'V' ? 'V' : 'H';
-  if (long >= 9 && short > 4) resizeLeaf(p, f, shortAxis, 4);        // a stair room is 4 ft wide at most (the model sometimes draws one 7 or 8 ft wide)
+  if (long >= 9 && short > 4 && !(two && short >= 6)) resizeLeaf(p, f, shortAxis, 4);   // a straight stair room is 4 ft wide at most (the model sometimes draws one 7 or 8 ft wide)
   if (long > 18) {
     const g = locate(p, (n) => n.t === 'stairs');
     resizeLeaf(p, g, longAxis, 17.5);
+  } else if (two && long < 15.5) {                                    // a straight stair up to a first floor needs the length for its steps (16 treads of 10 in and the strip at each door)
+    const q = clone(p), g = locate(q, (n) => n.t === 'stairs'), m0 = marginsOf(p);
+    resizeLeaf(q, g, longAxis, 16, (k) => k.k === 'room' && OPEN.has(k.t));
+    const m1 = marginsOf(q);
+    if (!m0 || !m1 || ['l', 'r', 'f', 'b'].every((k) => m1[k] >= m0[k] - 0.05)) return q;
   }
+  return p;
+}
+
+/** The stairs of a two-storey house as a proper turning stair (two flights side by side, a landing between): the room is brought to
+ *  STAIR_ROOM, or to one of the smaller proper sizes when the rooms beside it cannot spare that much, the difference taken from / given
+ *  to them. The room always runs along the depth of the plot; null when even the smallest does not fit (the straight stair is then the
+ *  fallback). */
+const STAIR_TIERS = [[STAIR_ROOM.wid, STAIR_ROOM.len], [7, 13], [6.5, 12.5]];
+function turningStairRoom(plan) {
+  const f0 = locate(plan, (n) => n.t === 'stairs');
+  if (!f0) return null;
+  const m0 = marginsOf(plan), isOpen = (k) => k.k === 'room' && OPEN.has(k.t);     // the open space round the house, the lawn and the porch are not given up for the stairs
+  for (const [wid, len] of STAIR_TIERS) {
+    let best = null;
+    for (const long of ['H']) {                                       // the room runs along the depth of the plot, like the stairs the first-floor model has seen
+      const short = 'V';
+      const p = clone(plan);
+      resizeLeaf(p, locate(p, (n) => n.t === 'stairs'), short, wid, isOpen);
+      resizeLeaf(p, locate(p, (n) => n.t === 'stairs'), long, len, isOpen);
+      const c = locate(p, (n) => n.t === 'stairs');
+      const m1 = marginsOf(p);
+      if (m0 && m1 && ['l', 'r', 'f', 'b'].some((k) => m1[k] < m0[k] - 0.05)) continue;     // the house must not grow into its open space
+      if (!turningStair({ w: c.w, d: c.d })) continue;
+      const off = Math.abs(Math.min(c.w, c.d) - wid) + Math.abs(Math.max(c.w, c.d) - len);
+      if (!best || off < best.off) best = { p, off };
+    }
+    if (best) return best.p;
+  }
+  return null;
+}
+
+/** A first floor drafted over a narrow stair (the model is shown 4 ft wide, which it has seen often) gets the stair room of the ground floor:
+ *  the stair leaf grows to `R` ({x, y, w, d} in the box) into the rooms beside it, which give up the width. Throws when they cannot, so the
+ *  draft is skipped. The plan's `up` is then R, as the rule checker expects the stairs to stand exactly where the stairs below are. */
+export function growUpperStairs(plan, R) {
+  if (!plan.tree || !plan.box || !plan.up) return plan;
+  const n = plan.up, near = (a, b) => Math.abs(a - b) < 0.011;
+  if (near(n.x, R.x) && near(n.y, R.y) && near(n.w, R.w) && near(n.d, R.d)) return plan;
+  const g = [n.x - R.x, R.x + R.w - (n.x + n.w), n.y - R.y, R.y + R.d - (n.y + n.d)];
+  if (g.some((v) => v < -0.011)) throw new Error('the stairs are bigger than the stair room');
+  const p = clone(plan);
+  const grow = (axis, g0, g1) => {                                    // axis 'V': across the plot, 'H': along its depth
+    if (g0 < 0.011 && g1 < 0.011) return;
+    const f = locate(p, (k) => k.t === 'stairs');
+    const link = f && [...f.chain].reverse().find((c) => c.node.k === axis);
+    if (!link) throw new Error('no cut to grow the stairs in');
+    const { node, i, parts } = link, work = parts.slice();
+    if (g0 > 0.011) { if (i < 1 || work[i - 1] - g0 < minLeaf(node.kids[i - 1])) throw new Error('no room beside the stairs'); work[i - 1] -= g0; work[i] += g0; }
+    if (g1 > 0.011) { if (i > work.length - 2 || work[i + 1] - g1 < minLeaf(node.kids[i + 1])) throw new Error('no room beside the stairs'); work[i + 1] -= g1; work[i] += g1; }
+    node.sizes = work.slice(0, -1).map((v) => Math.round(v * 100) / 100);
+  };
+  grow('V', g[0], g[1]); grow('H', g[2], g[3]);
+  p.up = { x: R.x, y: R.y, w: R.w, d: R.d };
   return p;
 }
 

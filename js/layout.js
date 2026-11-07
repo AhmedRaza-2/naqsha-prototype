@@ -7,7 +7,11 @@ export const stairPlan = (r) => {                                // the turning 
   const wid = Math.min(r.w, r.d), len = Math.max(r.w, r.d), wf = (wid - 0.5) / 2, u0 = 3.2, ld = wf + 0.1;
   return { wid, len, wf, u0, ld, run: len - u0 - ld };
 };
-export const turningStair = (r) => { const p = stairPlan(r); return p.wf >= 2.6 && p.run >= 4.2; };
+/** A proper stair: two flights at least 2.8 ft wide, each with a run of 6 ft or more (8 or more steps with treads of 9 inches or more and risers under 8). */
+export const turningStair = (r) => { const p = stairPlan(r); return p.wf >= 2.8 && p.run >= 6; };
+/** The room a proper turning stair is drawn in: 7 x 13.5 ft (flights of 3.25 ft, nine steps of 7 in with 9 in treads in each).
+ *  Whole and half feet only: the model that drafts the first floor over it knows sizes in half feet. */
+export const STAIR_ROOM = { wid: 7, len: 13.5 };
 export const PRESETS = [
   { label: '5 Marla', w: 25, d: 45 },
   { label: '7 Marla', w: 30, d: 50 },
@@ -99,22 +103,27 @@ export function finalize(L) {
       ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge', 'passage'] : ['lounge', 'dining', 'lobby', 'passage', 'drawing', 'kitchen'])
       : (PREF[r.type] || ['lounge', 'passage', 'lobby', 'dining']);
     if (r.type === 'stairs') {                                      // the flight needs its doors at the two ends: ground floor at the low end, first floor at the high end
-      const alongX = r.w > r.d, lo = alongX ? r.x : r.z, hi = lo + (alongX ? r.w : r.d), turn = turningStair(r), up = L.upper && !turn, order = L.upper ? ['lounge', 'terrace', 'passage', 'dining', 'study', 'store', 'lobby', 'bed'] : ['lobby', 'lounge', 'passage', 'drawing', 'dining', 'kitchen', 'bed'];
+      const alongX = r.w > r.d, lo = alongX ? r.x : r.z, hi = lo + (alongX ? r.w : r.d), turn = turningStair(r), up = L.upper || turn, order = L.upper ? ['lounge', 'terrace', 'passage', 'dining', 'study', 'store', 'lobby', 'bed'] : ['lobby', 'lounge', 'passage', 'drawing', 'dining', 'kitchen', 'bed'];
       const w = 3; let best = null;
       const wayOut = L.upper ? (L.open || []).filter((p) => p.type === 'terrace').map((p) => ({ id: 'terrace', type: 'terrace', x: p.x, z: p.z, w: p.w, d: p.d, att: null })) : [];      // the stairs open into the lounge or onto the terrace, not into a bedroom
-      for (const q of [...mains, ...wayOut]) {
-        if (q === r) continue;
-        const s0 = shared(r, q);
-        if (!s0) continue;
-        const [a1, b1] = doorSpan(r, s0.o, s0.c, s0.lo, s0.hi), [a2, b2] = doorSpan(q, s0.o, s0.c, a1, b1);
-        if (b2 - a2 < 2.4) continue;
-        const longWall = alongX ? s0.o === 'h' : s0.o === 'v';
-        let at, dist;
-        if (longWall) { const target = up ? hi - w / 2 - 0.2 : lo + w / 2 + 0.2; at = Math.max(a2 + w / 2, Math.min(b2 - w / 2, target)); if (b2 - a2 < w) at = (a2 + b2) / 2; dist = Math.abs(at - target); }
-        else { at = (a2 + b2) / 2; const endWall = alongX ? s0.c : s0.c; dist = Math.abs(endWall - (up ? hi : lo)) < 0.3 ? 0 : 60; }
-        const rank = order.indexOf(q.type) < 0 ? 9 : order.indexOf(q.type);
-        const key = (L.upper && rank > 1 ? 1000 : 0) + dist * 10 + rank;                // on a first floor the stairs open onto the lounge or the terrace before any other room
-        if (!best || key < best.key) best = { q, s: { ...s0, lo: a2, hi: b2 }, at, key, w: Math.min(w, Math.max(2.2, b2 - a2 - 0.2)) };
+      // a turning stair has both its doors at the same end of the room (the foot strip), on the ground floor and on the first floor: the first pass keeps to that end
+      for (const strict of turn ? [true, false] : [false]) {
+        for (const q of [...mains, ...wayOut]) {
+          if (q === r) continue;
+          const s0 = shared(r, q);
+          if (!s0) continue;
+          const [a1, b1] = doorSpan(r, s0.o, s0.c, s0.lo, s0.hi), [a2, b2] = doorSpan(q, s0.o, s0.c, a1, b1);
+          if (b2 - a2 < 2.4) continue;
+          const longWall = alongX ? s0.o === 'h' : s0.o === 'v';
+          let at, dist;
+          if (longWall) { const target = up ? hi - w / 2 - 0.2 : lo + w / 2 + 0.2; at = Math.max(a2 + w / 2, Math.min(b2 - w / 2, target)); if (b2 - a2 < w) at = (a2 + b2) / 2; dist = Math.abs(at - target); }
+          else { at = (a2 + b2) / 2; const endWall = alongX ? s0.c : s0.c; dist = Math.abs(endWall - (up ? hi : lo)) < 0.3 ? 0 : 60; }
+          if (strict && dist > 1.3) continue;
+          const rank = order.indexOf(q.type) < 0 ? 9 : order.indexOf(q.type);
+          const key = (L.upper && rank > 1 ? 1000 : 0) + dist * 10 + rank;                // on a first floor the stairs open onto the lounge or the terrace before any other room
+          if (!best || key < best.key) best = { q, s: { ...s0, lo: a2, hi: b2 }, at, key, w: Math.min(w, Math.max(2.2, b2 - a2 - 0.2)) };
+        }
+        if (best) break;
       }
       if (best) {
         const k = `${r.id}|${best.q.id}`;

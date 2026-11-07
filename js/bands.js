@@ -268,8 +268,14 @@ export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
   const stairs = rects.filter((r) => r.t === 'stairs');
   if (stairs.length) {
     for (const stair of stairs) {
-      if (stair.w < 2.5 || stair.w > 4.5) add('warn', `stair width ${stair.w.toFixed(1)}'`, `standard is 3–3.5 ft (got ${stair.w.toFixed(1)}')`);
-      const estSteps = Math.round(stair.d / 0.92);
+      const wid = Math.min(stair.w, stair.d), len = Math.max(stair.w, stair.d);
+      if (wid >= 5.6) {                                             // a turning stair: two flights side by side with a landing
+        if (wid > 9) add('warn', `stair width ${wid.toFixed(1)}'`, `a turning stair is about 7 ft wide (got ${wid.toFixed(1)}')`);
+        if (len > 18) add('warn', `stair length ${len.toFixed(1)}'`, `a turning stair is about 13 ft long (got ${len.toFixed(1)}')`);
+        continue;
+      }
+      if (wid < 2.5 || wid > 4.5) add('warn', `stair width ${wid.toFixed(1)}'`, `standard is 3–3.5 ft (got ${wid.toFixed(1)}')`);
+      const estSteps = Math.round(len / 0.92);
       if (estSteps > 22) add('warn', `stair length (${estSteps} steps)`, `single flight should be ≤20 steps, consider 2 flights or a landing`);
     }
   }

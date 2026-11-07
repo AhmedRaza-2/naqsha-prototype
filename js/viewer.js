@@ -94,7 +94,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     if (!keepPos) { state.pos.set(start, EYE, 2.5); state.floor = 0; state.hs = 0; state.onRoofDeck = false; state.yaw = Math.PI; state.pitch = 0; }
     applyCutaway();
     hooks.onCars?.(S.carsInfo);
-    if (/[?&]debug3d/.test(location.search)) window.__walk = { move: (a, b) => move(a, b), onRoof: () => onRoof(), roofColliders, carsInfo: S.carsInfo, tour, planPath: (...a) => planPath(...a), level: () => level(), state, colliders, upperColliders, R, stairs, doors, STOREY, roomAt: (x, z) => roomAt(x, z), rooms: L.rooms, upRooms: U ? U.rooms : null, mainDoor: L.openings.find((o) => o.main), openings: L.openings, B, gateX: S.gateX, gateLo: S.gateLo, gateHi: S.gateHi, start };   // for tests
+    if (/[?&]debug3d/.test(location.search)) window.__walk = { camera, orbit, setMode: (m) => setMode(m), move: (a, b) => move(a, b), onRoof: () => onRoof(), roofColliders, carsInfo: S.carsInfo, tour, planPath: (...a) => planPath(...a), level: () => level(), state, colliders, upperColliders, R, stairs, doors, STOREY, roomAt: (x, z) => roomAt(x, z), rooms: L.rooms, upRooms: U ? U.rooms : null, mainDoor: L.openings.find((o) => o.main), openings: L.openings, B, gateX: S.gateX, gateLo: S.gateLo, gateHi: S.gateHi, start };   // for tests
   }
 
   const orbit = new OrbitControls(camera, renderer.domElement);
@@ -258,10 +258,12 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   // ---------- one step of movement, shared by walking, following and the tour ----------
   /** On the roof (the stair head, the stair-head room and the open roof): above one and a half storeys. */
   const onRoof = () => state.hs > STOREY * 1.5;
+  /** Which walls stop the visitor: the roof's (the stair-head room, the parapet, the guards round the stair opening) only at the height of the roof
+   *  deck; on the last flight up to it (above one and a half storeys, below the deck) the stairwell's own walls are the ones that count. */
+  const collLvl = () => (state.hs >= STOREY * 2 - 0.6 ? 2 : state.hs > STOREY * 1.5 ? 1 : level());
   function move(dx, dz) {
-    const lvl = onRoof() ? 2 : level();
-    if (!blocked(state.pos.x + dx, state.pos.z, R, lvl)) state.pos.x += dx;
-    if (!blocked(state.pos.x, state.pos.z + dz, R, onRoof() ? 2 : level())) state.pos.z += dz;
+    if (!blocked(state.pos.x + dx, state.pos.z, R, collLvl())) state.pos.x += dx;
+    if (!blocked(state.pos.x, state.pos.z + dz, R, collLvl())) state.pos.z += dz;
     return settle();
   }
   // the height under the visitor: on the flight it follows the steps; leaving the flight at the top lands on the first floor
@@ -423,7 +425,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
         const bx = Math.sin(state.yaw), bz = Math.cos(state.yaw), lvl = level();
         let back = 8.5;
         const onS = state.inS;                                      // on the flight the rails are not walls: keep a gentle view from behind
-        const camBlocked = (x, z) => (onRoof() ? roofColliders : lvl ? upperColliders : colliders).some((c) => x > c.x0 - 0.3 && x < c.x1 + 0.3 && z > c.z0 - 0.3 && z < c.z1 + 0.3 && solid(c) && !(onS && c.k === 'rail'));
+        const camBlocked = (x, z) => (collLvl() === 2 ? roofColliders : lvl ? upperColliders : colliders).some((c) => x > c.x0 - 0.3 && x < c.x1 + 0.3 && z > c.z0 - 0.3 && z < c.z1 + 0.3 && solid(c) && !(onS && c.k === 'rail'));
         for (let t = 1.5; t <= 8.5; t += 0.5) { if (camBlocked(head.x + bx * t, head.z + bz * t)) { back = Math.max(onS ? 3.6 : 2.2, t - 0.8); break; } }
         const up = onS ? 2.4 + back * 0.15 + Math.max(0, 6 - back) * 0.7 + state.pitch * 3
           : 1.8 + back * 0.12 + Math.max(0, 6.5 - back) * 1.5 + state.pitch * 3;        // a wall behind: rise above it and look down

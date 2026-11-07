@@ -2,10 +2,10 @@
 // 3D walkthrough) uses.
 import { OPEN, MARLA_SQFT, toRects, outsideDoors } from './bands.js';
 import { toRects as treeRects, check as treeCheck } from './tree.js';
-import { finalize, ruleFor } from './layout.js';
+import { finalize, ruleFor, turningStair } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
 import { tidyRects } from './tidy.js';
-import { balconyRoom, reshapeFor, applyReshape, dropTerrace, dropGuestBath, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox } from './plantweak.js';
+import { balconyRoom, reshapeFor, applyReshape, dropTerrace, dropGuestBath, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox, growUpperStairs } from './plantweak.js';
 import { draftPlans, sampleDrafts, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -152,18 +152,28 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
   const styles = (await knowsStyles()) ? (family !== 'any' ? [family] : familiesFor(inner, request.beds)) : [null];
   const hasPorch = (it) => it.rects.some((r) => r.t === 'porch' || r.t === 'garage');
   const keep = (it) => (wantPorch === null || hasPorch(it) === wantPorch) && (family === 'any' || !it.style || it.style === family);
-  const items = await draftPlans({ w: inner.w, d: inner.d, ...request }, {
+  // a ground floor leaves the model with a proper stair (a 7 x 13.5 ft room for a two-storey house) and a car porch as wide as the cars asked for.
+  // A draft whose neighbouring rooms cannot give the stair its room is left out first; only when that leaves fewer than three layouts are the
+  // others (with the steeper straight stair) let in.
+  let strictStairs = request.storeys === 2 && !request.floor;
+  const run = (extra = {}) => draftPlans({ w: inner.w, d: inner.d, ...request }, {
     n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles, keep,
-    // a ground floor leaves the model with standard stairs (3.5-4 ft wide, 15-18 ft long) and a car porch as wide as the cars asked for
     embed: request.floor ? null : (p) => {
       let q = rsh ? applyReshape(p, plot.w, plot.d, rsh, request.rule) : p;
-      q = standardStairs(q);
+      q = standardStairs(q, strictStairs);
       for (const t of omit) q = dropRoom(q, t);                      // rooms the visitor chose to leave out (dining, drawing room ...)
       if (guestBath === 'no') q = dropGuestBath(q);                  // no washroom in the drawing room
       if (lawn === 'no') q = lawnToPorch(q);                          // no lawn: the front strip is all car porch
       return cars > 0 ? sizePorch(q, cars) : q;
     },
+    ...extra,
   });
+  let items = await run();
+  if (strictStairs && items.length < 3) {
+    strictStairs = false;
+    const more = await run({ n: 10, exclude: new Set([...(opts.exclude || []), ...items.map((it) => it.text)]) });
+    items = [...items, ...more].slice(0, 3);
+  }
   return items.map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
 }
 
@@ -238,6 +248,15 @@ export function stackShare(upperRects, groundRects) {
 /** Area (sq ft) of the terrace of a first floor: the open roof of the floor below that it does not cover. */
 export const terraceArea = (rects) => rects.filter((r) => r.t === 'terrace').reduce((s, r) => s + r.w * r.d, 0);
 
+/** 1 when the door of a first floor's stairs (at the end of the stair room the ground floor's door is at) opens onto the lounge or the terrace, else 0. */
+function stairsOpenOnLounge(it, R) {
+  try {
+    const L = planToLayout(it, 0), st = L.rooms.find((r) => r.type === 'stairs');
+    const d = st && L.openings.find((o) => o.kind === 'door' && o.room === st.id);
+    return d && (d.to === 'terrace' || (L.rooms.find((r) => r.id === d.to) || {}).type === 'lounge') ? 1 : 0;
+  } catch (e) { return 0; }
+}
+
 /** First floors over a chosen ground floor: three layouts drafted by the model, each rule-checked (the stairs sit exactly
  *  above the stairs below). Empty list when the ground floor has no stairs or the model gives nothing valid.
  *  prefs.terrace: 'with' (keep the open roof), 'without' (rooms cover it), 'both' (the default: some of each) or 'any'.
@@ -249,6 +268,10 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   const mode = prefs.terrace || 'both';
   const itemKey = (it) => JSON.stringify(it.plan.tree);
   const request = { w, d, beds: prefs.beds, baths: prefs.baths, floor: fb, ...(ground.plan.rule ? { rule: ground.plan.rule } : {}) };
+  // A ground floor with a proper turning stair (7 ft wide) is drafted over as a 4 ft wide stair inside that room, the width the model has seen often
+  // (it hardly ever draws a first floor round a 7 ft stair); the draft's stair then grows to the stair room (growUpperStairs), into the room beside it.
+  const R = fb.up, proper = R.w < R.d && R.w >= 6 && turningStair(R);
+  const natives = proper ? [0, R.w - 4].map((dx) => ({ ...fb, up: { ...R, x: R.x + dx, w: 4 } })) : [fb];
   const dbg = (typeof window !== 'undefined' && window.__S) ? (...a) => console.info('[upper]', ...a) : () => {};
   // The model is sampled once for this ground floor and every variant (with / without a terrace) and support level is cut
   // from the same drafts: sampling is what takes the time. More is drawn only when the drafts so far are not enough.
@@ -265,7 +288,11 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   const draw = async (count) => {
     const t0 = Date.now();
     draws += 1;
-    const more = await sampleDrafts(request, { n: count, temperature: opts.temperature ?? 0.8, onStatus: progress });
+    let more = [];
+    for (const [k, f] of natives.entries()) {
+      const part = await sampleDrafts({ ...request, floor: f }, { n: Math.ceil(count / natives.length), temperature: opts.temperature ?? 0.8, onStatus: (msg) => progress(String(msg).replace(/\((\d+)%\)/, (_, v) => `(${Math.round((k * 100 + +v) / natives.length)}%)`)) });
+      more = [...more, ...part];
+    }
     pool = [...pool, ...more];
     dbg('sampled', count, 'in', Date.now() - t0, 'ms');
   };
@@ -273,27 +300,34 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   const cut = (minSupport, variant) => draftPlans(request, {
     top: 3, exclude: opts.exclude, onStatus: progress, styles: [null], drafts: pool,
     keep: (it) => supportShare(it.rects, ground.rects) >= minSupport
+      && (!needLounge || stairsOpenOnLounge(it, R))
       && (variant !== 'with' || terraceArea(it.rects) >= 40)
       && (variant !== 'without' || (terraceArea(it.rects) < 40 && it.score >= 1)),     // no terrace left, and every rule still passes
-    embed: variant === 'without' || scale !== 1 || prefs.upDrawing
-      ? (p) => { let q = variant === 'without' ? dropTerrace(p) : scaleTerrace(p, scale); if (prefs.upDrawing) { const a = upperDrawing(q, 'terrace'); q = a !== q && !treeCheck(a, prefs.beds).some((c) => c.level === 'err') ? a : upperDrawing(q); } return q; } : null,
+    embed: variant === 'without' || scale !== 1 || prefs.upDrawing || proper
+      ? (p) => { let q = proper ? growUpperStairs(p, R) : p; q = variant === 'without' ? dropTerrace(q) : scaleTerrace(q, scale); if (prefs.upDrawing) { const a = upperDrawing(q, 'terrace'); q = a !== q && !treeCheck(a, prefs.beds).some((c) => c.level === 'err') ? a : upperDrawing(q); } return q; } : null,
     hang: (rects) => { const a = supportArea(rects, ground.rects); return a.tot - a.sup; },        // rooms are then pulled back over the ground floor
+    prefer: (it) => stairsOpenOnLounge(it, R),                                                    // the stairs open onto the lounge or the terrace, not into a bedroom
   });
   // a first floor must stand on the ground floor: rooms hanging over a yard or a car porch are not drawn if an alternative exists
+  let needLounge = false;                                          // first floors whose stairs open onto the lounge or the terrace come first (a turning stair has both its doors at one end of the room)
   const ladder = async (variant, want, more = variant === 'without' ? 0 : opts.quick ? 1 : 3) => {
     let items = [];
     for (let round = 0; round < 1 + more; round++) {
       if (round > 0 && opts.quick && items.length) break;             // the houses are pre-drafted: one more round only when nothing was found
       if (round > 0) await draw(opts.quick ? 24 : 30);                // big upper floors are drafted validly only now and then: sample more
-      for (const lvl of variant === 'without' ? [0.999, 0.9] : [0.999, 0.97, 0.88]) {       // the walls stand on the ground floor's walls: no room over the yard first
-        const t0 = Date.now();
-        const more = await cut(lvl, variant);
-        dbg(variant || 'any', 'support', lvl, '->', more.length, 'in', Date.now() - t0, 'ms');
-        const seen = new Set(items.map(itemKey));
-        items = [...items, ...more.filter((m) => !seen.has(itemKey(m)))].slice(0, want);
-        if (items.length >= want || (opts.exclude && items.length)) return items;
+      for (const lounge of proper && round === 0 ? [true, false] : [false]) {      // those with the lounge first, then (from the same drafts) any
+        needLounge = lounge;
+        for (const lvl of variant === 'without' ? [0.999, 0.9] : [0.999, 0.97, 0.88]) {       // the walls stand on the ground floor's walls: no room over the yard first
+          const t0 = Date.now();
+          const more = await cut(lvl, variant);
+          dbg(variant || 'any', 'support', lvl, lounge ? 'lounge' : '', '->', more.length, 'in', Date.now() - t0, 'ms');
+          const seen = new Set(items.map(itemKey));
+          items = [...items, ...more.filter((m) => !seen.has(itemKey(m)))].slice(0, want);
+          if (items.length >= want || (opts.exclude && items.length)) { needLounge = false; return items; }
+        }
       }
     }
+    needLounge = false;
     return items;
   };
   await draw(Math.max(opts.n ?? 12, mode === 'both' ? 16 : 0));

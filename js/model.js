@@ -239,7 +239,7 @@ export function cramped(rects) {
   return c;
 }
 
-export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, exclude = new Set(), onStatus, styles = [null], keep = () => true, hang = null, embed = null, drafts: given = null } = {}) {
+export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, exclude = new Set(), onStatus, styles = [null], keep = () => true, hang = null, embed = null, prefer = null, drafts: given = null } = {}) {
   const per = Math.max(1, Math.round(n / styles.length));
   // when no bigger room was asked for, the drafts are drawn with different emphasis (balanced, big lounge, big kitchen, big bedrooms): different arrangements, not one house three times
   const FOCI = ['balanced', 'lounge', 'kitchen', 'bedrooms'];
@@ -281,7 +281,8 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
     if (!r) continue;
     Object.assign(g, { plan: r.plan, checks: r.checks, score: r.score, rects: r.plan.tree ? treeRects(r.plan) : rowRects(r.plan), polished: r.moves });
   }
-  good.sort((a, b) => (b.score - a.score) || (a.cramp - b.cramp));       // among plans that pass the same rules, the roomier first
+  if (prefer) for (const g of good) g.pref = prefer(g) ? 1 : 0;           // a soft wish (the stairs open onto the lounge): decides among plans that pass the same rules
+  good.sort((a, b) => (b.score - a.score) || ((b.pref || 0) - (a.pref || 0)) || (a.cramp - b.cramp));       // among plans that pass the same rules, the roomier first
   const picked = [];
   for (const st of styles) {                                          // the best plan of each family first: three different layouts
     const best = good.find((g) => g.style === st && !picked.includes(g));
@@ -293,7 +294,8 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
     const rest = good.filter((g) => !picked.includes(g));
     if (!rest.length) break;
     const roomy = Math.min(...rest.filter((g) => g.score >= rest[0].score - 0.05).map((g) => g.cramp));
-    const near = rest.filter((g) => g.score >= rest[0].score - 0.05 && g.cramp <= roomy + 0.35);      // not much more cramped than the roomiest of them
+    let near = rest.filter((g) => g.score >= rest[0].score - 0.05 && g.cramp <= roomy + 0.35);      // not much more cramped than the roomiest of them
+    if (near.some((g) => g.pref)) near = near.filter((g) => g.pref);
     const apart = (g) => Math.min(...picked.map((p) => sigDistance(g, p) + 0.5 * layoutDistance(g, p)));     // where the stairs, entrance, kitchen ... stand matters most
     picked.push(picked.length ? near.reduce((a, b) => (apart(b) > apart(a) ? b : a)) : near[0]);
   }

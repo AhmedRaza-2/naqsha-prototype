@@ -663,12 +663,13 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     };
     const gd = doorOf(L, sr), ud = doorOf(U, upStairs);
     const gS = spanOf(gd) || [0, 0], uS = spanOf(ud) || [len, len];
-    // a turning stair (two flights side by side, a landing at the far end) when the room is wide enough and both doors are at the same end
+    // a turning stair (two flights side by side, a landing at the far end: 9 steps of 7 in with 9 in treads in each) when the room is 6.5 ft wide or more
+    // and 12.5 ft long or more, and both doors are at the same end
     const doorMid = (d, sp) => (d ? (sp[0] + sp[1]) / 2 : null), gm = doorMid(gd, gS), um = doorMid(ud, uS);
     const turned = (() => {
       if (!turningStair(sr) || gm == null || um == null || (gm < len / 2) !== (um < len / 2)) return null;
       const dir = gm < len / 2 ? 1 : -1, { u0, wf, ld, run } = stairPlan(sr);
-      const n = Math.max(7, Math.min(9, Math.round(run / 0.6))), tr = run / n, half = STOREY / 2, stepH = half / n;
+      const n = Math.max(8, Math.min(11, Math.round(run / 0.8))), tr = run / n, half = STOREY / 2, stepH = half / n;     // treads of about 9.5 in, risers of about 7 in
       const mStep = st.floorLiving.startsWith('marble') ? texMat(st.floorLiving, { roughness: 0.35 }, 4) : mTrim;
       const lowX = alongX ? sr.x : sr.z, lowAcross = alongX ? sr.z : sr.x;
       const bx = (ua, ub, va, vb, y0, y1, m, solid = false) => {            // a box from u (along, from the doors' end) and v (across, from the low side) ranges
@@ -693,6 +694,24 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         const p0 = at(uA, y0 + 3), p1 = at(uB, y1 + 3), vec = p1.clone().sub(p0);
         const bar = new THREE.Mesh(new THREE.BoxGeometry(vec.length(), 0.14, 0.14), mFrame);
         bar.position.copy(p0.clone().add(p1).multiplyScalar(0.5)); bar.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), vec.clone().normalize()); bar.castShadow = true; stairsG.add(bar);
+        const toWall = v < wid / 2 ? -1 : 1, nb = Math.max(2, Math.round(vec.length() / 2.6));         // brackets that hold the rail to the wall
+        for (let k = 0; k < nb; k++) {
+          const q = p0.clone().lerp(p1, (k + 0.5) / nb), br = new THREE.Mesh(new THREE.BoxGeometry(alongX ? 0.09 : 0.26, 0.11, alongX ? 0.26 : 0.09), mFrame);
+          br.position.set(q.x + (alongX ? 0 : toWall * 0.13), q.y - 0.05, q.z + (alongX ? toWall * 0.13 : 0)); stairsG.add(br);
+        }
+      };
+      // a smooth underside for a flight that is entered from below (the flights above the first floor): a plastered slope instead of the zig-zag of the steps
+      const mSoffit = mInt.clone(); mSoffit.color = mInt.color; mSoffit.emissive = mInt.color; mSoffit.emissiveIntensity = 0.45;     // lit from within: an underside gets no light, and a black one looks like a slab of wood
+      const soffit = (uA, uB, yA, yB, va, vb) => {
+        const at2 = (u, y, v) => { const o = dir > 0 ? u : len - u; return alongX ? new THREE.Vector3(sr.x + o, y, sr.z + v) : new THREE.Vector3(sr.x + v, y, sr.z + o); };
+        const T = 0.45, a = at2(uA, yA, 0), b = at2(uB, yB, 0), ex = b.clone().sub(a), L0 = ex.length();
+        ex.normalize();
+        let ez = alongX ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0), ey = new THREE.Vector3().crossVectors(ez, ex).normalize();
+        if (ey.y < 0) { ez = ez.negate(); ey = ey.negate(); }
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(L0 + 0.1, T, vb - va), mSoffit);
+        mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(ex, ey, ez));
+        const mid = at2((uA + uB) / 2, (yA + yB) / 2, (va + vb) / 2);
+        mesh.position.copy(mid.add(new THREE.Vector3(0, -T * 0.55, 0))); mesh.castShadow = true; mesh.receiveShadow = true; stairsG.add(mesh);
       };
       rail(0.28, 0, half, u0, len - ld); rail(wid - 0.28, STOREY, half, u0, len - ld);
       // the way on up to the roof: the same two flights again, one storey higher. The first floor's door at the foot of the stair meets the
@@ -708,6 +727,8 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
         bx(0, u0, 0.05, wid - 0.05, 2 * STOREY - 0.5, 2 * STOREY, mStep);                                  // the floor of the stair-head room
         bx(u0, len - ld, wf, wid - wf, STOREY, 2 * STOREY, mInt);                                           // the wall between the flights, up to the roof
         rail(0.28, Y, Y + half, u0, len - ld); rail(wid - 0.28, 2 * STOREY, Y + half, u0, len - ld);
+        soffit(u0, len - ld, Y - 0.05, Y + half - 0.05, 0.05, wf);                                          // the way up
+        soffit(len - ld, u0, Y + half - 0.05, 2 * STOREY - 0.05, wid - wf, wid - 0.05);                      // and the way back over it
       }
       const pushU = (d) => {                                          // a spot just beyond a door, in the room on its other side
         if (!d) return { x: sr.x + sr.w / 2, z: sr.z + sr.d / 2 };
