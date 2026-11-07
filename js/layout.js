@@ -7,9 +7,10 @@ export const stairPlan = (r) => {                                // the turning 
   const wid = Math.min(r.w, r.d), len = Math.max(r.w, r.d), wf = (wid - 0.5) / 2, u0 = 3.2, ld = wf + 0.1;
   return { wid, len, wf, u0, ld, run: len - u0 - ld };
 };
-/** A proper stair: two flights at least 2.8 ft wide, each with a run of 6 ft or more (8 or more steps with treads of 9 inches or more and risers under 8). */
-export const turningStair = (r) => { const p = stairPlan(r); return p.wf >= 2.8 && p.run >= 6; };
-/** The room a proper turning stair is drawn in: 7 x 13.5 ft (flights of 3.25 ft, nine steps of 7 in with 9 in treads in each).
+/** A proper stair: two flights at least 2.5 ft wide, each with a run of 6 ft or more (nine steps with risers of 7 in and treads of 8 in or more). */
+export const turningStair = (r) => { const p = stairPlan(r); return p.wf >= 2.5 && p.run >= 6; };
+/** The room a proper turning stair is drawn in: 7 x 13.5 ft (flights of 3.25 ft, nine steps of 7 in with 9 in treads in each, a 3 ft strip at the
+ *  doors' end, a landing at the other). A smaller house gets a smaller one, down to 5.5 x 12 ft (see STAIR_TIERS in plantweak.js).
  *  Whole and half feet only: the model that drafts the first floor over it knows sizes in half feet. */
 export const STAIR_ROOM = { wid: 7, len: 13.5 };
 export const PRESETS = [

@@ -147,19 +147,22 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
   const wantPorch = porch === 'any' ? null : porch === 'yes';
   // a model trained on layout families drafts each family that fits, so the three layouts differ in arrangement
   // more open space than the standard on a side: the model draws a smaller plot and the drawing is wrapped in the extra strips
-  const rsh = request.rule && !request.floor ? reshapeFor(plot.w, plot.d, request.rule) : null;      // the visitor's own open space on any mix of sides
+  // A side the visitor did not name keeps the standard of the real plot (not of the smaller or bigger plot the model draws), so a bigger front
+  // (15 ft for a two-car porch on 30 x 50) is not paid for with the sides and the back.
+  const own = request.rule && !request.floor ? { side: ruleFor(plot.w, plot.d).side, front: ruleFor(plot.w, plot.d).front, rear: ruleFor(plot.w, plot.d).rear, ...request.rule } : null;
+  const rsh = own ? reshapeFor(plot.w, plot.d, own) : null;      // the visitor's own open space on any mix of sides
   const inner = rsh ? { w: rsh.w, d: rsh.d } : plot;
   const styles = (await knowsStyles()) ? (family !== 'any' ? [family] : familiesFor(inner, request.beds)) : [null];
   const hasPorch = (it) => it.rects.some((r) => r.t === 'porch' || r.t === 'garage');
   const keep = (it) => (wantPorch === null || hasPorch(it) === wantPorch) && (family === 'any' || !it.style || it.style === family);
-  // a ground floor leaves the model with a proper stair (a 7 x 13.5 ft room for a two-storey house) and a car porch as wide as the cars asked for.
-  // A draft whose neighbouring rooms cannot give the stair its room is left out first; only when that leaves fewer than three layouts are the
-  // others (with the steeper straight stair) let in.
+  // a ground floor leaves the model with a proper stair (a 7 x 13.5 ft room for a two-storey house, smaller for a small house) and a car porch as
+  // wide as the cars asked for. A draft whose neighbouring rooms cannot give the stair its room is left out; more are drawn when that leaves fewer
+  // than three, and only when none has room for a proper stair is the steeper straight stair let in.
   let strictStairs = request.storeys === 2 && !request.floor;
   const run = (extra = {}) => draftPlans({ w: inner.w, d: inner.d, ...request }, {
     n: (opts.n ?? 12) + (wantPorch === null ? 0 : 6), top: 3, temperature: opts.temperature ?? 0.8, exclude: opts.exclude, onStatus, styles, keep,
     embed: request.floor ? null : (p) => {
-      let q = rsh ? applyReshape(p, plot.w, plot.d, rsh, request.rule) : p;
+      let q = rsh ? applyReshape(p, plot.w, plot.d, rsh, own) : p;
       q = standardStairs(q, strictStairs);
       for (const t of omit) q = dropRoom(q, t);                      // rooms the visitor chose to leave out (dining, drawing room ...)
       if (guestBath === 'no') q = dropGuestBath(q);                  // no washroom in the drawing room
@@ -169,10 +172,13 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
     ...extra,
   });
   let items = await run();
-  if (strictStairs && items.length < 3) {
-    strictStairs = false;
-    const more = await run({ n: 10, exclude: new Set([...(opts.exclude || []), ...items.map((it) => it.text)]) });
+  if (strictStairs && items.length < 3) {                          // a proper stair is worth more than a third option: draw more before settling for fewer
+    const more = await run({ n: 14, exclude: new Set([...(opts.exclude || []), ...items.map((it) => it.text)]) });
     items = [...items, ...more].slice(0, 3);
+  }
+  if (strictStairs && !items.length) {                             // no draft has room for one: the straight stair is the last resort
+    strictStairs = false;
+    items = await run({ n: 10 });
   }
   return items.map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
 }
@@ -270,8 +276,8 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   const request = { w, d, beds: prefs.beds, baths: prefs.baths, floor: fb, ...(ground.plan.rule ? { rule: ground.plan.rule } : {}) };
   // A ground floor with a proper turning stair (7 ft wide) is drafted over as a 4 ft wide stair inside that room, the width the model has seen often
   // (it hardly ever draws a first floor round a 7 ft stair); the draft's stair then grows to the stair room (growUpperStairs), into the room beside it.
-  const R = fb.up, proper = R.w < R.d && R.w >= 6 && turningStair(R);
-  const natives = proper ? [0, R.w - 4].map((dx) => ({ ...fb, up: { ...R, x: R.x + dx, w: 4 } })) : [fb];
+  const R = fb.up, proper = R.w < R.d && R.w >= 5.5 && turningStair(R);
+  const natives = proper ? [...new Set([0, Math.floor(R.w - 4) / 2, R.w - 4])].map((dx) => ({ ...fb, up: { ...R, x: R.x + dx, w: 4 } })) : [fb];     // the narrow stair at the left, in the middle and at the right of the stair room: the rooms beside it give up the width from one side or from both
   const dbg = (typeof window !== 'undefined' && window.__S) ? (...a) => console.info('[upper]', ...a) : () => {};
   // The model is sampled once for this ground floor and every variant (with / without a terrace) and support level is cut
   // from the same drafts: sampling is what takes the time. More is drawn only when the drafts so far are not enough.
@@ -317,7 +323,7 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
       if (round > 0) await draw(opts.quick ? 24 : 30);                // big upper floors are drafted validly only now and then: sample more
       for (const lounge of proper && round === 0 ? [true, false] : [false]) {      // those with the lounge first, then (from the same drafts) any
         needLounge = lounge;
-        for (const lvl of variant === 'without' ? [0.999, 0.9] : [0.999, 0.97, 0.88]) {       // the walls stand on the ground floor's walls: no room over the yard first
+        for (const lvl of variant === 'without' ? [0.999, 0.9, 0.8] : [0.999, 0.97, 0.88, 0.8]) {       // the walls stand on the ground floor's walls: no room over the yard first; a room over the car porch (up to a fifth of the floor) only when nothing else fits
           const t0 = Date.now();
           const more = await cut(lvl, variant);
           dbg(variant || 'any', 'support', lvl, lounge ? 'lounge' : '', '->', more.length, 'in', Date.now() - t0, 'ms');

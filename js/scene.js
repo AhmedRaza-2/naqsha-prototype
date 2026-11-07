@@ -669,7 +669,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     const turned = (() => {
       if (!turningStair(sr) || gm == null || um == null || (gm < len / 2) !== (um < len / 2)) return null;
       const dir = gm < len / 2 ? 1 : -1, { u0, wf, ld, run } = stairPlan(sr);
-      const n = Math.max(8, Math.min(11, Math.round(run / 0.8))), tr = run / n, half = STOREY / 2, stepH = half / n;     // treads of about 9.5 in, risers of about 7 in
+      const n = Math.max(9, Math.min(11, Math.round(run / 0.8))), tr = run / n, half = STOREY / 2, stepH = half / n;     // nine steps of 7 in risers in each flight at the least, treads of 8 to 10 in
       const mStep = st.floorLiving.startsWith('marble') ? texMat(st.floorLiving, { roughness: 0.35 }, 4) : mTrim;
       const lowX = alongX ? sr.x : sr.z, lowAcross = alongX ? sr.z : sr.x;
       const bx = (ua, ub, va, vb, y0, y1, m, solid = false) => {            // a box from u (along, from the doors' end) and v (across, from the low side) ranges

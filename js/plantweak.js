@@ -285,14 +285,11 @@ export function applyReshape(plan, W, D, rs, own) {
   const w0 = plan.plot.w, d0 = plan.plot.d;
   if (cut.l + cut.r + cut.f + cut.b > 0.001) q = trimGround(q, w0 - cut.l - cut.r, d0 - cut.f - cut.b, { w: w0, d: d0, ...cut }, true);
   const w1 = q.plot.w, d1 = q.plot.d;
-  // a little too big for the plot: the open space that was asked for in addition gives up to a foot or two rather than squeezing the rooms
-  for (const [axis, sides, over] of [['x', ['l', 'r'], w1 + add.l + add.r - W], ['y', ['f', 'b'], d1 + add.f + add.b - D]]) {
-    let left = Math.min(over, 2);
-    for (const k of sides) { const t = Math.min(left, add[k]); if (t > 0) { add[k] -= t; left -= t; } }
-  }
+  // the open space asked for (or the plot's standard on a side not named) is kept to the foot: when the plan comes out a little too big
+  // for the plot, the rooms take the difference (stretch below), not the open space
   if (add.l + add.r + add.f + add.b > 0.001) q = wrapGround(q, w1 + add.l + add.r, d1 + add.f + add.b, { w: w1, d: d1, l: add.l, r: add.r, f: add.f, b: add.b });
   const mw = q.plot.w - W, md = q.plot.d - D;
-  if (Math.abs(mw) > 4.01 || Math.abs(md) > 4.01) throw new Error('size mismatch');
+  if (Math.abs(mw) > 6.01 || Math.abs(md) > 6.01) throw new Error(`size mismatch ${mw} x ${md}`);       // the rooms take up to 6 ft of difference
   q = clone(q);
   stretch(q, 'x', -mw);
   stretch(q, 'y', -md);
@@ -415,10 +412,10 @@ function resizeLeaf(plan, f, axis, target, skip = () => false) {
   return cur + (delta > 0 ? done : -done);
 }
 
-/** Stairs the way a house is built. A house with a first floor gets a proper turning stair (two flights of about 3.25 ft side by side, a landing
- *  between, 9 steps of 7 in with 9 in treads in each) in a room of 7 x 13.5 ft (smaller sizes down to 6.5 x 12.5 when the rooms beside it cannot
- *  give that much); with `strict` a draft that cannot get one is refused (thrown). Otherwise a straight flight is 3.5 to 4 ft wide and up to
- *  18 ft long; what the model drew beyond that goes back to the room beside it. Ground floors only. */
+/** Stairs the way a house is built. A house with a first floor gets a proper turning stair (two flights side by side, a landing between, nine
+ *  steps of 7 in in each) in a room of 7 x 13.5 ft, or a smaller one (down to 5.5 x 12 ft, flights of 2.5 ft) when the house is small or the
+ *  rooms beside it cannot give that much; with `strict` a draft that cannot get one is refused (thrown). Otherwise (the last resort) a straight
+ *  flight is 3.5 to 4 ft wide and up to 18 ft long; what the model drew beyond that goes back to the room beside it. Ground floors only. */
 export function standardStairs(plan, strict = false) {
   if (!plan.tree || plan.floor) return plan;
   const two = (plan.storeys || 1) >= 2;
@@ -433,7 +430,7 @@ export function standardStairs(plan, strict = false) {
   const wide = f.w >= f.d ? 'V' : 'H';                               // the stair runs along its longer side; the other is its width
   const [short, long] = wide === 'V' ? [f.d, f.w] : [f.w, f.d];
   const shortAxis = wide === 'V' ? 'H' : 'V', longAxis = wide === 'V' ? 'V' : 'H';
-  if (long >= 9 && short > 4 && !(two && short >= 6)) resizeLeaf(p, f, shortAxis, 4);   // a straight stair room is 4 ft wide at most (the model sometimes draws one 7 or 8 ft wide)
+  if (long >= 9 && short > 4) resizeLeaf(p, f, shortAxis, 4);   // a straight stair room is 4 ft wide at most (the model sometimes draws one 7 or 8 ft wide)
   if (long > 18) {
     const g = locate(p, (n) => n.t === 'stairs');
     resizeLeaf(p, g, longAxis, 17.5);
@@ -450,12 +447,14 @@ export function standardStairs(plan, strict = false) {
  *  STAIR_ROOM, or to one of the smaller proper sizes when the rooms beside it cannot spare that much, the difference taken from / given
  *  to them. The room always runs along the depth of the plot; null when even the smallest does not fit (the straight stair is then the
  *  fallback). */
-const STAIR_TIERS = [[STAIR_ROOM.wid, STAIR_ROOM.len], [7, 13], [6.5, 12.5]];
+const STAIR_TIERS = [[STAIR_ROOM.wid, STAIR_ROOM.len, 1000], [7, 13, 850], [6.5, 12.5, 750], [6, 12.5, 650], [5.5, 12, 0]];     // [width, length, smallest built area it is drawn in]: flights down to 2.5 ft, so a small house gets a smaller proper stair, never the long straight one
 function turningStairRoom(plan) {
   const f0 = locate(plan, (n) => n.t === 'stairs');
   if (!f0) return null;
   const m0 = marginsOf(plan), isOpen = (k) => k.k === 'room' && OPEN.has(k.t);     // the open space round the house, the lawn and the porch are not given up for the stairs
-  for (const [wid, len] of STAIR_TIERS) {
+  const area = m0 ? (plan.plot.w - m0.l - m0.r) * (plan.plot.d - m0.f - m0.b) : Infinity;      // the house's footprint: the stair takes a smaller share of a small house
+  for (const [wid, len, minArea] of STAIR_TIERS) {
+    if (area < minArea) continue;
     let best = null;
     for (const long of ['H']) {                                       // the room runs along the depth of the plot, like the stairs the first-floor model has seen
       const short = 'V';

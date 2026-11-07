@@ -731,7 +731,7 @@ function areaTable(floors) {
   return '<table>' + rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('') + '</table><p class="fine">Setbacks and coverage limits are indicative; confirm with your development authority.</p>';
 }
 /** First floors over a ground floor, stepping down to fewer upstairs bedrooms or washrooms when the plan does not fit. */
-async function upperFor(ground, { regen, quick = false }, onStatus) {
+async function upperFor(ground, { regen, quick = false, retry = false }, onStatus) {
   const { upBeds, upBaths, terrace, upDrawing } = S.prefs;
   const tries = [[upBeds, upBaths, '']];
   if (upBaths > upBeds) tries.push([upBeds, upBeds, `${upBaths} washrooms upstairs do not fit with this ground floor, so these have ${upBeds}, one attached to each bedroom.`]);
@@ -745,7 +745,7 @@ async function upperFor(ground, { regen, quick = false }, onStatus) {
   };
   for (const [beds, baths, msg] of quick ? tries.slice(0, 1) : tries) {                // quick: the houses are drafted without the step-downs
     const layouts = await upperLayouts(ground, { beds, baths, terrace, upDrawing, upOmit: ['store', 'study'] }, status,
-      { exclude: regen ? S.seenUp : new Set(), temperature: regen ? 0.95 : 0.8, n: regen ? 18 : 12, quick });
+      { exclude: regen ? S.seenUp : new Set(), temperature: regen || retry ? 0.95 : 0.8, n: regen || retry ? 18 : 12, quick });
     if (layouts.length) return { layouts, note: [msg, layouts.note].filter(Boolean).join(' ') };
     if (regen) break;                                            // Regenerate keeps the request; only the first try relaxes it
   }
@@ -777,6 +777,7 @@ async function draftUpper(regen, btnId) {
   let layouts = [], note = '';
   try {
     ({ layouts, note } = await upperFor(S.sel, { regen }, (m) => (btn.textContent = m)));
+    if (!layouts.length && !regen) ({ layouts, note } = await upperFor(S.sel, { regen, retry: true }, (m) => (btn.textContent = m)));     // the model draws at random: one more go, a little looser, before giving up
   } catch (err) {
     console.warn('Naqsha model could not draft the first floor.', err);
   }

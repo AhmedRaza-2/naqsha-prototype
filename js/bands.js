@@ -269,7 +269,7 @@ export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
   if (stairs.length) {
     for (const stair of stairs) {
       const wid = Math.min(stair.w, stair.d), len = Math.max(stair.w, stair.d);
-      if (wid >= 5.6) {                                             // a turning stair: two flights side by side with a landing
+      if (wid >= 5.4) {                                             // a turning stair: two flights side by side with a landing
         if (wid > 9) add('warn', `stair width ${wid.toFixed(1)}'`, `a turning stair is about 7 ft wide (got ${wid.toFixed(1)}')`);
         if (len > 18) add('warn', `stair length ${len.toFixed(1)}'`, `a turning stair is about 13 ft long (got ${len.toFixed(1)}')`);
         continue;
