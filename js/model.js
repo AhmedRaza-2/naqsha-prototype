@@ -5,6 +5,7 @@
 import { score, check as rowCheck, toRects as rowRects } from './bands.js';
 import { parseAny, familyOf, check as treeCheck, toRects as treeRects } from './tree.js';
 import { polish, refine, tuck, outlineKey } from './polish.js';
+import { Guide, tokenTable } from './grammar.js';
 
 const BASE = new URL('../models/', import.meta.url);
 const LAYERS = 6, HEADS = 8, HEAD_DIM = 32;
@@ -144,7 +145,7 @@ export async function knowsStyles() {
 
 /** Sample plans: one per entry of `styles` (null = no style tag). Rows whose prompts have the same length share one
  *  batch and one key/value cache. Returns [{ text, style }] (may be invalid, the caller checks them). */
-async function sample(request, styles, { temperature = 0.8, maxNew = 170 } = {}, onStatus) {
+async function sample(request, styles, { temperature = 0.8, maxNew = 200 } = {}, onStatus) {
   await load();                                                     // the prompt depends on the loaded vocabulary
   const groups = new Map();
   styles.forEach((ent) => {
@@ -159,7 +160,9 @@ async function sample(request, styles, { temperature = 0.8, maxNew = 170 } = {},
   let g = 0;
   for (const rows of groups.values()) {
     g += 1;
-    const texts = await sampleBatch(rows, temperature, maxNew, expectedLength(request), (pct) => onStatus?.(`Drafting layouts (${Math.min(99, Math.round(((g - 1 + pct) / groups.size) * 100))}%)`));
+    const rect = request.floor ? { w: request.floor.box.w, d: request.floor.box.d } : { w: request.w, d: request.d };      // what the tree divides: the plot, or the built box of a first floor
+    const req = { beds: request.beds, baths: stoi.has('BATHS') && request.baths != null ? request.baths : null, stairs: request.storeys === 2 && !request.floor, must: !request.floor, up: request.floor ? request.floor.up : null };      // what the plan must have (grammar.js)
+    const texts = await sampleBatch(rows, temperature, maxNew, expectedLength(request), rect, req, (pct) => onStatus?.(`Drafting layouts (${Math.min(99, Math.round(((g - 1 + pct) / groups.size) * 100))}%)`));
     rows.forEach((r, i) => out.push({ text: texts[i], style: r.style }));
   }
   return out;
@@ -169,7 +172,14 @@ async function sample(request, styles, { temperature = 0.8, maxNew = 170 } = {},
  *  14 marla up), so the progress shown while drafting runs to about 100% instead of stopping half way. */
 const expectedLength = ({ w, d, floor }) => Math.min(125, Math.max(42, 22 + 6.8 * ((w * d) / 225))) * (floor ? 0.55 : 1);
 
-async function sampleBatch(rows, temperature, maxNew, expected, progress) {
+/** Sampling statistics of the last runs, for the tests: drafts written, and how often the guide had to step in. */
+export const sampleStats = { drafts: 0, steered: 0, stoodAside: 0 };
+/** guided: false writes the plans without the guide (for measuring what it adds). */
+export const decoding = { guided: true, trace: null };       // trace: an array to record where the guide overruled the model (tests)
+let tokTable = null;
+const TOP_P = 0.97;                                                 // nucleus sampling: the unlikely tail of the distribution is never drawn
+
+async function sampleBatch(rows, temperature, maxNew, expected, rect, req, progress) {
   const { ort } = await load();
   const B = rows.length;
   const L0 = rows[0].ids.length;
@@ -191,21 +201,37 @@ async function sampleBatch(rows, temperature, maxNew, expected, progress) {
   const V = vocab.tokens.length;
   const out = Array.from({ length: B }, () => []);
   const done = new Array(B).fill(false);
+  tokTable ||= tokenTable(vocab);
+  const guides = rows.map(() => { const G = new Guide(tokTable, rect, req); G.ok = decoding.guided; return G; });      // one per draft: it follows the tree as it is written (grammar.js)
+  const order = new Int32Array(V), p = new Float64Array(V);
+  sampleStats.drafts += B;
   for (let s = 0; s < maxNew && pos < vocab.max_len - 1; s++) {
     progress(Math.min(0.99, s / expected));
     const logits = await step(cur, pos);
     const next = new Array(B);
+    const left = Math.min(maxNew - s, vocab.max_len - 1 - pos);
     for (let b = 0; b < B; b++) {
-      const row = logits.subarray(b * V, (b + 1) * V);
-      let mx = -Infinity;
-      for (let i = 0; i < V; i++) if (row[i] > mx) mx = row[i];
-      let sum = 0;
-      const p = new Float64Array(V);
-      for (let i = 0; i < V; i++) { p[i] = Math.exp((row[i] - mx) / temperature); sum += p[i]; }
-      let r = Math.random() * sum, pick = V - 1;
-      for (let i = 0; i < V; i++) { r -= p[i]; if (r <= 0) { pick = i; break; } }
+      const row = logits.subarray(b * V, (b + 1) * V), G = guides[b];
+      if (done[b]) { next[b] = vocab.eos; continue; }
+      G.hurry = left <= G.minLeft() + 6;                             // running out of room: finish what is open
+      // the model's probabilities over the tokens the guide allows
+      let mx = -Infinity, any = false, best = -1, bestAll = -Infinity;
+      for (let i = 0; i < V; i++) { if (row[i] > bestAll) { bestAll = row[i]; best = i; } if (G.allows(i)) { any = true; if (row[i] > mx) mx = row[i]; } }
+      if (!any) { G.ok = false; mx = bestAll; sampleStats.stoodAside++; }
+      else if (!G.allows(best)) { sampleStats.steered++; G.steerFrom = best; }
+      let sum = 0, n = 0;
+      for (let i = 0; i < V; i++) { if (G.allows(i)) { p[i] = Math.exp((row[i] - mx) / temperature); sum += p[i]; order[n++] = i; } else p[i] = 0; }
+      // nucleus: the most likely tokens that together carry TOP_P of the probability
+      const idx = Array.from(order.subarray(0, n)).sort((a, c) => p[c] - p[a]);
+      let acc = 0, keep = 0;
+      while (keep < idx.length && acc < TOP_P * sum) acc += p[idx[keep++]];
+      let r = Math.random() * acc, pick = idx[keep - 1];
+      for (let k2 = 0; k2 < keep; k2++) { r -= p[idx[k2]]; if (r <= 0) { pick = idx[k2]; break; } }
       next[b] = pick;
-      if (!done[b]) { out[b].push(pick); if (pick === vocab.eos) done[b] = true; }
+      if (decoding.trace && G.steerFrom != null) decoding.trace.push({ b, s, want: vocab.tokens[G.steerFrom], got: vocab.tokens[pick] });
+      G.steerFrom = null;
+      G.push(pick);
+      out[b].push(pick); if (pick === vocab.eos) done[b] = true;
     }
     cur = next; pos++;
     if (done.every(Boolean)) break;
@@ -288,13 +314,13 @@ export async function draftPlans(request, { n = 12, top = 3, temperature = 0.8, 
   good.sort((a, b) => (b.score - a.score) || ((b.pref || 0) - (a.pref || 0)) || (a.cramp - b.cramp));       // among plans that pass the same rules, the roomier first
   const picked = [];
   for (const st of styles) {                                          // the best plan of each family first: three different layouts
-    const best = good.find((g) => g.style === st && !picked.includes(g));
+    const best = good.find((g) => g.style === st && !picked.includes(g) && g.score >= good[0].score - 0.1);      // the best of a family, unless it is clearly worse than the best plan there is
     if (best && picked.length < top) picked.push(best);
   }
   // then, among the plans that score as well as the best one left, the one least like the cards already picked
   // (a mirror image counts as the same layout), so the cards do not show one house three times
   while (picked.length < top) {
-    const rest = good.filter((g) => !picked.includes(g));
+    const rest = good.filter((g) => !picked.includes(g) && (!picked.length || g.score >= good[0].score - 0.2));      // a card is not filled with a plan far below the best one
     if (!rest.length) break;
     const roomy = Math.min(...rest.filter((g) => g.score >= rest[0].score - 0.05).map((g) => g.cramp));
     let near = rest.filter((g) => g.score >= rest[0].score - 0.05 && g.cramp <= roomy + 0.35);      // not much more cramped than the roomiest of them

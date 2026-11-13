@@ -44,6 +44,12 @@
               </button>
             </div>
             <div class="examples" id="examples" aria-label="Examples you can tap"><span class="fine">Try</span></div>
+            <div class="quickfloors" id="quickfloors"><span class="fine">Floors</span>
+              <div class="seg" id="fseg2" role="radiogroup" aria-label="Number of floors">
+                <button type="button" role="radio" data-f="1" aria-checked="true" class="on">One floor</button>
+                <button type="button" role="radio" data-f="2" aria-checked="false">Two floors</button>
+              </div>
+            </div>
             <div class="voicebar" id="voicebar"><span class="meter" id="meter" aria-hidden="true"><i></i></span><span class="fine" id="micstat" aria-live="polite">Speaking needs a microphone. A small speech model runs on your device (about 40 MB the first time).</span></div>
             <div class="said" id="nlsaid" aria-live="polite"></div>
             <div class="voiceok" id="voiceok" hidden role="group" aria-label="Check what was heard">
@@ -244,7 +250,8 @@
       <div class="card colors" id="facade">
         <div class="swrow"><span class="swlabel">Doors and shutters</span><div class="sw" id="swacc" role="radiogroup" aria-label="Accent colour"></div></div>
         <div class="swrow"><span class="swlabel">Front of the house</span>
-          <label class="mini">Front design<select id="ffront"><option value="auto">Suited to the style</option><option value="frame">Entrance frame</option><option value="tower">Feature wall</option><option value="bands">Floating slabs</option><option value="plain">Plain</option></select></label>
+          <label class="mini">Front design<select id="ffront"><option value="auto">Suited to the style</option><option value="frame">Entrance frame</option><option value="tower">Feature wall</option><option value="bands">Floating slabs</option><option value="gen">A new variation</option><option value="plain">Plain</option></select></label>
+          <button class="btn sm" id="fnew" type="button">Another front</button>
           <label class="mini">Roof<select id="froof"><option value="flat">Flat, with a low wall round it</option><option value="hip">Sloping, with tiles</option></select></label>
           <label class="mini">Window shape<select id="fwin"><option value="standard">Normal</option><option value="tall">Tall and narrow</option><option value="wide">Wide</option></select></label>
           <label class="mini">Window shutters<select id="fshut"><option value="0">No shutters</option><option value="1">Wooden shutters</option></select></label>

@@ -85,7 +85,7 @@ $('punit').addEventListener('change', () => {
 });
 $('pwu').addEventListener('input', () => { const v = +$('pwu').value; if (v > 0) $('pw').value = String(toFt(v)); readPlot(); });
 $('pdu').addEventListener('input', () => { const v = +$('pdu').value; if (v > 0) $('pd').value = String(toFt(v)); readPlot(); });
-$('fseg').addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) { $('pfloors').value = b.dataset.f; $('pfloors').dispatchEvent(new Event('change', { bubbles: true })); } });
+for (const seg of ['fseg', 'fseg2']) $(seg).addEventListener('click', (e) => { const b = e.target.closest('[data-f]'); if (b) { $('pfloors').value = b.dataset.f; $('pfloors').dispatchEvent(new Event('change', { bubbles: true })); } });
 mountFloorForm($('ffhost'), 'tabs');
 
 // ---- the plot drawn to scale, and a one-line summary beside the Generate button: both read the form's own fields ----
@@ -426,11 +426,12 @@ const recBedsFor = (w, d) => {
 let userBeds = false;                                              // once the visitor picks a bedroom count, keep it
 const floors = () => +$('pfloors').value;
 const setShown = (el, on) => { el.style.display = on ? '' : 'none'; };
-setShown($('floorsrow'), false);                                   // shown once the loaded model knows two-storey houses
+// The floors choice is there from the start: "two floors" said or typed while the model is still downloading must not be lost.
+// It is only taken away if the model that arrives turns out not to know two-storey houses.
 function syncFloors() {
   const two = floors() === 2;
   setShown($('pupl'), two); setShown($('pupbl'), two); setShown($('pterrl'), two);
-  document.querySelectorAll('#fseg [data-f]').forEach((b) => { const on = +b.dataset.f === (two ? 2 : 1); b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+  document.querySelectorAll('#fseg [data-f], #fseg2 [data-f]').forEach((b) => { const on = +b.dataset.f === (two ? 2 : 1); b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
   $('pbl').childNodes[0].nodeValue = two ? 'Bedrooms downstairs\n            ' : 'Bedrooms\n            ';
   const ub = +$('pup').value, sel = $('pupbaths'), keep = +sel.value;
   sel.innerHTML = '';
@@ -491,7 +492,7 @@ onModelState((st) => {
   if (waitingBtn && st.phase === 'loading') waitingBtn.textContent = `Downloading the Naqsha model ${st.pct}%`;
 });
 let knowsStoreysNow = false;
-preloadModel().then(() => knowsStoreys()).then((ok) => { knowsStoreysNow = ok; setShown($('floorsrow'), ok); if (!ok) $('pfloors').value = '1'; syncFloors(); })
+preloadModel().then(() => knowsStoreys()).then((ok) => { knowsStoreysNow = ok; setShown($('floorsrow'), ok); setShown($('quickfloors'), ok); if (!ok) $('pfloors').value = '1'; syncFloors(); renderAdvice(); })
   .catch((err) => console.warn('Naqsha model could not load.', err));
 
 /** Draft layouts with the model for S.plot / S.prefs. regen = different layouts from the ones already shown. */
@@ -950,6 +951,7 @@ function relayout(plan, idx) {
 function bindFacade() {
   const set = (key, v) => { S.site[key] = v; drawStyleCards(); };
   $('ffront').value = S.site.facade || 'auto'; $('ffront').onchange = () => set('facade', $('ffront').value);
+  $('fnew').onclick = () => { S.site.facadeSeed = (S.site.facadeSeed || 0) + 1; $('ffront').value = 'gen'; set('facade', 'gen'); };      // every press draws another front from the generator
   $('froof').value = S.site.roof; $('froof').onchange = () => set('roof', $('froof').value);
   $('fwin').value = S.site.windows; $('fwin').onchange = () => set('windows', $('fwin').value);
   $('fshut').value = S.site.shutters ? '1' : '0'; $('fshut').onchange = () => set('shutters', $('fshut').value === '1');

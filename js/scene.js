@@ -6,7 +6,7 @@ import { furnish } from './furniture.js';
 import { addFurniture, furnitureColliders, setFurnitureLook, restyle, furnitureMaterials } from './furn3d.js';
 import { buildDecor, restyleDecor } from './decor.js';
 import { LOOKS } from './interior.js';
-import { buildFacade, facadeFor } from './facade.js';
+import { buildFacade, facadeGenes } from './facade.js';
 import { loadCar, CARS } from './car3d.js';
 import { turningStair, stairPlan } from './layout.js';
 
@@ -161,7 +161,7 @@ export function prepareRenderer(renderer) {
  * L: ground floor layout; U: first floor of a two-storey house (or null). colors: { wall, trim, interior, accent } overrides.
  */
 export const SITE_DEFAULT = { wall: 'plain', wallH: 4.5, wallColor: null, gate: 'slide', car: 'ferrari', carColor: 'red', floorLiving: null, floorBed: null,
-  roof: 'flat', windows: 'standard', shutters: false, cladding: 'none', facade: 'auto' };          // the last four are facade options (render only)
+  roof: 'flat', windows: 'standard', shutters: false, cladding: 'none', facade: 'auto', facadeSeed: 0 };          // the last four are facade options (render only)
 export function buildScene(renderer, L, styleId, U = null, { colors = {}, furniture = true, context = false, site = {}, look = null } = {}) {
   site = { ...SITE_DEFAULT, ...site };
   let lk = LOOKS[look] || null;                                    // the interior look (walls inside, floors, furniture colours); null: the facade style's own
@@ -1002,7 +1002,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const facU = new THREE.Group(); world.add(facU);
   curColl = colliders;
   const fac = buildFacade({ box, world, upperG: facU, roofG, L, U, B, st, site, H, STOREY, SLAB, mainDoor, porch, carportAtFront, adj: adjWin,
-    mats: { mTrim, mAccent, mFrame, mStone: mLedge, mSlats, mExt, mConcrete, mat }, gate: site.wall !== 'none' ? { lo: gateLo, hi: gateHi, top: Math.max(6, site.wallH + 1.5) } : null }, facadeFor(styleId, site.facade));
+    mats: { mTrim, mAccent, mFrame, mStone: mLedge, mSlats, mExt, mConcrete, mat }, gate: site.wall !== 'none' ? { lo: gateLo, hi: gateHi, top: Math.max(6, site.wallH + 1.5) } : null }, facadeGenes(styleId, site.facade, site.facadeSeed));
   if (carportAtFront) {                                          // the car porch has its own roof and slim pillars; the house front stays visible
     const z0 = porch.z, z1 = Math.min(porch.z + porch.d, B.z + 0.4);
     slab(porch.x, porch.x + porch.w, z0, z1, 9.3);

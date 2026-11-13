@@ -1,36 +1,68 @@
 // The front of the house, composed the way houses in Bahria Town and DHA are: not a flat wall with windows, but a few
-// strong pieces in front of it. Three compositions, each in the materials of the chosen style:
-//   frame  a double-height frame round the entrance, clad inside, with a screen of timber fins on the blank wall upstairs
-//   tower  a tall stone-clad feature wall at one side, rising past the parapet, with a dark slit beside it and a long canopy
-//   bands  a "C" of floating slabs: one at the first floor, one at the roof, joined by a side wall, timber between the windows
-// All three box the upstairs windows in deep frames, put a pergola edge on the car porch and lights on the gate pillars.
-// Everything here stands in front of the walls the plan gives: no room, door or window is moved.
+// strong pieces in front of it. A front is described by a small set of design choices (its "genes"):
+//   entry    what stands at the door: a double-height frame, a canopy, or the style's own portico
+//   wall     a tall feature wall at the side away from the door (stacked stone, timber or dark render), with or without a slit
+//   slabs    floating slabs: at the first floor, at the roof, or both joined by a side wall into a "C"
+//   fins     a screen of upright timber fins on the widest blank stretch upstairs
+//   cladUp   timber or stone between the upstairs windows
+//   win      how the front windows are framed: a deep box, an L (sunshade and one cheek), or only their sunshade
+// plus sizes (how wide, how far out, how high past the parapet). Three named fronts are fixed sets of genes; "a new
+// variation" draws the genes at random from a seed, under composition rules (one strong piece at least, never two that
+// fight for the same stretch of wall, the feature wall opposite the door so the front balances), so every press gives
+// another front that still makes sense. Everything stands in front of the walls the plan gives: no room, door or window moves.
 import * as THREE from 'three';
 
-export const FACADES = { frame: 'Entrance frame', tower: 'Feature wall', bands: 'Floating slabs', plain: 'Plain' };
+export const FACADES = { frame: 'Entrance frame', tower: 'Feature wall', bands: 'Floating slabs', gen: 'A new variation', plain: 'Plain' };
 const AUTO = { modern: 'frame', box: 'bands', classic: 'frame', colonial: 'bands', spanish: 'tower', haveli: 'tower' };
+const PRESET = {
+  frame: { entry: 'frame', wall: false, slabs: 'none', fins: true, cladUp: false, win: 'box', fill: 'auto', frameW: 2.6, proj: 1.4, rise: 1.3 },
+  tower: { entry: 'canopy', wall: true, wallMat: 'stone', slit: true, slabs: 'none', fins: false, cladUp: false, win: 'box', wallW: 0.3, proj: 0.7, rise: 2.2 },
+  bands: { entry: 'portico', wall: false, slabs: 'C', fins: false, cladUp: true, win: 'box', fill: 'auto', proj: 2.2, rise: 1.6 },
+};
+function rng(seed) { let s = (seed * 2654435761) >>> 0 || 1; return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296; }
+
+/** The genes of a front. choice: 'auto' (the one that suits the style), a named front, 'gen' (drawn from `seed`) or 'plain' (null). */
+export function facadeGenes(styleId, choice = 'auto', seed = 0) {
+  const name = choice && choice !== 'auto' && FACADES[choice] ? choice : AUTO[styleId] || 'frame';
+  if (name === 'plain') return null;
+  if (name !== 'gen') return { ...PRESET[name], name };
+  const r = rng(seed + styleId.length * 97 + styleId.charCodeAt(0)), pick = (a) => a[Math.floor(r() * a.length)], between = (a, b) => Math.round((a + r() * (b - a)) * 10) / 10;
+  const g = { name: 'gen', entry: pick(['frame', 'frame', 'canopy', 'portico']) };
+  g.wall = g.entry === 'frame' ? r() < 0.35 : r() < 0.65;
+  g.wallMat = pick(['stone', 'stone', 'timber', 'dark']); g.slit = r() < 0.6; g.wallW = between(0.22, 0.34);
+  g.slabs = pick(g.entry === 'frame' ? ['none', 'none', 'roof', 'band'] : ['none', 'roof', 'band', 'C', 'C']);
+  if (g.wall && g.slabs === 'C') g.slabs = 'roof';                 // a feature wall and the side wall of a C would crowd the same corner
+  g.fins = r() < 0.5; g.cladUp = !g.fins && r() < 0.55;
+  g.win = pick(['box', 'box', 'L', 'none']);
+  g.fill = pick(['timber', 'stone', 'auto']);
+  g.frameW = between(2.1, 3.3); g.proj = between(g.slabs === 'none' ? 1.1 : 1.7, g.slabs === 'none' ? 1.6 : 2.4); g.rise = between(0.9, 2.6);
+  if (g.entry !== 'frame' && !g.wall && g.slabs === 'none') g.slabs = 'C';       // at least one strong piece
+  if (g.entry !== 'frame' && !g.wall && !g.fins && !g.cladUp) g.cladUp = true;    // and something on the wall itself
+  return g;
+}
 export const facadeFor = (styleId, choice) => (choice && choice !== 'auto' && FACADES[choice] ? choice : AUTO[styleId] || 'frame');
 
 /**
  * c: { box, world, upperG, roofG, L, U, B, st, site, H, STOREY, SLAB, mainDoor, porch, carportAtFront, adj(opening), mats: { mTrim, mAccent, mFrame, mStone, mSlats, mExt, mConcrete, mat }, gate: { lo, hi, top } }
- * -> { portico: false when the composition has its own cover over the door }
+ * g: the genes (facadeGenes), or null for a plain front.
+ * -> { portico: false when the front has its own cover over the door }
  */
-export function buildFacade(c, comp) {
+export function buildFacade(c, g) {
   const { box, L, U, B, st, H, STOREY, SLAB, mainDoor: door, mats } = c;
   const { mTrim, mAccent, mFrame, mStone, mSlats, mat } = mats;
-  if (comp === 'plain') return { portico: true };
+  if (!g) return { portico: true };
   const fam = st.family;
   const UB = U ? U.B : null, flush = !!UB && Math.abs(UB.z - B.z) < 0.5;        // the first floor's front wall stands on the ground floor's
   const face = B.z - 0.375, wallTop = (U ? STOREY : 0) + H, roofTop = wallTop + SLAB + 2.6, split = U ? STOREY - 0.55 : Infinity;
-  const mFeature = fam === 'modern' ? mTrim : fam === 'classic' ? mTrim : mAccent;                 // the frame and the slabs
-  const mClad = fam === 'modern' ? mSlats : mStone;                                                 // what fills the frame: timber on a modern front, stone on the others
+  const mFeature = fam === 'spanish' ? mAccent : mTrim;                         // the frame and the slabs
+  const matOf = (k) => (k === 'timber' ? mSlats : k === 'stone' ? mStone : k === 'dark' ? mFrame : fam === 'modern' ? mSlats : mStone);     // 'auto': timber on a modern front, stone on the others
   const mFin = fam === 'classic' ? mAccent : mSlats;
   const mLamp = new THREE.MeshStandardMaterial({ color: '#fff3d0', emissive: '#ffd890', emissiveIntensity: 1.3 });
 
   // a piece of the front, cut where the storeys meet so each part hides with its storey (ground / first floor / above the walls)
   const put = (x0, x1, y0, y1, z0, z1, m, collide = false) => {
     for (const [a, b, parent] of [[y0, Math.min(y1, split), c.world], [Math.max(y0, split), Math.min(y1, wallTop), U ? c.upperG : c.world], [Math.max(y0, wallTop), y1, c.roofG]]) {
-      if (b - a > 0.02) box(parent, x0, x1, a, b, z0, z1, m, collide && parent === c.world);
+      if (b - a > 0.02 && x1 - x0 > 0.02) box(parent, x0, x1, a, b, z0, z1, m, collide && parent === c.world);
     }
   };
   // windows and doors in the front wall, as rectangles (x0, x1, y0, y1) with the surround they already have
@@ -56,14 +88,14 @@ export function buildFacade(c, comp) {
     }
     if (x1 > cur) put(cur, x1, y0, y1, face - depth, face, m);
   };
-  /** A deep frame round an upstairs window: two cheeks and a ledge that join the sunshade already over it. */
-  const boxFrame = (h, depth = 1.5) => {
-    const p = h.win, o0 = p.at - p.w / 2, o1 = p.at + p.w / 2, y0 = h.dy + p.sill, y1 = h.dy + p.top;
-    put(o0 - 0.7, o0 - 0.38, y0 - 0.55, y1 + 0.62, face - depth, face, mFeature);
-    put(o1 + 0.38, o1 + 0.7, y0 - 0.55, y1 + 0.62, face - depth, face, mFeature);
-    put(o0 - 0.7, o1 + 0.7, y0 - 0.55, y0 - 0.27, face - depth, face, mFeature);
+  /** A frame round a window that joins the sunshade already over it: a deep box (two cheeks and a ledge) or an L (the cheek on the door's side only). */
+  const winFrame = (h, kind, depth) => {
+    const p = h.win, o0 = p.at - p.w / 2, o1 = p.at + p.w / 2, y0 = h.dy + p.sill, y1 = h.dy + p.top, doorSide = door.at < p.at ? -1 : 1;
+    if (kind === 'box' || doorSide < 0) put(o0 - 0.7, o0 - 0.38, y0 - 0.55, y1 + 0.62, face - depth, face, mFeature);
+    if (kind === 'box' || doorSide > 0) put(o1 + 0.38, o1 + 0.7, y0 - 0.55, y1 + 0.62, face - depth, face, mFeature);
+    if (kind === 'box') put(o0 - 0.7, o1 + 0.7, y0 - 0.55, y0 - 0.27, face - depth, face, mFeature);
   };
-  /** Free stretches of the first floor's front wall between x0 and x1 (no window in them). */
+  /** Free stretches of the first floor's front wall between x0 and x1 (no window in them), widest first. */
   const blankUp = (x0, x1) => {
     const hs = holes.filter((h) => h.upper && h.x1 > x0 && h.x0 < x1).sort((a, b) => a.x0 - b.x0), out = [];
     let cur = x0;
@@ -80,46 +112,58 @@ export function buildFacade(c, comp) {
   const left = B.x - 0.3, right = B.x + B.w + 0.3;
   const tall = flush && UB.x <= B.x + 0.6 && UB.x + UB.w >= B.x + B.w - 0.6;      // the first floor covers the whole front
   const top = tall ? roofTop : (U ? STOREY - 0.5 : H + SLAB + 2.6);                // how high the tall pieces may rise from the ground
-  let portico = true;
+  const doorLeft = door.at <= B.x + B.w / 2;                                       // the door is in the left half: the feature wall and the C's side wall go right
+  const taken = [];                                                                // stretches of the front (x0, x1) already holding a strong piece
+  const clear = (a, b) => !taken.some(([p, q]) => a < q + 0.3 && b > p - 0.3);
+  let portico = g.entry === 'portico';
 
-  if (comp === 'frame') {
-    // the frame round the entrance: two piers and a beam, standing proud of the wall, rising past the parapet
-    const fx0 = Math.max(left, door.at - door.w / 2 - 2.6), fx1 = Math.min(right, door.at + door.w / 2 + 2.6), fz = face - 1.4, ft = top + 1.3;
+  // ---- the entrance
+  if (g.entry === 'frame') {                                       // two piers and a beam standing proud of the wall, rising past the parapet, clad inside
+    const fx0 = Math.max(left, door.at - door.w / 2 - g.frameW), fx1 = Math.min(right, door.at + door.w / 2 + g.frameW), fz = face - g.proj, ft = top + g.rise;
     put(fx0, fx0 + 0.75, 0, ft, fz, face, mFeature, true); put(fx1 - 0.75, fx1, 0, ft, fz, face, mFeature, true);
     put(fx0, fx1, ft - 0.9, ft, fz, face, mFeature);
-    clad(fx0 + 0.75, fx1 - 0.75, door.top + 0.5, ft - 0.9, 0.16, mClad);            // clad between the piers, above the door
-    put(fx0 + 0.75, fx1 - 0.75, door.top + 0.55, door.top + 0.95, face - 3.2, face, mFeature);     // a canopy over the door, inside the frame
-    portico = false;
-    if (tall) {                                                    // upstairs: timber fins on the widest blank stretch, deep frames round the windows
-      const free = blankUp(left + 0.4, right - 0.4).flatMap(([a, b]) => [[a, Math.min(b, fx0 - 0.3)], [Math.max(a, fx1 + 0.3), b]]).filter(([a, b]) => b - a >= 2.4).sort((p, q) => (q[1] - q[0]) - (p[1] - p[0]));
-      if (free[0]) { const [a, b] = free[0], w = Math.min(b - a, 7.5), mid = (a + b) / 2; fins(mid - w / 2, mid + w / 2, STOREY + 0.4, wallTop - 0.2); }
+    clad(fx0 + 0.75, fx1 - 0.75, door.top + 0.5, ft - 0.9, 0.16, matOf(g.fill));
+    put(fx0 + 0.75, fx1 - 0.75, door.top + 0.55, door.top + 0.95, face - Math.max(3, g.proj + 1.6), face, mFeature);     // a canopy over the door, inside the frame
+    taken.push([fx0, fx1]);
+  } else if (g.entry === 'canopy' && !c.carportAtFront) {           // a thin slab over the door, reaching to the side
+    const cx0 = Math.max(left, door.at - door.w / 2 - (doorLeft ? 1.2 : 4.5)), cx1 = Math.min(right, door.at + door.w / 2 + (doorLeft ? 4.5 : 1.2));
+    put(cx0, cx1, door.top + 0.6, door.top + 1.0, face - 3.4, face, mFeature);
+  } else portico = true;                                            // the style's own portico (scene.js builds it)
+
+  // ---- the feature wall, on the side away from the door
+  if (g.wall) {
+    const tw = Math.max(5, Math.min(9, B.w * g.wallW)), tx0 = doorLeft ? right - tw : left, tx1 = tx0 + tw, tt = top + Math.max(1.2, g.rise);
+    if (clear(tx0, tx1)) {
+      clad(tx0, tx1, 0, tt, Math.max(0.5, Math.min(0.9, g.proj * 0.5)), matOf(g.wallMat));
+      put(tx0 - 0.15, tx1 + 0.15, tt, tt + 0.3, face - 1.0, face + 0.2, mFeature);
+      if (g.slit) { const sx = doorLeft ? tx0 - 0.75 : tx1 + 0.25; if (clear(sx, sx + 0.5)) put(sx, sx + 0.5, 0.4, top - 0.4, face - 0.12, face, mFrame); }      // a recessed dark strip the height of the house
+      taken.push([tx0, tx1]);
     }
-  } else if (comp === 'tower') {
-    // the feature wall on the side away from the door: stone from the ground past the parapet, a dark slit beside it
-    const onLeft = door.at > B.x + B.w / 2, tw = Math.max(6, Math.min(9, B.w * 0.3));
-    const tx0 = onLeft ? left : right - tw, tx1 = tx0 + tw, tt = top + 2.2;
-    clad(tx0, tx1, 0, tt, 0.7, mStone);
-    put(tx0 - 0.15, tx1 + 0.15, tt, tt + 0.3, face - 0.85, face + 0.2, mFeature);
-    const sx = onLeft ? tx1 + 0.25 : tx0 - 0.75;
-    put(sx, sx + 0.5, 0.4, top - 0.4, face - 0.12, face, mFrame);                   // the slit: a recessed dark strip the height of the house
-    // a long canopy from the feature wall across the door
-    const cx0 = onLeft ? tx1 : Math.max(left, door.at - door.w / 2 - 2.2), cx1 = onLeft ? Math.min(right, door.at + door.w / 2 + 2.2) : tx0;
-    if (!c.carportAtFront && cx1 - cx0 > 3) { put(cx0, cx1, door.top + 0.6, door.top + 1.0, face - 3.4, face, mFeature); portico = false; }
-  } else if (comp === 'bands') {
-    // the C: a slab at the first floor and a slab at the roof, joined at one side by a wall, all standing 2.2 ft proud
-    const d = 2.2, onLeft = door.at > B.x + B.w / 2, yb = U ? STOREY - 0.75 : door.top + 0.6, yt = (tall || !U ? (U ? wallTop : H) + SLAB + 1.6 : STOREY - 0.75);
-    if (tall || !U) {
-      put(left - 0.2, right + 0.2, yt, yt + 0.55, face - d, face, mFeature);                                   // roof slab
-      const wx = onLeft ? left - 0.2 : right - 0.5;
-      put(wx, wx + 0.7, U ? yb : 0, yt, face - d, face, mFeature, !U);                                         // the side wall of the C
-    }
-    if (U) put(left - 0.2, right + 0.2, yb, yb + 0.5, face - d, face, mFeature);                                // first-floor slab
-    if (tall) for (const [a, b] of blankUp(left + 1.2, right - 1.2).filter(([a, b]) => b - a >= 2).slice(0, 2)) clad(a + 0.2, b - 0.2, STOREY + 0.2, wallTop, 0.14, mClad);   // timber between the windows
-    if (!U) clad(left + 1, right - 1, door.top + 1.2, H + SLAB + 1.6, 0.14, mClad);
-    portico = !U ? false : portico;
   }
-  // deep frames round the upstairs windows (round every front window of a single-storey house on the feature compositions)
-  for (const h of holes) if (h.win && (h.upper || !U) && !(comp === 'bands' && !U)) boxFrame(h, comp === 'bands' ? 2.0 : 1.5);
+
+  // ---- floating slabs
+  const d = Math.max(1.6, g.proj);
+  if (g.slabs !== 'none') {
+    const yb = U ? STOREY - 0.75 : door.top + 0.6, yt = (U ? wallTop : H) + SLAB + Math.min(1.8, g.rise);
+    const roofSlab = (g.slabs === 'roof' || g.slabs === 'C') && (tall || !U), band = (g.slabs === 'band' || g.slabs === 'C') && !!U;
+    if (roofSlab) put(left - 0.2, right + 0.2, yt, yt + 0.55, face - d, face, mFeature);
+    if (band) put(left - 0.2, right + 0.2, yb, yb + 0.5, face - d, face, mFeature);
+    if (g.slabs === 'C' && roofSlab) {                              // the side wall that joins them, on the side away from the door
+      const wx = doorLeft ? right - 0.5 : left - 0.2;
+      if (clear(wx, wx + 0.7)) put(wx, wx + 0.7, U ? yb : 0, yt, face - d, face, mFeature, !U);
+    }
+    if (!U && roofSlab) portico = false;
+  }
+
+  // ---- on the wall upstairs: fins on the widest blank stretch, or cladding between the windows
+  if (tall) {
+    const free = blankUp(left + 0.6, right - 0.6).flatMap(([a, b]) => { let parts = [[a, b]]; for (const [p, q] of taken) parts = parts.flatMap(([s, e]) => [[s, Math.min(e, p - 0.3)], [Math.max(s, q + 0.3), e]]); return parts; }).filter(([a, b]) => b - a >= 2.2).sort((p, q) => (q[1] - q[0]) - (p[1] - p[0]));
+    if (g.fins && free[0]) { const [a, b] = free[0], w = Math.min(b - a, 7.5), mid = (a + b) / 2; fins(mid - w / 2, mid + w / 2, STOREY + 0.4, wallTop - 0.2); }
+    else if (g.cladUp) for (const [a, b] of free.slice(0, 2)) clad(a + 0.2, b - 0.2, STOREY + 0.2, wallTop, 0.14, matOf(g.fill));
+  } else if (!U && g.cladUp) clad(left + 1, right - 1, door.top + 1.2, H + SLAB + 1.2, 0.14, matOf(g.fill));
+
+  // ---- window frames (upstairs; every front window of a single-storey house), outside the pieces already there
+  if (g.win !== 'none') for (const h of holes) if (h.win && (h.upper || !U) && clear(h.x0 + 0.6, h.x1 - 0.6)) winFrame(h, g.win, g.slabs === 'none' ? 1.5 : Math.min(2, d));
 
   // the car porch: a pergola edge of slim beams beyond its roof, and lights under it
   if (c.carportAtFront && c.porch) {
