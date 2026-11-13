@@ -949,6 +949,7 @@ function relayout(plan, idx) {
 
 function bindFacade() {
   const set = (key, v) => { S.site[key] = v; drawStyleCards(); };
+  $('ffront').value = S.site.facade || 'auto'; $('ffront').onchange = () => set('facade', $('ffront').value);
   $('froof').value = S.site.roof; $('froof').onchange = () => set('roof', $('froof').value);
   $('fwin').value = S.site.windows; $('fwin').onchange = () => set('windows', $('fwin').value);
   $('fshut').value = S.site.shutters ? '1' : '0'; $('fshut').onchange = () => set('shutters', $('fshut').value === '1');

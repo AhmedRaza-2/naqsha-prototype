@@ -6,6 +6,7 @@ import { furnish } from './furniture.js';
 import { addFurniture, furnitureColliders, setFurnitureLook, restyle, furnitureMaterials } from './furn3d.js';
 import { buildDecor, restyleDecor } from './decor.js';
 import { LOOKS } from './interior.js';
+import { buildFacade, facadeFor } from './facade.js';
 import { loadCar, CARS } from './car3d.js';
 import { turningStair, stairPlan } from './layout.js';
 
@@ -62,6 +63,20 @@ function makeTex(kind, tint = null) {
       }
     }
     speckle(6000, 0.12, 2);
+  } else if (kind === 'ledge') {                                  // stacked stone cladding (gutka): thin courses of stones of uneven length
+    g.fillStyle = '#6f6a62'; g.fillRect(0, 0, N, N);
+    const rows = 20, rh = N / rows;
+    for (let r = 0; r < rows; r++) {
+      let x = -rnd() * 60;
+      while (x < N) {
+        const bw = 40 + rnd() * 110, v = (rnd() - 0.5) * 46, warm = rnd() * 14;
+        g.fillStyle = `rgb(${172 + v + warm},${164 + v + warm * 0.5},${150 + v})`;
+        g.fillRect(x + 1.5, r * rh + 1.5, bw - 3, rh - 3);
+        g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(x + 1.5, r * rh + 1.5, bw - 3, 2);
+        x += bw;
+      }
+    }
+    speckle(7000, 0.1, 2);
   } else if (kind === 'brick') {
     g.fillStyle = '#d9cfc0'; g.fillRect(0, 0, N, N);
     const rows = 16, rh = N / rows;
@@ -146,7 +161,7 @@ export function prepareRenderer(renderer) {
  * L: ground floor layout; U: first floor of a two-storey house (or null). colors: { wall, trim, interior, accent } overrides.
  */
 export const SITE_DEFAULT = { wall: 'plain', wallH: 4.5, wallColor: null, gate: 'slide', car: 'ferrari', carColor: 'red', floorLiving: null, floorBed: null,
-  roof: 'flat', windows: 'standard', shutters: false, cladding: 'none' };          // the last four are facade options (render only)
+  roof: 'flat', windows: 'standard', shutters: false, cladding: 'none', facade: 'auto' };          // the last four are facade options (render only)
 export function buildScene(renderer, L, styleId, U = null, { colors = {}, furniture = true, context = false, site = {}, look = null } = {}) {
   site = { ...SITE_DEFAULT, ...site };
   let lk = LOOKS[look] || null;                                    // the interior look (walls inside, floors, furniture colours); null: the facade style's own
@@ -190,6 +205,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const mGlass = new THREE.MeshStandardMaterial({ color: '#4f6d7d', metalness: 0.25, roughness: 0.04, transparent: true, opacity: 0.42, envMapIntensity: 1.6 });
   const mFrame = mat(st.frame, { roughness: 0.45, metalness: 0.3 });
   const mStone = texMat('stone', { roughness: 0.8 }, 4);
+  const mLedge = texMat('ledge', { roughness: 0.85, bumpMap: makeTex('ledge'), bumpScale: 0.04 }, 6);
   const mDoor = texMat('wood-dark', { roughness: 0.6 }, 3);
   const mSlats = texMat('slats', { roughness: 0.65 }, 3);
   const mGrill = mat('#2a2d30', { roughness: 0.45, metalness: 0.6 });
@@ -309,19 +325,21 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     }
   }
 
+  /** A window as it is built: the facade's window choice (tall, wide) changes its size. */
+  const adjWin = (p) => {
+    if (p.kind !== 'window' || p.bath || site.windows === 'standard') return p;
+    const room = p.span ? p.span[1] - p.span[0] : p.w + 2;
+    if (site.windows === 'tall') return { ...p, sill: 0.7, top: 7.8, w: Math.min(p.w, Math.max(2.5, room - 1)) };
+    if (site.windows === 'wide') return { ...p, w: Math.min(p.w * 1.4, Math.max(p.w, room - 1.2)), sill: 3.4, top: 6.7 };
+    return p;
+  };
   // ---------- walls, floors, furniture: one storey (dy = height of its floor) ----------
   function buildStorey(L, dy, upper) {
     const { B } = L;
     const open = L.open || [];
     const walls = new THREE.Group(); walls.position.y = dy; world.add(walls); storeyG.push(walls);
     curColl = upper ? upperColliders : colliders;
-    const OPS = L.openings.map((p) => {
-      if (p.kind !== 'window' || p.bath || site.windows === 'standard') return p;
-      const room = p.span ? p.span[1] - p.span[0] : p.w + 2;
-      if (site.windows === 'tall') return { ...p, sill: 0.7, top: 7.8, w: Math.min(p.w, Math.max(2.5, room - 1)) };
-      if (site.windows === 'wide') return { ...p, w: Math.min(p.w * 1.4, Math.max(p.w, room - 1.2)), sill: 3.4, top: 6.7 };
-      return p;
-    });
+    const OPS = L.openings.map(adjWin);
     const plinthH = site.cladding === 'stone' ? 3.8 : 1.4;
     const hl = new Map(), vl = new Map();
     const addEdge = (map, c, a, b) => {
@@ -980,6 +998,11 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     box(world, x0 - 0.1, x1 + 0.1, y - 0.15, y + 0.65, z0 - 0.1, z0 + 0.15, mTrim);
   };
   const carportAtFront = porch && !innerPorch;
+  // the composition of the front (facade.js): a frame round the entrance, a feature wall or floating slabs, in front of the walls of the plan
+  const facU = new THREE.Group(); world.add(facU);
+  curColl = colliders;
+  const fac = buildFacade({ box, world, upperG: facU, roofG, L, U, B, st, site, H, STOREY, SLAB, mainDoor, porch, carportAtFront, adj: adjWin,
+    mats: { mTrim, mAccent, mFrame, mStone: mLedge, mSlats, mExt, mConcrete, mat }, gate: site.wall !== 'none' ? { lo: gateLo, hi: gateHi, top: Math.max(6, site.wallH + 1.5) } : null }, facadeFor(styleId, site.facade));
   if (carportAtFront) {                                          // the car porch has its own roof and slim pillars; the house front stays visible
     const z0 = porch.z, z1 = Math.min(porch.z + porch.d, B.z + 0.4);
     slab(porch.x, porch.x + porch.w, z0, z1, 9.3);
@@ -987,13 +1010,13 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     if (z1 - z0 > 14) { pillar(porch.x + 0.6, (z0 + z1) / 2, 9.3); pillar(porch.x + porch.w - 0.6, (z0 + z1) / 2, 9.3); }
   }
   const doorUnderCarport = carportAtFront && doorXc >= porch.x - 0.5 && doorXc <= porch.x + porch.w + 0.5;
-  if (!innerPorch && !doorUnderCarport) {                         // a portico over the front door
+  if (!innerPorch && !doorUnderCarport && fac.portico) {          // a portico over the front door (unless the front's composition covers it)
     const pw = Math.max(7, mainDoor.w + 4.5), pdp = Math.min(Math.max(pd, 3), 5);
     const x0 = Math.max(B.x, doorXc - pw / 2), x1 = Math.min(B.x + B.w, doorXc + pw / 2);
     slab(x0, x1, B.z - pdp, B.z + 0.4, 9.3);
     pillar(x0 + 0.6, B.z - pdp + 0.6, 9.3); pillar(x1 - 0.6, B.z - pdp + 0.6, 9.3);
   }
-  if (st.deco === 'wood') {                                      // timber cladding round the entrance
+  if (st.deco === 'wood' && fac.portico) {                       // timber cladding round the entrance
     const dx0 = mainDoor.at - mainDoor.w / 2 - 0.2, dx1 = mainDoor.at + mainDoor.w / 2 + 0.2;
     box(world, dx0 - 1.6, dx0, 0, H, B.z - 0.45, B.z - 0.2, mSlats);
     box(world, dx1, dx1 + 1.6, 0, H, B.z - 0.45, B.z - 0.2, mSlats);
@@ -1217,7 +1240,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   }
   /** Every material that mirrors the surroundings, with its daylight strength (the lighting dims them at night). */
   const envMaterials = () => { const set = new Set(furnitureMaterials()); scene.traverse((o) => { if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m.isMeshStandardMaterial) set.add(m); }); for (const m of set) if (m.userData.env0 == null) m.userData.env0 = m.envMapIntensity; return [...set]; };
-  return { hemi, mCeil, mGlass, mDownlight, setLook, envMaterials, mumty: mum ? { x0: mum.x0, x1: mum.x1, z0: mum.z0, z1: mum.z1 } : null, carsInfo, scene, sun, world, roofG, midG, stairsG, storeyG, doors: doorList, colliders, upperColliders, roofColliders, stairs, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, innerPorch, mats, setColors, setFloors, furnReady, site, pieces: { ground: piecesG, upper: piecesU } };
+  return { facadeUpper: facU, hemi, mCeil, mGlass, mDownlight, setLook, envMaterials, mumty: mum ? { x0: mum.x0, x1: mum.x1, z0: mum.z0, z1: mum.z1 } : null, carsInfo, scene, sun, world, roofG, midG, stairsG, storeyG, doors: doorList, colliders, upperColliders, roofColliders, stairs, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, innerPorch, mats, setColors, setFloors, furnReady, site, pieces: { ground: piecesG, upper: piecesU } };
 }
 
 function disposeScene(scene) {

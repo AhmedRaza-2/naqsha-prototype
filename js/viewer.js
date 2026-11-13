@@ -137,6 +137,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     const hideRoof = orbiting;
     roofG.visible = !hideRoof;
     S.storeyG[1] && (S.storeyG[1].visible = !(orbiting && c === 'ground'));
+    S.facadeUpper.visible = !(orbiting && c === 'ground');
     S.midG.visible = !(orbiting && c === 'ground');
     if (S.stairsG) S.stairsG.visible = true;
   }
