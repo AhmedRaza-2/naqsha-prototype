@@ -274,7 +274,7 @@
           <option value="walk">Walk (first person)</option>
           <option value="follow">Follow a visitor</option>
           <option value="tour">Guided tour</option>
-          <option value="orbit">Overview</option>
+          <option value="doll">Dollhouse (roof off)</option>
           <option value="top">Top view</option>
           <option value="street">Street view</option>
           <option value="showcase">Showcase (turning)</option>
@@ -289,6 +289,20 @@
       <button class="btn sm" id="vroof">Hide roof</button>
       <button class="btn sm" id="vreset">Reset</button>
       <button class="btn sm" id="vback">Exit</button>
+    </div>
+    <div class="tourcard" id="tourcard" hidden aria-live="polite">
+      <div class="tc-step" id="tcstep"></div>
+      <h3 id="tcname"></h3>
+      <div class="tc-size" id="tcsize"></div>
+      <p id="tcpoint"></p>
+    </div>
+    <div class="hud showbar" id="showbar">
+      <button class="btn sm go" id="vtour" type="button">Start tour</button>
+      <button class="btn sm" id="vmusic" type="button" aria-pressed="true" hidden>Music on</button>
+      <button class="btn sm" id="vdoll" type="button">Dollhouse</button>
+      <div class="seg" id="vlooks" role="radiogroup" aria-label="Interior style"></div>
+      <label class="tod"><span id="vtimename">Midday</span>
+        <input type="range" id="vtime" min="0" max="100" value="36" aria-label="Time of day, from morning to night"></label>
     </div>
     <button type="button" class="doorprompt" id="doorprompt" hidden><kbd>F</kbd><span id="doorprompttxt"></span></button>
     <div class="hud palette" id="vpalette" hidden>

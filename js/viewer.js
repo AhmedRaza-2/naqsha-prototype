@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildScene, prepareRenderer, SITE_DEFAULT, STOREY, H, EYE, disposeScene } from './scene.js';
+import { createAmbience } from './ambience.js';
 
 const R = 0.42;                                                  // the visitor's radius (ft)
 const DOOR_OPEN = 0.55;                                          // a door is passable once it has swung this far
@@ -48,14 +49,19 @@ export function makePerson({ kurta = '#7fa6c8', shalwar = '#ece7da', skin = '#c5
 }
 
 /** U: the first-floor layout of a two-storey house (built above the ground floor, stairs between). */
-export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}, siteIn = {}) {
+export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}, siteIn = {}, opts = {}) {
   const { w: W, d: D } = L.plot;
   const { B } = L;
   let site = { ...SITE_DEFAULT, ...siteIn };
   let curColors = { ...colors };
 
   const renderer = prepareRenderer(new THREE.WebGLRenderer({ antialias: true }));
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  let pxRatio = Math.min(devicePixelRatio, 2);
+  renderer.setPixelRatio(pxRatio);
+  renderer.shadowMap.autoUpdate = false;                          // the shadows are redrawn only when something that casts one moves (the sun, a door, the visitor): the biggest saving per frame
+  let shadowDirty = true;
+  const amb = createAmbience(renderer);
+  let look = opts.look || null, time = opts.time ?? 0.36, light = { fill: 0.5, night: 0, glow: 0.12 };
   host.appendChild(renderer.domElement);
   renderer.domElement.style.touchAction = 'none';
   const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 2000);
@@ -78,10 +84,11 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   function bind(newS, keepPos) {
     if (S) { scene.remove(person); disposeScene(S.scene); }
     S = newS; scene = S.scene; roofG = S.roofG; colliders = S.colliders; upperColliders = S.upperColliders; roofColliders = S.roofColliders; stairs = S.stairs; doors = S.doors;
-    pool = Array.from({ length: 6 }, () => { const p = new THREE.PointLight('#ffe9c8', 30, 26, 2); scene.add(p); return p; });
+    pool = Array.from({ length: 8 }, () => { const p = new THREE.PointLight('#ffe9c8', 30, 26, 2); scene.add(p); return p; });
+    amb.forget(); applyTime();
     person ||= makePerson();
     scene.add(person);
-    person.visible = state.mode === 'follow' || state.mode === 'tour';
+    person.visible = state.mode === 'follow';
     // the visitor starts just inside the gate, in line with the front door, or beside it if the car is parked there
     const hit = (x, z) => colliders.some((c) => { const m = c.k === 'car' ? 1.6 : R; return x > c.x0 - m && x < c.x1 + m && z > c.z0 - m && z < c.z1 + m && solid(c); });     // a car is wider than its box: start well clear of it
     start = (() => {
@@ -106,13 +113,25 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   orbit.panSpeed = 0.9; orbit.rotateSpeed = 0.8; orbit.screenSpacePanning = true;
 
   function build(keepPos) {
-    bind(buildScene(renderer, L, styleId, U, { colors: curColors, furniture: true, site }), keepPos);
-    Promise.all(S.furnReady).then(() => hooks.onReady?.());
+    bind(buildScene(renderer, L, styleId, U, { colors: curColors, furniture: true, site, look }), keepPos);
+    const built = S;
+    Promise.all(S.furnReady).then(() => { if (S !== built) return; amb.forget(); applyTime(); hooks.onReady?.(); });
   }
+
+  // ---------- the time of day and the interior look ----------
+  function applyTime() {
+    if (!S) return;
+    light = amb.apply(S, time);
+    for (const p of pool) { p.intensity = 30 * light.fill; p.color.set(light.night > 0.4 ? '#ffd7a0' : '#ffe9c8'); }
+    shadowDirty = true;
+  }
+  function setTime(t) { time = Math.max(0, Math.min(1, t)); applyTime(); placeLights(); }
+  function setLook(id) { look = id; S.setLook(id); amb.forget(); applyTime(); }
 
   // ---------- views ----------
   const FIRST_PERSON = new Set(['walk']);
   const MOVING = new Set(['walk', 'follow', 'tour']);
+  const ORBIT = ['orbit', 'top', 'street', 'showcase', 'doll'];
   function applyCutaway() {
     const c = state.cutaway, orbiting = !MOVING.has(state.mode);
     const hideRoof = orbiting;
@@ -124,7 +143,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   const dist = Math.max(W, D);
   function setMode(mode) {
     state.mode = mode;
-    const orb = ['orbit', 'top', 'street', 'showcase'].includes(mode);
+    const orb = ORBIT.includes(mode);
     orbit.enabled = orb;
     camera.near = orb ? 1.2 : 0.15; camera.far = orb ? 2000 : 900; camera.updateProjectionMatrix();       // far views need the finer depth: the floors and the slab below them flickered into each other
     orbit.autoRotate = mode === 'showcase';
@@ -134,20 +153,24 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
       const cx = W / 2, cz = D / 2, top = (U ? STOREY + H : H);
       if (mode === 'top') { camera.position.set(cx, dist * 1.5, cz + 0.01); orbit.target.set(cx, 0, cz); orbit.maxPolarAngle = 0.25; }
       else if (mode === 'street') { camera.position.set(cx + dist * 0.35, top * 0.7, -Math.max(48, dist * 0.8)); orbit.target.set(cx, top * 0.4, B.z); }
+      else if (mode === 'doll') { const p = dollPose(); camera.position.copy(p.pos); orbit.target.copy(p.target); }
       else if (mode === 'showcase') { camera.position.set(cx + dist * 0.9, dist * 0.55, cz - dist * 0.9); orbit.target.set(cx, 3, cz); }
       else { camera.position.set(cx + dist * 0.35, dist * 0.95, -D * 0.35); orbit.target.set(cx, 0, cz); }
       orbit.update();
     }
     if (mode === 'walk') { camera.fov = state.fov; camera.updateProjectionMatrix(); }
-    person.visible = mode === 'follow' || mode === 'tour';
+    person.visible = mode === 'follow';
     if (mode !== 'tour') tour.on = false;
+    shadowDirty = true;
     applyCutaway();
     placeLights();
     hooks.onMode?.(mode, roofG.visible);
   }
-  function setRoof(v) { roofG.visible = v; }
-  function setCutaway(c) { state.cutaway = c; applyCutaway(); hooks.onMode?.(state.mode, roofG.visible); }
-  function resetWalk() { state.floor = 0; state.hs = 0; state.inS = false; state.onRoofDeck = false; state.pos.set(start, EYE, 2.5); state.yaw = Math.PI; state.pitch = 0; hooks.onFloor?.(0); if (state.mode === 'orbit' || state.mode === 'top' || state.mode === 'street' || state.mode === 'showcase') setMode('walk'); }
+  /** The dollhouse view: from above and in front, the roof off, every room in sight. */
+  function dollPose() { const cx = W / 2, cz = B.z + B.d / 2, k = Math.max(B.w, B.d * 0.9) + (U ? 8 : 0); return { pos: new THREE.Vector3(cx + k * 0.22, k * 1.08 + 12, cz - k * 0.62), target: new THREE.Vector3(cx, U && state.cutaway !== 'ground' ? STOREY : 0, cz + 1) }; }
+  function setRoof(v) { roofG.visible = v; shadowDirty = true; }
+  function setCutaway(c) { state.cutaway = c; applyCutaway(); shadowDirty = true; hooks.onMode?.(state.mode, roofG.visible); }
+  function resetWalk() { state.floor = 0; state.hs = 0; state.inS = false; state.onRoofDeck = false; state.pos.set(start, EYE, 2.5); state.yaw = Math.PI; state.pitch = 0; hooks.onFloor?.(0); if (ORBIT.includes(state.mode) || state.mode === 'rise') setMode('walk'); }
   /** Climb to the first floor (or come back down): the visitor appears just beyond the door of the stairs. */
   function setFloor(f) {
     if (!U) return;
@@ -198,7 +221,8 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
 
   // ---------- lights follow the visitor ----------
   function placeLights() {
-    const lvl = level(), here = lvl ? U : L, cx = person.visible ? person.position.x : camera.position.x, cz = person.visible ? person.position.z : camera.position.z;
+    const moving = MOVING.has(state.mode), lvl = moving ? level() : (U && state.cutaway !== 'ground' ? 1 : 0), here = lvl ? U : L;
+    const cx = !moving ? orbit.target.x : person.visible ? person.position.x : camera.position.x, cz = !moving ? orbit.target.z : person.visible ? person.position.z : camera.position.z;
     const rooms = here.rooms.filter((r) => !r.parent).map((r) => ({ r, d: Math.hypot(r.x + r.w / 2 - cx, r.z + r.d / 2 - cz) })).sort((a, b) => a.d - b.d);
     // a lamp keeps its room while that room stays among the nearest few; reshuffling them every step made the light jump (a flicker)
     const want = rooms.slice(0, pool.length), key = (r) => lvl + ':' + r.id;
@@ -211,7 +235,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
       p.userData.key = key(it.r); taken.add(p.userData.key);
       p.position.set(it.r.x + it.r.w / 2, lvl * STOREY + 8.4, it.r.z + it.r.d / 2);
     }
-    for (const p of pool) p.visible = !!p.userData.key && keep.has(p.userData.key) && MOVING.has(state.mode);
+    for (const p of pool) p.visible = !!p.userData.key && keep.has(p.userData.key) && (moving || light.night > 0.25);      // outside views: the rooms are lit only once it gets dark
   }
 
   // ---------- input ----------
@@ -279,7 +303,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   }
 
   // ---------- the guided tour: a visitor walks through every room ----------
-  const tour = { on: false, path: [], i: 0, wait: 0, labels: [] };
+  const tour = { on: false, path: [], i: 0, wait: 0, pan: 1, end: false };
   const GR = 0.25;
   function planPath(from, targets) {
     // breadth-first search over a grid of the plot, on two levels; the stairs room joins them
@@ -328,33 +352,69 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     const thin = out.filter((_, k) => k % 2 === 0 || k === out.length - 1);
     return { pts: thin, target: want.get(found), end: out[out.length - 1] };
   }
+  /** One line a seller would say about a room, from what the plan really has (its size, windows, washroom, what it opens onto). */
+  function sellingPoint(r, lay) {
+    const onWall = (p) => (p.o === 'h' ? (Math.abs(p.c - r.z) < 0.06 || Math.abs(p.c - r.z - r.d) < 0.06) && p.at > r.x && p.at < r.x + r.w : (Math.abs(p.c - r.x) < 0.06 || Math.abs(p.c - r.x - r.w) < 0.06) && p.at > r.z && p.at < r.z + r.d);
+    const wins = lay.openings.filter((p) => p.kind === 'window' && !p.bath && onWall(p));
+    const sides = new Set(wins.map((p) => p.o + Math.round(p.c))).size, area = r.w * r.d;
+    const toTerrace = lay.openings.some((p) => p.terrace && (p.room === r.id || p.to === r.id));
+    switch (r.type) {
+      case 'bed': return r.att ? (/master/i.test(r.name) ? 'Its own attached bathroom, a king bed and a full wardrobe wall' : 'Its own attached bathroom, so nobody shares') : sides >= 2 ? 'Windows on two sides: bright all day, with a cross breeze' : area >= 150 ? 'Room for a double bed, a wardrobe and a desk' : 'A quiet room set away from the lounge';
+      case 'lounge': return toTerrace ? 'The family room, opening straight onto the terrace' : /dining/i.test(r.name) ? 'Sitting and dining in one open room: the heart of the home' : 'The family sits together here, in the middle of the house';
+      case 'drawing': return r.att ? 'Guests are received here, with their own washroom, without entering the house' : 'A formal room for guests, right beside the entrance';
+      case 'kitchen': return wins.length ? 'Daylight over the worktop, and counters along two walls' : 'A full run of counters with the cooker, sink and fridge in easy reach';
+      case 'dining': return 'A table for six, next to the kitchen';
+      case 'lobby': return 'A proper entrance that keeps the rooms out of sight of the door';
+      case 'study': return 'A quiet desk for work or homework';
+      case 'store': return 'Storage that keeps the rooms clear';
+      default: return sides >= 2 ? 'Light from two sides' : 'Well placed in the plan';
+    }
+  }
   function startTour() {
+    // the tour begins at the gate, with every door shut: the camera opens each one as it comes to it
+    state.floor = 0; state.hs = 0; state.inS = false; state.onRoofDeck = false; state.pos.set(start, EYE, 2.5); state.yaw = Math.PI; state.pitch = 0;
+    setAllDoors(false);
     planning = true;
+    const stopOf = (r, lay, l) => ({ l, x: r.x + r.w / 2, z: r.z + r.d / 2, name: r.name, w: r.w, d: r.d, sqft: Math.round(r.w * r.d), point: sellingPoint(r, lay) });
     const rooms = [
-      ...L.rooms.filter((r) => !r.parent && r.type !== 'stairs' && r.type !== 'passage').map((r) => ({ l: 0, x: r.x + r.w / 2, z: r.z + r.d / 2, name: r.name })),
-      ...(U ? U.rooms.filter((r) => !r.parent && r.type !== 'stairs' && r.type !== 'passage').map((r) => ({ l: 1, x: r.x + r.w / 2, z: r.z + r.d / 2, name: r.name })) : []),
-      ...(U ? (U.open || []).filter((o) => o.type === 'terrace').map((o) => ({ l: 1, x: o.x + o.w / 2, z: o.z + o.d / 2, name: 'Terrace' })) : []),
+      ...L.rooms.filter((r) => !r.parent && r.type !== 'stairs' && r.type !== 'passage').map((r) => stopOf(r, L, 0)),
+      ...(U ? U.rooms.filter((r) => !r.parent && r.type !== 'stairs' && r.type !== 'passage').map((r) => stopOf(r, U, 1)) : []),
+      ...(U ? (U.open || []).filter((o) => o.type === 'terrace' && o.w * o.d >= 40).map((o) => ({ l: 1, x: o.x + o.w / 2, z: o.z + o.d / 2, name: 'Terrace', w: o.w, d: o.d, sqft: Math.round(o.w * o.d), point: 'Open-air sitting space for cool evenings' })) : []),
     ];
     // a door-to-door route: nearest room first, ground floor before the first floor
-    let cur = { l: level(), x: state.pos.x, z: state.pos.z };
+    let cur = { l: 0, x: state.pos.x, z: state.pos.z };
     const todo = rooms.filter((r) => r.l === 0), up = rooms.filter((r) => r.l === 1);
     const route = [];
+    let count = 0;
     for (const group of [todo, up]) {
       while (group.length) {
         const res = planPath(cur, group);
         if (!res) break;
-        route.push(...res.pts.map((p, k) => ({ x: p[0], z: p[1], stop: k === res.pts.length - 1 ? res.target.name : null })));
+        count++;
+        route.push(...res.pts.map((p, k) => ({ x: p[0], z: p[1], stop: k === res.pts.length - 1 ? { ...res.target, i: count } : null })));
         cur = { l: res.target.l, x: res.end[0], z: res.end[1] };
         group.splice(group.indexOf(res.target), 1);
       }
     }
     planning = false;
-    tour.path = route; tour.i = 0; tour.wait = 0; tour.on = route.length > 0;
-    state.mode = 'tour'; person.visible = true; orbit.enabled = false; roofG.visible = true;
+    for (const pt of route) if (pt.stop) pt.stop.n = count;
+    tour.path = route; tour.i = 0; tour.wait = 0; tour.pan = 1; tour.end = false;
     setMode('tour'); tour.on = route.length > 0;
+    hooks.onFloor?.(0);
     hooks.onTour?.(tour.on);
   }
-  function stopTour() { tour.on = false; if (state.mode === 'tour') setMode('follow'); hooks.onTour?.(false); }
+  function stopTour() { tour.on = false; if (state.mode === 'tour') setMode('walk'); hooks.onTour?.(false); }
+  /** The end of the tour: the camera leaves the last room and rises to the dollhouse view of the whole home. */
+  const rise = { t: 0, from: new THREE.Vector3(), q0: new THREE.Quaternion(), q1: new THREE.Quaternion(), to: null };
+  function startRise() {
+    tour.on = false;
+    rise.t = 0; rise.from.copy(camera.position); rise.q0.copy(camera.quaternion);
+    rise.to = dollPose();
+    const m = new THREE.Matrix4().lookAt(rise.to.pos, rise.to.target, new THREE.Vector3(0, 1, 0)); rise.q1.setFromRotationMatrix(m);
+    state.mode = 'rise'; orbit.enabled = false;
+    camera.near = 0.6; camera.far = 2000; camera.updateProjectionMatrix();
+    hooks.onTour?.(false, true);
+  }
 
   function resize() {
     const w = host.clientWidth, h = host.clientHeight;
@@ -366,7 +426,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   ro.observe(host);
   resize();
 
-  let raf, last = performance.now(), lastRoom = '', lightT = 0, lastNear = null, lastNearKey = '';
+  let raf, last = performance.now(), lastRoom = '', lightT = 0, lastNear = null, lastNearKey = '', fps = 60, slowT = 0;
   const head = new THREE.Vector3();
   function loop(now) {
     raf = requestAnimationFrame(loop);
@@ -380,24 +440,28 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
         if (d.kind === 'swing') d.pivot.rotation.y = d.open * d.t; else d.slide.position[d.axis] = d.travel * d.t;
       }
     }
-    if (MOVING.has(state.mode)) {
+    if (state.mode === 'rise') { /* flown below */ }
+    else if (MOVING.has(state.mode)) {
       const k = state.keys;
       let fwd = 0, str = 0, sp = 0;
       if (state.mode === 'tour' && tour.on) {
         for (const d of doors) if (d.target === 0 && Math.hypot(d.x - state.pos.x, d.z - state.pos.z) < 3.6 && (d.upper ? 1 : 0) === level()) d.target = 1;      // the guided visitor opens each door on the way
         const tgt = tour.path[tour.i];
-        if (tour.wait > 0) { tour.wait -= dt; state.yaw += dt * 0.6; }
+        if (tour.wait > 0) { tour.wait -= dt; state.yaw += dt * 0.34 * tour.pan; state.pitch += (-0.1 - state.pitch) * Math.min(1, dt * 2); }      // a slow look round the room
         else if (tgt) {
           const dx = tgt.x - state.pos.x, dz = tgt.z - state.pos.z, dd = Math.hypot(dx, dz);
-          const want = Math.atan2(-dx, -dz);
+          const ahead = tour.path[Math.min(tour.path.length - 1, tour.i + 5)];                  // the camera looks a few steps along the way, so it turns before the corner, smoothly
+          const want = Math.atan2(-(ahead.x - state.pos.x), -(ahead.z - state.pos.z));
           let dy = want - state.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-          state.yaw += dy * Math.min(1, dt * 7);
-          if (dd < 0.35) { if (tgt.stop) { tour.wait = 1.6; hooks.onRoomStop?.(tgt.stop); } tour.i++; if (tour.i >= tour.path.length) { tour.on = false; hooks.onTour?.(false); } }
-          else { const s = Math.min(dd, 5.2 * dt); const mx = (dx / dd) * s, mz = (dz / dd) * s; state.speed = s / dt; state.pos.x += mx; state.pos.z += mz; }
+          if (Math.hypot(ahead.x - state.pos.x, ahead.z - state.pos.z) > 0.6) state.yaw += dy * Math.min(1, dt * 2.6);
+          state.pitch += (-0.04 - state.pitch) * Math.min(1, dt * 2);
+          if (dd < 0.35) { if (tgt.stop) { tour.wait = 4.6; tour.pan = -tour.pan; hooks.onRoomStop?.(tgt.stop); } tour.i++; if (tour.i >= tour.path.length) tour.end = true; }
+          else { const s = Math.min(dd, 3.7 * dt); const mx = (dx / dd) * s, mz = (dz / dd) * s; state.speed = s / dt; state.pos.x += mx; state.pos.z += mz; }
         }
         const h = settle();
         state.hs += (h - state.hs) * Math.min(1, dt * 12);
         if (tour.wait > 0) state.speed = 0;
+        if (tour.end && tour.wait <= 0) { tour.end = false; startRise(); }
       } else {
         const run = k.has('shift') ? 2 : 1;
         const turn = ((k.has('arrowleft') || k.has('q')) ? 1 : 0) - ((k.has('arrowright') || k.has('e')) ? 1 : 0);
@@ -417,7 +481,8 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
       person.rotation.y = state.yaw + Math.PI;
       state.phase += dt * state.speed * 1.7;
       person.walk(state.phase, Math.min(1, state.speed / 6));
-      if (state.mode === 'walk') {
+      if (state.mode === 'rise') { /* the camera is flown below */ }
+      else if (state.mode === 'walk' || state.mode === 'tour') {
         camera.position.copy(state.pos);
         camera.rotation.set(state.pitch, state.yaw, 0);
       } else {                                                     // third person: behind and above the visitor, pulled in by walls
@@ -440,6 +505,23 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
         if (key !== lastNearKey) { lastNear = nd; lastNearKey = key; hooks.onNearDoor?.(nd ? { open: !!nd.target, label: doorLabel(nd) } : null); }
       }
     } else orbit.update();
+    if (state.mode === 'rise') {
+      rise.t = Math.min(1, rise.t + dt / 4.2);
+      const k = rise.t * rise.t * (3 - 2 * rise.t);
+      camera.position.lerpVectors(rise.from, rise.to.pos, k); camera.position.y += Math.sin(k * Math.PI) * 6;
+      camera.quaternion.slerpQuaternions(rise.q0, rise.q1, Math.min(1, k * 1.15));
+      if (rise.t > 0.3 && roofG.visible) { roofG.visible = false; shadowDirty = true; }
+      if (rise.t >= 1) setMode('doll');
+    }
+    // shadows: redrawn while a door is moving, while the visitor is shown walking, or after the sun, a look or the roof changed
+    if (shadowDirty || state.mode === 'follow' || doors.some((d) => Math.abs(d.t - d.target) > 0.001)) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; }
+    // a slow machine: draw fewer pixels first, then a smaller shadow map
+    fps += ((1 / Math.max(dt, 0.001)) - fps) * 0.05;
+    if ((slowT = fps < 27 ? slowT + dt : 0) > 3) {
+      slowT = 0;
+      if (pxRatio > 1) { pxRatio = Math.max(1, pxRatio - 0.5); renderer.setPixelRatio(pxRatio); resize(); }
+      else if (S.sun.shadow.mapSize.x > 2048) { S.sun.shadow.mapSize.set(2048, 2048); S.sun.shadow.map?.dispose(); S.sun.shadow.map = null; shadowDirty = true; }
+    }
     renderer.render(scene, camera);
   }
   build(false);
@@ -447,7 +529,8 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   raf = requestAnimationFrame(loop);
 
   return {
-    setMode, setRoof, resetWalk, setFloor, setCutaway, setFov, startTour, stopTour,
+    setMode, setRoof, resetWalk, setFloor, setCutaway, setFov, startTour, stopTour, setTime, setLook,
+    get time() { return time; }, get look() { return look; },
     setColors: (c) => { curColors = { ...curColors, ...c }; S.setColors(c); },
     setFloors: (f) => { site = { ...site, ...(f.living ? { floorLiving: f.living } : {}), ...(f.bed ? { floorBed: f.bed } : {}) }; S.setFloors(f); },
     setSite: (s) => { site = { ...site, ...s }; build(true); },                       // a new boundary wall, gate or car: the scene is rebuilt
@@ -463,7 +546,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     dispose() {
       cancelAnimationFrame(raf); ro.disconnect();
       window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); window.removeEventListener('pointerup', onUp);
-      orbit.dispose(); disposeScene(scene); renderer.dispose(); renderer.domElement.remove();
+      amb.dispose(); orbit.dispose(); disposeScene(scene); renderer.dispose(); renderer.domElement.remove();
     },
   };
 }

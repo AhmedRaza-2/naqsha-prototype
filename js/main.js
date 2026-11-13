@@ -4,8 +4,12 @@ import { STYLES, STYLE_IDS } from './styles.js';
 import { renderFront, SITE_DEFAULT } from './scene.js';
 import { createViewer } from './viewer.js';
 import { parseRequest } from './nlp.js';
+import { understand, loadReader } from './nlu.js';
 import { setPorch, setBalcony, hasPorch, balconyRoom } from './plantweak.js';
 import { readInspiration } from './inspire.js';
+import { LOOKS, LOOK_IDS, lookFor } from './interior.js';
+import { timeName } from './ambience.js';
+import { createMusic } from './music.js';
 import { modelLayouts, upperLayouts, planToLayout, knowsStoreys, boxAndStairs, terraceArea, FAMILY } from './modelplans.js';
 import { check, score, serialize } from './bands.js';
 import { check as treeCheck, serialize as treeSerialize } from './tree.js';
@@ -146,17 +150,34 @@ function applyParsed(r) {
   if (r.omit) { document.querySelectorAll('input[name=omit]').forEach((c) => { if (r.omit.includes(c.value)) c.checked = true; }); $('prefs').open = true; }
   if (r.upDrawing) { $('pupdraw').value = 'yes'; $('prefs').open = true; }
   if (r.terrace && $('floorsrow').style.display !== 'none' && floors() === 2) $('pterr').value = r.terrace;
-  S.wantStyle = r.style || null;
+  if ('understood' in r) S.wantStyle = r.style || null; else if (r.style) S.wantStyle = r.style;      // a whole reading resets it; the model's additions only add
   if (r.colors && r.colors.wall) S.colors.wall = r.colors.wall;
 }
-$('nl').addEventListener('input', () => {
-  const r = parseRequest($('nl').value);
-  applyParsed(r);
-  readPlot();
-  const chips = r.understood.map((u) => `<span class="chip-said"><b>${u.label}</b> ${u.value}</span>`).join('');
+let lastRead = { text: '', r: null };                              // the latest reading of the sentence (patterns, then the model's additions)
+const readOf = (text) => (lastRead.text === text && lastRead.r ? lastRead.r : parseRequest(text));
+const showRead = (r) => {
+  const chips = r.understood.map((u) => `<span class="chip-said${u.model ? ' by-model' : ''}"${u.model ? ' title="Read by the language model"' : ''}><b>${u.label}</b> ${u.value}</span>`).join('');
   const notes = r.notes.length ? `<span class="chip-note">Noted, but the planner cannot place these yet: ${r.notes.join(', ')}.</span>` : '';
   NL_CHIPS.innerHTML = chips + notes;
+};
+let readTimer = 0;
+$('nl').addEventListener('input', () => {
+  const text = $('nl').value, r = parseRequest(text);
+  lastRead = { text, r };
+  applyParsed(r);
+  readPlot();
+  showRead(r);
+  // the language model reads the same sentence a moment later and fills in what the patterns missed
+  clearTimeout(readTimer);
+  readTimer = setTimeout(async () => {
+    const m = await understand(text).catch(() => null);
+    if (!m || $('nl').value !== text || !m.byModel.length) return;
+    lastRead = { text, r: m };
+    applyParsed(Object.fromEntries(m.byModel.map((k) => [k, m[k]])));
+    readPlot(); showRead(m); renderAdvice();
+  }, 250);
 });
+$('nl').addEventListener('focus', () => { loadReader(); }, { once: true });
 
 // ---------- the assistant under the text box: asks about what is missing, and what to give up when two wishes clash ----------
 const ADV = $('advice');
@@ -169,7 +190,7 @@ const PORCH_NEED = [10, 18, 26, 26, 26, 26];                                  //
 const setField = (id, v) => { $(id).value = String(v); };
 const omitOn = (kind) => document.querySelectorAll('input[name=omit]').forEach((c) => { if (c.value === kind) c.checked = true; });
 function questions() {
-  const text = $('nl').value.trim(), r = parseRequest(text);
+  const text = $('nl').value.trim(), r = readOf($('nl').value);
   const w = +$('pw').value, d = +$('pd').value, two = floors() === 2, shown = $('floorsrow').style.display !== 'none';
   const cars = +$('pcars').value || 0, porchOn = $('pporch').value !== 'no';
   const rule = ruleFor(w, d), marla = Math.round((w * d) / MARLA * 10) / 10;
@@ -1047,11 +1068,13 @@ function downloadSheet() {
 $('dl').onclick = downloadSheet;
 
 // ---------- step 4 ----------
+let music = null;
 const VIEW_HINT = {
   walk: 'Drag to look. W/A/S/D or arrows to move, Shift to run. Every door and the gate start shut: walk up to one and press F (or click it) to open or close it.',
   follow: 'You are the visitor: W/A/S/D to walk, drag to turn the camera. Doors and the gate start shut: press F near one (or click it) to open or close it.',
-  tour: 'A guided tour: the visitor walks through every room. Pick another view to take over.',
-  orbit: 'Drag to orbit, scroll to zoom, right-drag to pan.',
+  tour: 'A guided tour through every room. Press Stop tour (or pick another view) to take over.',
+  doll: 'The whole home with the roof off. Drag to turn it, scroll to zoom, right-drag to pan.',
+  rise: 'The whole home, from above.',
   top: 'Looking straight down. Scroll to zoom, right-drag to pan.',
   street: 'The street view. Drag to look around the house.',
   showcase: 'The house turns slowly. Drag to take over.',
@@ -1064,12 +1087,27 @@ function openViewer() {
   $('vview').value = 'walk';
   $('vdoors').textContent = 'Open all doors';
   let doorsOpen = false, carNote = '';
+  S.look ||= lookFor(STYLES[S.style].family);
+  music ||= createMusic();
+  const card = (info) => {
+    $('tourcard').hidden = !info;
+    if (!info) return;
+    $('tcstep').textContent = `Room ${info.i} of ${info.n}`;
+    $('tcname').textContent = info.name;
+    $('tcsize').textContent = localize(`${info.w} x ${info.d} ft`) + `  ·  ${fmtArea(info.sqft)}`;
+    $('tcpoint').textContent = info.point;
+    $('tourcard').style.animation = 'none'; void $('tourcard').offsetWidth; $('tourcard').style.animation = '';
+  };
   S.viewer = createViewer($('vhost'), S.sel, S.style, {
     onRoom: (n) => ($('hudroom').textContent = n),
     onCars: (c) => { carNote = c && c.want > c.inside + c.outside ? `Only ${c.inside + c.outside} of ${c.want} cars could be parked.` : c && c.outside ? `${c.inside} car${c.inside === 1 ? '' : 's'} inside the plot, ${c.outside} on the footpath outside the gate.` : ''; $('hudhint').textContent = (carNote ? carNote + ' ' : '') + (VIEW_HINT[S.viewer ? S.viewer.mode : 'walk'] || ''); },
     onFloor: (f) => ($('vfloor').textContent = f ? 'Go downstairs' : 'Go upstairs'),
-    onTour: (on) => { if (!on && S.viewer && S.viewer.mode === 'tour') { $('vview').value = 'follow'; S.viewer.setMode('follow'); } },
-    onRoomStop: (n) => ($('hudroom').textContent = n),
+    onTour: (on, finished) => {
+      $('vtour').textContent = on ? 'Stop tour' : 'Start tour';
+      $('vmusic').hidden = !on;
+      if (on) { if (!music.muted) music.start(); } else { if (finished) setTimeout(() => { music.stop(); card(null); }, 6000); else { music.stop(); card(null); } }
+    },
+    onRoomStop: (info) => { $('hudroom').textContent = info.name; card(info); },
     onNearDoor: (d) => {
       const base = (carNote ? carNote + ' ' : '') + VIEW_HINT[S.viewer ? S.viewer.mode : 'walk'];
       $('hudhint').textContent = base;
@@ -1081,12 +1119,15 @@ function openViewer() {
       $('vview').value = mode;
       $('vroof').textContent = roof ? 'Hide roof' : 'Show roof';
       $('vreset').hidden = !['walk', 'follow', 'tour'].includes(mode);
-      $('vcutl').hidden = !(S.up && ['orbit', 'top', 'street', 'showcase'].includes(mode));
+      $('vcutl').hidden = !(S.up && ['doll', 'top', 'street', 'showcase'].includes(mode));
+      $('vdoll').textContent = mode === 'doll' ? 'Walk inside' : 'Dollhouse';
+      if (!['walk', 'follow'].includes(mode)) $('doorprompt').hidden = true;
       $('vdoors').hidden = !['walk', 'follow', 'tour'].includes(mode);
       $('hudhint').textContent = (carNote ? carNote + ' ' : '') + (VIEW_HINT[mode] || '');
     },
-  }, S.up, S.colors, S.site);
+  }, S.up, S.colors, S.site, { look: S.look, time: S.time ?? 0.36 });
   $('vpalette').hidden = true;
+  card(null);
   $('vcolors').setAttribute('aria-expanded', 'false');
   const v = S.viewer;
   swatches($('vswwall'), WALLS.slice(1), S.colors.wall, (c) => v.setColors({ wall: c }));
@@ -1101,7 +1142,16 @@ function openViewer() {
   }
   $('vfov').value = 70;
   $('vfov').oninput = () => v.setFov(+$('vfov').value);
-  $('vview').onchange = () => { const m = $('vview').value; if (m === 'tour') v.startTour(); else v.setMode(m); };
+  $('vview').onchange = () => { const m = $('vview').value; if (m === 'tour') v.startTour(); else { if (v.touring) v.stopTour(); v.setMode(m); } };
+  $('vtour').textContent = 'Start tour'; $('vmusic').hidden = true;
+  $('vtour').onclick = () => (v.mode === 'tour' ? v.stopTour() : v.startTour());
+  $('vdoll').onclick = () => { if (v.mode === 'tour') v.stopTour(); v.setMode(v.mode === 'doll' ? 'walk' : 'doll'); };
+  $('vmusic').onclick = () => { const m = !music.muted; music.setMuted(m); if (!m) music.start(); $('vmusic').textContent = m ? 'Music off' : 'Music on'; $('vmusic').setAttribute('aria-pressed', String(!m)); };
+  $('vmusic').textContent = music.muted ? 'Music off' : 'Music on';
+  $('vlooks').innerHTML = LOOK_IDS.map((id) => `<button type="button" role="radio" data-look="${id}" aria-checked="${id === S.look}">${LOOKS[id].name}</button>`).join('');
+  $('vlooks').onclick = (e) => { const b = e.target.closest('button[data-look]'); if (!b) return; S.look = b.dataset.look; v.setLook(S.look); [...$('vlooks').children].forEach((c) => c.setAttribute('aria-checked', String(c === b))); };
+  $('vtime').value = Math.round((S.time ?? 0.36) * 100); $('vtimename').textContent = timeName(S.time ?? 0.36);
+  $('vtime').oninput = () => { S.time = +$('vtime').value / 100; v.setTime(S.time); $('vtimename').textContent = timeName(S.time); };
   $('vcut').value = 'all';
   $('vcut').onchange = () => v.setCutaway($('vcut').value);
   $('vdoors').onclick = () => { doorsOpen = !doorsOpen; v.setAllDoors(doorsOpen); $('vdoors').textContent = doorsOpen ? 'Close all doors' : 'Open all doors'; };
@@ -1113,6 +1163,7 @@ $('vroof').onclick = () => { const v = S.viewer; v.setRoof(!v.roofVisible); $('v
 $('vreset').onclick = () => S.viewer.resetWalk();
 $('vfloor').onclick = () => S.viewer.setFloor(S.viewer.floor ? 0 : 1);
 $('vback').onclick = () => {
+  music?.stop();
   S.viewer.dispose(); S.viewer = null;
   $('viewer').hidden = true; document.body.style.overflow = '';
 };

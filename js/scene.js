@@ -3,7 +3,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { STYLES } from './styles.js';
 import { furnish } from './furniture.js';
-import { addFurniture, furnitureColliders } from './furn3d.js';
+import { addFurniture, furnitureColliders, setFurnitureLook, restyle, furnitureMaterials } from './furn3d.js';
+import { buildDecor, restyleDecor } from './decor.js';
+import { LOOKS } from './interior.js';
 import { loadCar, CARS } from './car3d.js';
 import { turningStair, stairPlan } from './layout.js';
 
@@ -31,8 +33,8 @@ function makeTex(kind, tint = null) {
       g.fillStyle = gr; g.fillRect(x - rr, y - rr, 2 * rr, 2 * rr);
     }
   };
-  if (kind === 'wood' || kind === 'wood-dark' || kind === 'slats') {
-    const base = kind === 'wood' ? [196, 150, 100] : kind === 'slats' ? [150, 100, 64] : [130, 86, 54];
+  if (kind === 'wood' || kind === 'wood-dark' || kind === 'slats' || kind === 'oak') {
+    const base = kind === 'wood' ? [196, 150, 100] : kind === 'oak' ? [222, 196, 158] : kind === 'slats' ? [150, 100, 64] : [130, 86, 54];
     const n = kind === 'slats' ? 12 : 8, pw = N / n;
     for (let i = 0; i < n; i++) {
       const v = (rnd() - 0.5) * 26;
@@ -145,9 +147,11 @@ export function prepareRenderer(renderer) {
  */
 export const SITE_DEFAULT = { wall: 'plain', wallH: 4.5, wallColor: null, gate: 'slide', car: 'ferrari', carColor: 'red', floorLiving: null, floorBed: null,
   roof: 'flat', windows: 'standard', shutters: false, cladding: 'none' };          // the last four are facade options (render only)
-export function buildScene(renderer, L, styleId, U = null, { colors = {}, furniture = true, context = false, site = {} } = {}) {
+export function buildScene(renderer, L, styleId, U = null, { colors = {}, furniture = true, context = false, site = {}, look = null } = {}) {
   site = { ...SITE_DEFAULT, ...site };
-  const st = { ...STYLES[styleId], ...Object.fromEntries(Object.entries(colors).filter(([, v]) => v)) };
+  let lk = LOOKS[look] || null;                                    // the interior look (walls inside, floors, furniture colours); null: the facade style's own
+  const st = { ...STYLES[styleId], ...(lk ? { interior: lk.wall, floorLiving: lk.floorLiving, floorBed: lk.floorBed } : {}), ...Object.fromEntries(Object.entries(colors).filter(([, v]) => v)) };
+  if (lk && furniture) setFurnitureLook(lk);
   const { w: W, d: D } = L.plot;
   const { B, rule } = L;
 
@@ -156,7 +160,8 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   scene.environment = envFor(renderer);
   scene.fog = new THREE.Fog('#dce6ea', 260, 900);
 
-  scene.add(new THREE.HemisphereLight('#dcecff', '#6e6650', 0.78));
+  const hemi = new THREE.HemisphereLight('#dcecff', '#6e6650', 0.78);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight('#fff0d6', 3.0);
   sun.position.set(W * 0.5 - 70, 95, -85);
   sun.target.position.set(W / 2, 0, D / 2);
@@ -178,6 +183,8 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const mExt = texMat('plaster', { color: st.wall, bumpMap: makeTex('plaster'), bumpScale: 0.02, roughness: 0.95 }, 9);
   const mInt = texMat('plaster-fine', { color: st.interior, roughness: 0.92, envMapIntensity: 0.55 }, 9);
   const mDownlight = new THREE.MeshBasicMaterial({ color: '#fff4d6' });
+  const mCeil = new THREE.MeshStandardMaterial({ color: '#f6f4ef', roughness: 0.95, emissive: '#f6f4ef', emissiveIntensity: 0.42, envMapIntensity: 0.2 });     // lit from below by the room: a ceiling gets no sky light of its own and looked brown
+  const decorRegs = [];                                            // per storey: what a change of interior look redraws
   const mSkirt = mat('#f1f2f0', { roughness: 0.55 });
   const mTrim = mat(st.trim, { roughness: 0.7 }), mAccent = mat(st.accent, { roughness: 0.75 });
   const mGlass = new THREE.MeshStandardMaterial({ color: '#4f6d7d', metalness: 0.25, roughness: 0.04, transparent: true, opacity: 0.42, envMapIntensity: 1.6 });
@@ -506,7 +513,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     for (const l of vl.values()) addLine('v', l);
 
     // ---------- floors ----------
-    const floorMat = (kind) => texMat(kind, { roughness: kind.startsWith('marble') ? 0.35 : kind === 'tile' ? 0.4 : 0.7, envMapIntensity: kind.startsWith('marble') ? 0.8 : 0.4 }, kind === 'tile' ? 2.5 : 4);
+    const floorMat = (kind) => texMat(kind, { roughness: kind.startsWith('marble') ? 0.2 : kind === 'tile' ? 0.3 : 0.5, envMapIntensity: kind.startsWith('marble') ? 1.1 : 0.55 }, kind === 'tile' ? 2.5 : 4);
     const fm = {};
     const floorKind = (r) => (r.type.endsWith('bath') || r.type === 'kitchen' ? 'tile' : r.type === 'bed' ? (site.floorBed || st.floorBed) : (site.floorLiving || st.floorLiving));
     const order = [...L.rooms.filter((r) => !r.parent), ...L.rooms.filter((r) => r.parent)];
@@ -517,7 +524,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       if (!r.type.endsWith('bath') && r.type !== 'kitchen') { fl.userData.floorFor = r.type === 'bed' ? 'bed' : 'living'; floorMeshes.push({ mesh: fl, w: r.w, d: r.d }); }
     });
     // a ceiling under every slab (the roof's underside), so rooms look finished from inside
-    for (const r of L.rooms) if (!r.parent) { const cp = plane(r.x, r.x + r.w, r.z, r.z + r.d, H - 0.02, mat('#f6f4ef', { roughness: 0.95, emissive: '#3b3934' }), walls); cp.rotation.x = Math.PI / 2;
+    for (const r of L.rooms) if (!r.parent) { const cp = plane(r.x, r.x + r.w, r.z, r.z + r.d, H - 0.02, mCeil, walls); cp.rotation.x = Math.PI / 2;
       if (r.type !== 'stairs' && r.w > 5 && r.d > 5) {                           // recessed downlights: one in a small room, two in a long one
         const spots = r.w > 15 || r.d > 15 ? (r.w >= r.d ? [[0.3, 0.5], [0.7, 0.5]] : [[0.5, 0.3], [0.5, 0.7]]) : [[0.5, 0.5]];
         for (const [fx, fz] of spots) { const dl = new THREE.Mesh(new THREE.CircleGeometry(0.34, 20), mDownlight); dl.rotation.x = Math.PI / 2; dl.position.set(r.x + r.w * fx, H - 0.05, r.z + r.d * fz); walls.add(dl); }
@@ -527,7 +534,10 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     curColl.push(...furnitureColliders(pieces));
     if (furniture) {
       const furn = new THREE.Group(); walls.add(furn);
-      furnReady.push(addFurniture(furn, pieces));
+      const reg = { rugs: [], art: [] };
+      const dec = buildDecor(L, pieces, lk || LOOKS.modern);
+      furn.add(dec.group); reg.art = dec.reg.art; decorRegs.push(reg);
+      furnReady.push(addFurniture(furn, [...pieces, ...dec.items], reg));
     }
     return pieces;
   }
@@ -1184,7 +1194,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     for (const key of ['living', 'bed']) {
       const kind = f[key];
       if (!kind) continue;
-      const m = (floorCache[kind] ||= texMat(kind, { roughness: kind.startsWith('marble') || kind === 'granite' ? 0.35 : 0.7 }, 4));
+      const m = (floorCache[kind] ||= texMat(kind, { roughness: kind.startsWith('marble') || kind === 'granite' ? 0.2 : 0.5, envMapIntensity: kind.startsWith('marble') ? 1.1 : 0.55 }, 4));
       for (const fm of floorMeshes) if (fm.mesh.userData.floorFor === key) {
         const t = m.map.clone(); t.needsUpdate = true; t.repeat.set(fm.w / 4, fm.d / 4);
         const m2 = m.clone(); m2.map = t; fm.mesh.material = m2;
@@ -1197,7 +1207,17 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     if (c.trim) mTrim.color.set(c.trim);
     if (c.accent) mAccent.color.set(c.accent);
   }
-  return { mumty: mum ? { x0: mum.x0, x1: mum.x1, z0: mum.z0, z1: mum.z1 } : null, carsInfo, scene, sun, world, roofG, midG, stairsG, storeyG, doors: doorList, colliders, upperColliders, roofColliders, stairs, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, innerPorch, mats, setColors, setFloors, furnReady, site, pieces: { ground: piecesG, upper: piecesU } };
+  /** A new interior look, live: furniture colours, rugs, pictures, the walls inside and the floors. */
+  function setLook(id) {
+    lk = LOOKS[id]; if (!lk) return;
+    setFurnitureLook(lk);
+    for (const reg of decorRegs) { restyle(reg); restyleDecor(reg, lk); }
+    mInt.color.set(lk.wall);
+    setFloors({ living: lk.floorLiving, bed: lk.floorBed });
+  }
+  /** Every material that mirrors the surroundings, with its daylight strength (the lighting dims them at night). */
+  const envMaterials = () => { const set = new Set(furnitureMaterials()); scene.traverse((o) => { if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m.isMeshStandardMaterial) set.add(m); }); for (const m of set) if (m.userData.env0 == null) m.userData.env0 = m.envMapIntensity; return [...set]; };
+  return { hemi, mCeil, mGlass, mDownlight, setLook, envMaterials, mumty: mum ? { x0: mum.x0, x1: mum.x1, z0: mum.z0, z1: mum.z1 } : null, carsInfo, scene, sun, world, roofG, midG, stairsG, storeyG, doors: doorList, colliders, upperColliders, roofColliders, stairs, stairsRoom, upStairs, gateX, gateLo, gateHi, open, porch, innerPorch, mats, setColors, setFloors, furnReady, site, pieces: { ground: piecesG, upper: piecesU } };
 }
 
 function disposeScene(scene) {

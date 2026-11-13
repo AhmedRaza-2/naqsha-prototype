@@ -84,6 +84,9 @@ export function preloadModel() {
   return loading;
 }
 
+/** The ONNX runtime, once preloadModel() has resolved (the request reader in nlu.js runs on it too). */
+export const runtime = () => ortRef;
+
 async function load() {
   await preloadModel();
   return { ort: ortRef, session };
