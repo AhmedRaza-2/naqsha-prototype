@@ -634,3 +634,33 @@ export function refitBox(plan, box) {
   if (!peel(h, 'V', box.x, box.w, W)) return plan;
   return p;
 }
+
+// ---------------------------------------------------------------- washrooms of different shapes
+/**
+ * Washrooms that are not all the same box. The model draws nearly every attached washroom about 4.5 x 6.5 ft; real plans
+ * have long narrow ones (3.5 x 9: a bedroom keeps a wide wall) and squarer ones (5.5 x 5.5: a short bedroom keeps its depth).
+ * Each washroom is redrawn with the same floor area in another shape that still fits its room and keeps the rooms useful:
+ * the shape is chosen from the room's own proportions (a long room takes a narrow washroom along its wall; a squarish one
+ * a squarer washroom) and, so that neighbours differ, rotated through the candidates by the washroom's place in the plan.
+ */
+export function varyBaths(plan, salt = 0) {
+  if (!plan.tree) return plan;
+  const list = rooms(plan).filter((r) => r.node.bath);
+  if (!list.length) return plan;
+  const p = clone(plan), mine = rooms(p).filter((r) => r.node.bath);
+  mine.forEach((r, n) => {
+    const [bw, bd] = r.node.bath, A = bw * bd, longRoom = r.d >= r.w * 1.15;
+    const cand = [];
+    for (let w = 3.5; w <= 6.5; w += 0.5) {
+      const d = Math.round((A / w) * 2) / 2, area = w * d;
+      if (w > r.w - 1 || d > r.d - 2 || d < 5 || Math.abs(area - A) / A > 0.1 || Math.max(w, d) / Math.min(w, d) > 2.7) continue;
+      cand.push([w, d]);
+    }
+    if (cand.length < 2) return;
+    cand.sort((a, b) => a[0] - b[0]);                                // narrow and long first, squarer last
+    const k = longRoom ? [0, 1, 0, Math.floor(cand.length / 2)] : [cand.length - 1, Math.floor(cand.length / 2), 0, cand.length - 1];
+    const [w, d] = cand[Math.min(cand.length - 1, k[(n + salt) % k.length])];
+    r.node.bath = [w, d, r.node.bath[2]];
+  });
+  return p;
+}

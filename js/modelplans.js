@@ -5,7 +5,7 @@ import { toRects as treeRects, check as treeCheck } from './tree.js';
 import { finalize, ruleFor, turningStair } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
 import { tidyRects } from './tidy.js';
-import { balconyRoom, reshapeFor, applyReshape, dropTerrace, dropGuestBath, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox, growUpperStairs } from './plantweak.js';
+import { balconyRoom, reshapeFor, applyReshape, dropTerrace, dropGuestBath, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox, growUpperStairs, varyBaths } from './plantweak.js';
 import { draftPlans, sampleDrafts, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -164,6 +164,7 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
     embed: request.floor ? null : (p) => {
       let q = rsh ? applyReshape(p, plot.w, plot.d, rsh, own) : p;
       q = standardStairs(q, strictStairs);
+      q = varyBaths(q, plot.w);                                       // washrooms of different shapes, not all one box
       for (const t of omit) q = dropRoom(q, t);                      // rooms the visitor chose to leave out (dining, drawing room ...)
       if (guestBath === 'no') q = dropGuestBath(q);                  // no washroom in the drawing room
       if (lawn === 'no') q = lawnToPorch(q);                          // no lawn: the front strip is all car porch
@@ -267,8 +268,39 @@ function stairsOpenOnLounge(it, R) {
  *  above the stairs below). Empty list when the ground floor has no stairs or the model gives nothing valid.
  *  prefs.terrace: 'with' (keep the open roof), 'without' (rooms cover it), 'both' (the default: some of each) or 'any'.
  *  The returned array has a `note` when the terrace choice could not be met. */
+/** A first floor that stands over the car porch too: the porch in front of the built box (or inside it) counts as ground that carries rooms.
+ *  -> { fb: the box and stairs with the box grown forward over the porch, rects: the ground rects with the porch as built floor } or null when this ground floor
+ *  has no porch that fits (it must run along most of the box's front). */
+export function overPorch(rects) {
+  const fb0 = boxAndStairs(rects);
+  const porch = fb0 && rects.find((r) => r.t === 'porch');
+  if (!porch) return null;
+  const bx0 = fb0.box.x, bx1 = fb0.box.x + fb0.box.w, by0 = fb0.box.y;
+  const px0 = Math.max(porch.x, bx0), px1 = Math.min(porch.x + porch.w, bx1);
+  const asBuilt = rects.map((r) => (r === porch ? { ...r, t: 'store' } : r));       // a non-open type: the checks then see a floor that carries
+  if (porch.y >= by0 - 0.01) return { fb: fb0, rects: asBuilt };               // the porch is inside the box already
+  if (Math.abs(porch.y + porch.d - by0) > 0.6 || px1 - px0 < 0.7 * fb0.box.w || porch.d < 6 || porch.d > 16) return null;
+  const grow = Math.round((by0 - porch.y) * 100) / 100;
+  const box = { x: fb0.box.x, y: porch.y, w: fb0.box.w, d: Math.round((fb0.box.d + grow) * 100) / 100 };
+  return { fb: { box, up: { ...fb0.up, y: Math.round((fb0.up.y + grow) * 100) / 100 } }, rects: asBuilt };
+}
+
 export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
-  const fb = boxAndStairs(ground.rects);
+  const over = prefs.upOver ? overPorch(ground.rects) : null;
+  const fb = over ? over.fb : boxAndStairs(ground.rects);
+  const groundRects = over ? over.rects : ground.rects;                 // what the first floor must stand on
+  const porchRect = over ? ground.rects.find((r) => r.t === 'porch') : null;
+  /** Share (0-1) of the car porch that a first floor's rooms cover. */
+  const porchCover = (rects) => {
+    if (!porchRect) return 1;
+    let c = 0;
+    for (const r of rects) {
+      if (OPEN.has(r.t) || r.parent !== undefined || r.t === 'bath') continue;
+      const w = Math.min(r.x + r.w, porchRect.x + porchRect.w) - Math.max(r.x, porchRect.x), d = Math.min(r.y + r.d, porchRect.y + porchRect.d) - Math.max(r.y, porchRect.y);
+      if (w > 0 && d > 0) c += w * d;
+    }
+    return c / (porchRect.w * porchRect.d);
+  };
   if (!fb) return [];
   const { w, d } = ground.plot;
   const mode = prefs.terrace || 'both';
@@ -305,13 +337,14 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   // variant: 'with' keeps drafts that have a terrace; 'without' takes it away from every draft (dropTerrace); null: as drafted
   const cut = (minSupport, variant) => draftPlans(request, {
     top: 3, exclude: opts.exclude, onStatus: progress, styles: [null], drafts: pool,
-    keep: (it) => supportShare(it.rects, ground.rects) >= minSupport
+    keep: (it) => supportShare(it.rects, groundRects) >= minSupport
+      && (!over || porchCover(it.rects) >= 0.6)                       // the visitor asked for rooms over the porch: most of the porch is covered
       && (!needLounge || stairsOpenOnLounge(it, R))
       && (variant !== 'with' || terraceArea(it.rects) >= 40)
       && (variant !== 'without' || (terraceArea(it.rects) < 40 && it.score >= 1)),     // no terrace left, and every rule still passes
     embed: variant === 'without' || scale !== 1 || prefs.upDrawing || proper
       ? (p) => { let q = proper ? growUpperStairs(p, R) : p; q = variant === 'without' ? dropTerrace(q) : scaleTerrace(q, scale); if (prefs.upDrawing) { const a = upperDrawing(q, 'terrace'); q = a !== q && !treeCheck(a, prefs.beds).some((c) => c.level === 'err') ? a : upperDrawing(q); } return q; } : null,
-    hang: (rects) => { const a = supportArea(rects, ground.rects); return a.tot - a.sup; },        // rooms are then pulled back over the ground floor
+    hang: (rects) => { const a = supportArea(rects, groundRects); return a.tot - a.sup; },        // rooms are then pulled back over the ground floor
     prefer: (it) => stairsOpenOnLounge(it, R),                                                    // the stairs open onto the lounge or the terrace, not into a bedroom
   });
   // a first floor must stand on the ground floor: rooms hanging over a yard or a car porch are not drawn if an alternative exists
@@ -341,8 +374,8 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
   if (mode === 'both') {
     const b = await ladder('without', 2);
     const a = await ladder('with', b.length ? 2 : 3);
-    const gap = (x) => Math.min(8, Math.floor(outlineGap(x.rects, ground.rects) / 4));
-    const sup = (x) => Math.floor(supportShare(x.rects, ground.rects) * 50);
+    const gap = (x) => Math.min(8, Math.floor(outlineGap(x.rects, groundRects) / 4));
+    const sup = (x) => Math.floor(supportShare(x.rects, groundRects) * 50);
     for (const arr of [a, b]) arr.sort((x, y) => (gap(x) - gap(y)) || (sup(y) - sup(x)) || (stackShare(y.rects, ground.rects) - stackShare(x.rects, ground.rects)));      // standing on the ground floor first, then washrooms over washrooms
     // a third kind: the terrace made smaller (or bigger when it cannot be smaller), so the cards do not all show the same terrace
     const near = (x) => a.some((y) => Math.abs(terraceArea(x.rects) - terraceArea(y.rects)) < 0.1 * terraceArea(y.rects));
@@ -362,11 +395,12 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
     const attempt = (p) => {                                       // a changed plan is kept only if it breaks no rule, passes no fewer, and does not move the walls away from the ground floor's
       if (!p || p === cur.plan) return;
       const rects = treeRects(p), checks = treeCheck(p, prefs.beds);
-      if (outlineGap(rects, ground.rects) > outlineGap(cur.rects, ground.rects)) return;
+      if (outlineGap(rects, groundRects) > outlineGap(cur.rects, groundRects)) return;
       if (checks.some((c) => c.level === 'err') || oks(checks) < oks(cur.checks)) return;
       cur = { ...cur, plan: p, rects, checks, grid: undefined };
     };
     attempt(refitBox(it.plan, fb.box));
+    attempt(varyBaths(cur.plan, 1));                                   // washrooms of different shapes, when that breaks no rule
     for (const t of prefs.upOmit || []) attempt(dropRoom(cur.plan, t));       // rooms that are not offered (store, study) are left out upstairs too, when the plan still passes without them
     return cur;
   });
@@ -374,11 +408,13 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
     const L = Object.assign(planToLayout(it, i), { terrace: Math.round(terraceArea(it.rects)) });
     const share = stackShare(it.rects, ground.rects);              // shown as a rule line, so the visitor sees how well the plumbing lines up
     L.checks.push({ level: share >= 0.5 ? 'ok' : 'warn', title: 'Washrooms above washrooms', detail: share >= 0.5 ? `${Math.round(share * 100)}% of the first-floor washroom area sits over a ground-floor washroom, so the pipes can share a stack.` : `Only ${Math.round(share * 100)}% of the first-floor washrooms sit over a washroom below; moving them over the ones below saves plumbing.` });
-    const gp = outlineGap(it.rects, ground.rects);
+    const gp = outlineGap(it.rects, groundRects);
     L.checks.push({ level: gp < 1 ? 'ok' : 'warn', title: 'Same outer walls as the ground floor', detail: gp < 1 ? `The first floor stands on exactly the ground floor's outline.` : `The outline differs from the ground floor's by about ${Math.round(gp)} sq ft.` });
     L.score = L.checks.filter((c) => c.level === 'ok').length;
     return L;
   });
+  if (prefs.upOver && !over) note = `${note} A room over the car porch needs a porch that runs along most of the front of the house; this one is too narrow (or there is none), so the first floor stands on the ground floor as before.`.trim();
+  else if (over && out.length) note = `${note} The first floor reaches forward over the car porch.`.trim();
   out.note = note;
   return out;
 }

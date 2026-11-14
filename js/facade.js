@@ -120,7 +120,7 @@ export function buildFacade(c, g) {
   // ---- the entrance
   if (g.entry === 'frame') {                                       // two piers and a beam standing proud of the wall, rising past the parapet, clad inside
     const fx0 = Math.max(left, door.at - door.w / 2 - g.frameW), fx1 = Math.min(right, door.at + door.w / 2 + g.frameW), fz = face - g.proj, ft = top + g.rise;
-    put(fx0, fx0 + 0.75, 0, ft, fz, face, mFeature, true); put(fx1 - 0.75, fx1, 0, ft, fz, face, mFeature, true);
+    put(fx0, fx0 + 0.75, 0, ft, fz, face, mFeature, !c.carportAtFront); put(fx1 - 0.75, fx1, 0, ft, fz, face, mFeature, !c.carportAtFront);      // under a car porch the piers do not block the cars parked beside the door
     put(fx0, fx1, ft - 0.9, ft, fz, face, mFeature);
     clad(fx0 + 0.75, fx1 - 0.75, door.top + 0.5, ft - 0.9, 0.16, matOf(g.fill));
     put(fx0 + 0.75, fx1 - 0.75, door.top + 0.55, door.top + 0.95, face - Math.max(3, g.proj + 1.6), face, mFeature);     // a canopy over the door, inside the frame

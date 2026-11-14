@@ -18,7 +18,7 @@ export function readFloor(which) {
       drawing: !omitBox('drawing').checked, lounge: !omitBox('lounge').checked, dining: !omitBox('dining').checked, porch: $('pporch').value !== 'no', openk: $('popenk').value === 'yes', gbath: $('pgbath').value !== 'no' };
   }
   return { w, d, twoFloors: true, ground: false, beds: +$('pup').value, baths: +$('pupbaths').value || +$('pup').value + 1,
-    drawing: $('pupdraw').value === 'yes', lounge: true, terrace: $('pterr').value !== 'without' };
+    drawing: $('pupdraw').value === 'yes', lounge: true, terrace: $('pterr').value !== 'without', over: $('pupover').value === 'yes', hasPorch: $('pporch').value !== 'no' };
 }
 
 const pill = (key, label, on, off = false, why = '') => `<label class="pill${on ? ' on' : ''}${off ? ' off' : ''}" data-k="${key}"${off ? ` aria-disabled="true" title="${why.replace(/"/g, '')}"` : ''}><input type="checkbox" data-k="${key}"${on ? ' checked' : ''}${off ? ' disabled' : ''}><span>${label}</span></label>`;
@@ -56,6 +56,7 @@ function tick(floor, k, on, quiet = false) {
     else { const b = omitBox(k); if (b) { b.checked = !on; fire(b); } }
   } else if (k === 'drawing') setVal('pupdraw', on ? 'yes' : 'no');
   else if (k === 'terrace') setVal('pterr', on ? 'with' : 'without');
+  else if (k === 'over') setVal('pupover', on ? 'yes' : 'no');
   if (!quiet) refreshForms();
 }
 function stepper(inst, key, dir) {
@@ -90,7 +91,7 @@ function render(inst) {
   if (floor === 'ground') {
     rooms = `${room('drawing', 'Drawing room')}${room('lounge', 'TV lounge')}${room('dining', 'Dining room')}${pill('porch', 'Car porch', cfg.porch)}${pill('gbath', 'Drawing room washroom', cfg.gbath)}<span class="pill fixed"><span>Kitchen</span></span>${pill('openk', 'Open kitchen (counter, no wall)', cfg.openk)}`;
   } else {
-    rooms = `<span class="pill fixed"><span>Family lounge</span></span>${room('drawing', 'Drawing room')}${room('terrace', 'Open terrace')}`;
+    rooms = `<span class="pill fixed"><span>Family lounge</span></span>${room('drawing', 'Drawing room')}${room('terrace', 'Open terrace')}${cfg.hasPorch ? pill('over', 'Over the car porch', cfg.over) : ''}`;
   }
   const warn = [inst.note, ...a.msgs].filter(Boolean);
   inst.host.innerHTML = `${tabs}<div class="ffbody"><div class="ffsteps">${step('beds', 'Bedrooms', cfg.beds)}${step('baths', 'Washrooms', cfg.baths)}${floor === 'ground' ? step('cars', 'Cars to park', Math.max(1, +$('pcars').value)) : ''}</div>`

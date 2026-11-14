@@ -125,6 +125,9 @@ export function parseRequest(raw) {
   const UP = /(?:up\s*stairs|upstairs|upper|first\s*floor|upar)/.source, DR = /drawing(?:\s*room)?/.source;
   if (!omit.includes('drawing') && (new RegExp('\\b' + DR + '\\b.{0,30}\\b' + UP + '\\b').test(t) || new RegExp('\\b' + UP + '\\b.{0,30}\\b' + DR + '\\b').test(t))) { out.upDrawing = true; say('First floor', 'with a drawing room'); }
 
+  // ---- a room over the car porch / garage
+  if (/(?:(?:room|rooms|bedroom|lounge|floor|first\s*floor|upstairs|portion).{0,24}(?:over|above|on\s*top\s*of|upar).{0,16}(?:car\s*porch|porch|garage|parking)|(?:over|above|on\s*top\s*of)\s+(?:the\s+)?(?:car\s*porch|porch|garage|parking))/.test(t)) { out.upOver = true; say('First floor', 'over the car porch'); }
+
   // ---- terrace on the first floor (the open roof of the floor below)
   if (/\b(?:no|without|bina|nahi|nahin)\s+(?:an?\s+)?(?:open\s+)?(?:roof\s*)?(?:terrace|chhat|chat)/.test(t)) { out.terrace = 'without'; say('Terrace', 'none'); }
   else if (/\b(?:terrace|chhat|chat)\b/.test(t)) { out.terrace = 'with'; say('Terrace', 'open terrace'); }

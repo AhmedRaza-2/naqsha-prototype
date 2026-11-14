@@ -679,3 +679,31 @@ footer { color: var(--ink-soft); }
 .chip-said.by-model { border-style: dashed; }
 
 .quickfloors { display: flex; align-items: center; gap: 10px; margin: 10px 0 2px; }
+
+.ask.note { background: var(--bg-alt); border-color: transparent; }
+.ask.note p { margin: 0; color: var(--ink-soft); }
+.ask.note .asks { margin-top: 8px; }
+.guiderow { margin: 6px 0 2px; }
+.btn.ghost { background: transparent; }
+.guide { margin: 10px 0 4px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); animation: tcin 0.35s var(--ease); }
+.guide[hidden] { display: none; }
+.gtop { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gstep { font: 500 0.75rem var(--font-mono); color: var(--ink-soft); }
+.gdots { display: flex; gap: 5px; }
+.gdots i { width: 22px; height: 4px; border-radius: 4px; background: var(--line); }
+.gdots i.done { background: var(--accent); opacity: 0.55; }
+.gdots i.now { background: var(--accent); }
+.gq { margin: 12px 0 12px; font-size: 1.35rem; letter-spacing: -0.02em; font-weight: 600; }
+.gchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.gchip { font: inherit; font-size: 1rem; min-width: 64px; height: 48px; padding: 0 20px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; transition: border-color 0.2s, background-color 0.2s, transform 0.2s var(--ease); }
+.gchip:hover { border-color: var(--accent); }
+.gchip:active { transform: scale(0.97); }
+.gchip.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--ring); }
+.gvoice { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.gnav { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.galoud { margin-left: auto; font-size: 0.8rem; color: var(--ink-soft); display: inline-flex; align-items: center; gap: 6px; }
+.galoud input { width: 16px; height: 16px; }
+.gdone { display: flex; gap: 12px; align-items: flex-start; }
+.gdone p { margin: 4px 0 0; color: var(--ink-soft); font-size: 0.92rem; }
+.gcheck { width: 28px; height: 28px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; flex: none; }
+.gacts { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }

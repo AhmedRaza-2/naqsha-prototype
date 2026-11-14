@@ -4,7 +4,8 @@
 // (about 40 MB, kept in the browser cache after the first use) are downloaded, from the Hugging Face hub.
 // English only for now. The text it returns is read by the same sentence reader as typed text (nlp.js).
 const TRANSFORMERS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2/dist/transformers.min.js';
-const MODEL = 'Xenova/whisper-tiny.en';
+const MODELS = { tiny: 'Xenova/whisper-tiny.en', base: 'Xenova/whisper-base.en' };
+const MODEL = MODELS[(typeof window !== 'undefined' && window.__ASR) || 'tiny'];      // tiny.en: about 2.5 times faster than base.en on a laptop's single thread, which matters more for words that appear while you speak
 
 let asrPromise = null;
 /** Download (once) and start the speech model. onProgress(0..1) reports the download. */
@@ -144,7 +145,13 @@ export function startLive({ onText, onEnd, lang = 'en-PK' }) {
 }
 
 /** Speech (16 kHz mono) to text, or '' when nothing was said. */
-export async function transcribe(audio, onProgress) {
+let busy = Promise.resolve();                                       // the model runs one recording at a time: a partial result and the final one must not overlap
+export function transcribe(audio, onProgress) {
+  const run = busy.then(() => transcribeNow(audio, onProgress));
+  busy = run.catch(() => {});
+  return run;
+}
+async function transcribeNow(audio, onProgress) {
   const asr = await loadSpeechModel(onProgress);
   const out = await asr(audio, { chunk_length_s: 30, stride_length_s: 5 });
   const text = (Array.isArray(out) ? out.map((o) => o.text).join(' ') : out.text) || '';

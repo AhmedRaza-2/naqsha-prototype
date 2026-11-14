@@ -666,6 +666,11 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   else {
     curColl = colliders;
     roofOf(B, H, midG, 3, stairsRoom, false, U.rooms.filter((r) => !r.parent));
+    if (U.B.z < B.z - 0.5) {                                          // a first floor that stands over the car porch too: its floor slab reaches forward over the porch
+      const sx0 = Math.min(U.B.x, B.x), sx1 = Math.max(U.B.x + U.B.w, B.x + B.w);
+      box(midG, sx0, sx1, H, H + SLAB, U.B.z, B.z + 0.2, mConcrete, false);
+      box(midG, sx0 - 0.15, sx1 + 0.15, H - 0.3, H + SLAB + 0.05, U.B.z - 0.15, U.B.z + 0.05, mTrim, false);
+    }
     curColl = roofColliders;
     roofOf(U.B, STOREY + H, roofG, 2.6, upStairs && site.roof !== 'hip' ? upStairs : null, true);      // the stairs go on up through the roof slab
     curColl = colliders;
@@ -1002,7 +1007,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
   const facU = new THREE.Group(); world.add(facU);
   curColl = colliders;
   const fac = buildFacade({ box, world, upperG: facU, roofG, L, U, B, st, site, H, STOREY, SLAB, mainDoor, porch, carportAtFront, adj: adjWin,
-    mats: { mTrim, mAccent, mFrame, mStone: mLedge, mSlats, mExt, mConcrete, mat }, gate: site.wall !== 'none' ? { lo: gateLo, hi: gateHi, top: Math.max(6, site.wallH + 1.5) } : null }, facadeGenes(styleId, site.facade, site.facadeSeed));
+    mats: { mTrim, mAccent, mFrame, mStone: mLedge, mSlats, mExt, mConcrete, mat }, gate: site.wall !== 'none' ? { lo: gateLo, hi: gateHi, top: Math.max(6, site.wallH + 1.5) } : null }, U && U.B.z < B.z - 0.5 ? null : facadeGenes(styleId, site.facade, site.facadeSeed));      // a first floor over the porch is the front itself: the plain style front
   if (carportAtFront) {                                          // the car porch has its own roof and slim pillars; the house front stays visible
     const z0 = porch.z, z1 = Math.min(porch.z + porch.d, B.z + 0.4);
     slab(porch.x, porch.x + porch.w, z0, z1, 9.3);
@@ -1146,16 +1151,20 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
     const doorX = mainDoor.o === 'h' ? mainDoor.at : mainDoor.c;
     const cands = [];
     if (porch) {
-      const z = porch.z + porch.d - 7.15 - (porch.d >= 17 ? 3 : 0);     // nose toward the house (up to the wall behind the porch), tail towards the gate
+      const z = porch.d >= 17 ? porch.z + porch.d - 10.2 : Math.max(7.7, porch.z + porch.d - 7.4);     // nose toward the house (up to the wall behind the porch), tail towards the gate (inside it)
       cands.push({ x: doorX > porch.x + porch.w / 2 ? porch.x + 3.3 : porch.x + porch.w - 3.3, z, along: true }, { x: porch.x + porch.w / 2, z, along: true });
     }
-    if (B.z >= 9.5) {                                              // across the front lawn, parallel to the road
-      const z = Math.max(3.8, Math.min(B.z - 4.2, 6.5));
-      for (const x of [W * 0.72, W * 0.28, W / 2]) cands.push({ x, z, along: false });
-      for (let x = 8; x < W - 7; x += 15) cands.push({ x, z, along: false }, { x: W - x, z, along: false });      // more along the lawn, 15 ft apart
-    }
+    // the front lawn: cars are placed one by one, wherever one still fits (a scan every half foot, away from the door first), either across it
+    // (parallel to the road, 14 ft each) or nose to the house (6 ft each, when the lawn is deep enough): whichever way holds more cars
+    const lawnScan = (perp) => {
+      const out = [];
+      if (perp ? B.z < 14 : B.z < 9.5) return out;
+      const z = perp ? B.z - 0.6 - 6.7 : Math.max(3.8, Math.min(B.z - 4.2, 6.5)), half = perp ? 3.4 : 7;
+      for (let x = half + 0.3; x <= W - half - 0.3; x += 0.5) out.push({ x, z, along: perp, ...(perp ? { half } : {}) });
+      return out.sort((a, b) => Math.abs(b.x - doorX) - Math.abs(a.x - doorX));
+    };
     if (!roomInside) cands.length = 0;
-    const boxOf = (c) => (c.along ? { x0: c.x - 3, x1: c.x + 3, z0: c.z - 6.7, z1: c.z + 6.7 } : { x0: c.x - 7, x1: c.x + 7, z0: c.z - 3, z1: c.z + 3 });
+    const boxOf = (c) => (c.along ? { x0: c.x - (c.half || 3), x1: c.x + (c.half || 3), z0: c.z - 6.7, z1: c.z + 6.7 } : { x0: c.x - 7, x1: c.x + 7, z0: c.z - 3, z1: c.z + 3 });
     const fits = (c) => { const b = boxOf(c); return b.x0 > 0.2 && b.x1 < W - 0.2 && (c.along || b.z0 > 0.4) && !colliders.some((o) => o.x0 < b.x1 && o.x1 > b.x0 && o.z0 < b.z1 && o.z1 > b.z0); };
     const open0 = doorReach([]);
     // one car per bay of the porch (a porch 10 ft wide holds 1 car, 18 ft 2, 26 ft 3), else one across the lawn
@@ -1174,16 +1183,30 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       placed++;
     };
     if (roomInside && porch && bays > 1 && want > 1) {
-      const z = porch.z + porch.d - 7.2 - (porch.d >= 17 ? 3 : 1.2), n = Math.min(bays, want), slot = porch.w / bays;
+      const z = porch.d >= 17 ? porch.z + porch.d - 10.2 : Math.max(7.7, porch.z + porch.d - 7.4), n = Math.min(bays, want), slot = porch.w / bays;     // the car's tail stays inside the gate, its nose clear of the front wall
       for (let i = 0; i < bays && placed < n; i++) {
         const c = { x: porch.x + slot * (i + 0.5), z, along: true };
         if (fits(c) && (!open0 || doorReach([boxOf(c)]))) put(c);
       }
     }
-    while (placed < want) {                                         // the first car in the porch (or on the lawn), any more across the lawn
+    while (placed < want) {                                         // the first car in the porch, if the porch's own bays did not place it
       const pick = cands.find((c) => fits(c) && (!open0 || doorReach([boxOf(c)])));
       if (!pick) break;
       put(pick);
+    }
+    if (roomInside && placed < want) {
+      const tryOrder = (perp) => {                                  // place greedily with this orientation; returns the picks and leaves the colliders as they were
+        const list = lawnScan(perp), picks = [], pushed = [];
+        while (placed + picks.length < want) {
+          const c = list.find((q) => fits(q) && (!open0 || doorReach([boxOf(q)])));
+          if (!c) break;
+          picks.push(c); const bb = { ...boxOf(c), k: 'car' }; colliders.push(bb); pushed.push(bb);
+        }
+        for (const bb of pushed) colliders.splice(colliders.indexOf(bb), 1);
+        return picks;
+      };
+      const a = tryOrder(false), b2 = tryOrder(true), picks = b2.length > a.length ? b2 : a;
+      for (const c of picks) put(c);
     }
     const inside = placed;
     if (asked) {                                                    // no room left in the plot: the rest park on the footpath outside the gate, either side of it

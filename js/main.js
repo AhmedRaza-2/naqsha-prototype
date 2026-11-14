@@ -5,6 +5,7 @@ import { renderFront, SITE_DEFAULT } from './scene.js';
 import { createViewer } from './viewer.js';
 import { parseRequest } from './nlp.js';
 import { understand, loadReader } from './nlu.js';
+import { parseShort, QUESTIONS } from './guide.js';
 import { setPorch, setBalcony, hasPorch, balconyRoom } from './plantweak.js';
 import { readInspiration } from './inspire.js';
 import { LOOKS, LOOK_IDS, lookFor } from './interior.js';
@@ -149,6 +150,7 @@ function applyParsed(r) {
   if (r.lawn) { $('plawn').value = r.lawn; $('prefs').open = true; }
   if (r.omit) { document.querySelectorAll('input[name=omit]').forEach((c) => { if (r.omit.includes(c.value)) c.checked = true; }); $('prefs').open = true; }
   if (r.upDrawing) { $('pupdraw').value = 'yes'; $('prefs').open = true; }
+  if (r.upOver) $('pupover').value = 'yes';
   if (r.terrace && $('floorsrow').style.display !== 'none' && floors() === 2) $('pterr').value = r.terrace;
   if ('understood' in r) S.wantStyle = r.style || null; else if (r.style) S.wantStyle = r.style;      // a whole reading resets it; the model's additions only add
   if (r.colors && r.colors.wall) S.colors.wall = r.colors.wall;
@@ -189,44 +191,20 @@ $('pfloors').addEventListener('change', () => { floorsTouched = true; });
 const PORCH_NEED = [10, 18, 26, 26, 26, 26];                                  // ft across for 1, 2, 3 cars side by side
 const setField = (id, v) => { $(id).value = String(v); };
 const omitOn = (kind) => document.querySelectorAll('input[name=omit]').forEach((c) => { if (c.value === kind) c.checked = true; });
+/** What the planner does with the request, said once and plainly: nothing here blocks Generate or asks the visitor to settle an argument.
+ *  Each note may carry one optional button that changes the default (the note disappears when it no longer applies). */
 function questions() {
-  const text = $('nl').value.trim(), r = readOf($('nl').value);
-  const w = +$('pw').value, d = +$('pd').value, two = floors() === 2, shown = $('floorsrow').style.display !== 'none';
+  const w = +$('pw').value, d = +$('pd').value, two = floors() === 2;
   const cars = +$('pcars').value || 0, porchOn = $('pporch').value !== 'no';
   const rule = ruleFor(w, d), marla = Math.round((w * d) / MARLA * 10) / 10;
   const qs = [];
-  if (text) {                                                     // something the sentence did not say
-    if (!r.plot && !plotTouched) qs.push({ id: 'plot', kind: 'missing', text: 'What size is the plot?', opts: [['5 marla', 25, 45], ['7 marla', 30, 52], ['10 marla', 35, 65], ['1 kanal', 50, 90]].map(([label, pw, pd]) => ({ label, apply: () => { setField('pw', pw); setField('pd', pd); plotTouched = true; } })) });
-    if (!r.beds && !userBeds) qs.push({ id: 'beds', kind: 'missing', text: 'How many bedrooms do you need?', opts: [2, 3, 4, 5].map((n) => ({ label: `${n} bedrooms`, apply: () => { setField('pb', n); userBeds = true; } })) });
-    if (!r.floors && !floorsTouched && shown) qs.push({ id: 'floors', kind: 'missing', text: 'One floor or two?', opts: [{ label: 'One floor', apply: () => { setField('pfloors', 1); syncFloors(); } }, { label: 'Two floors', apply: () => { setField('pfloors', 2); syncFloors(); } }] });
-  }
-  if (cars >= 1) {                                                // cars that cannot all stand inside the plot
-    const front0 = toFt(+$('psbf').value) || rule.front;
-    const bays = porchOn ? (w - 3 >= 26 ? 3 : w - 3 >= 18 ? 2 : w - 3 >= 10 ? 1 : 0) : 0, lawn = front0 >= 9.5 ? Math.max(0, Math.floor((w - 1) / 15)) : 0, inside = bays + lawn;
-    if (cars > inside) qs.push({ id: 'cars-room', kind: 'conflict', text: `${cars} cars will not all fit inside this ${w} ft wide plot (about ${inside} can: ${bays} under the porch, ${lawn} on the lawn). What should I do with the other ${cars - inside}?`, opts: [
-      { label: `Park them on the footpath outside the gate`, apply: () => {} },
-      { label: `Only ${Math.max(1, inside)} car${inside > 1 ? 's' : ''}`, apply: () => setField('pcars', Math.max(1, inside)) },
-    ] });
-  }
-  if (cars >= 2 && cars <= 3 && porchOn) {                        // a porch for several cars
-    const need = PORCH_NEED[cars - 1], front = toFt(+$('psbf').value) || rule.front;
-    if (w < need + 3) {
-      const fit = w - 3 >= 26 ? 3 : w - 3 >= 18 ? 2 : 1;                // cars that fit across, leaving a little lawn at each end
-      qs.push({ id: 'cars-width', kind: 'conflict', text: `${cars} cars side by side need about ${need} ft across, and the frontage is ${w} ft. How should I park them?`, opts: [
-        { label: `${fit} under the porch, the rest on the front lawn`, apply: () => setField('plawn', 'yes') },
-        { label: `No lawn: the whole front is car porch (${fit} cars)`, apply: () => { setField('plawn', 'no'); setField('pcars', fit); } },
-        { label: `Only ${fit} car${fit > 1 ? 's' : ''}`, apply: () => setField('pcars', fit) },
-        { label: 'Keep it as I said', apply: () => {} },
-      ] });
-    }
-    if (rule.front >= 10 && front < 15) {
-      const less = 15 - front;
-      qs.push({ id: 'cars-depth', kind: 'conflict', text: `A car is about 15 ft long, so a ${cars}-car porch needs 15 ft of depth; the front open space for ${marla} marla is ${rule.front} ft.${two ? ' On two floors that depth comes out of the rooms on both floors.' : ''} What should I give up?`, opts: [
-        { label: `Make the front 15 ft deep (rooms ${less} ft shorter)`, apply: () => setField('psbf', 15) },
-        { label: 'Use the lawn as car porch too (no lawn)', apply: () => { setField('psbf', 15); setField('plawn', 'no'); } },
-        { label: 'Leave out the dining room, keep the rest big', apply: () => { setField('psbf', 15); omitOn('dining'); } },
-        { label: 'Leave out the store and the study', apply: () => { setField('psbf', 15); omitOn('store'); omitOn('study'); } },
-        { label: 'Keep the standard front (cars may stand partly on the lawn)', apply: () => {} },
+  if (cars >= 1) {
+    const front = toFt(+$('psbf').value) || rule.front, front0 = front;
+    const bays = porchOn ? (w - 3 >= 26 ? 3 : w - 3 >= 18 ? 2 : w - 3 >= 10 ? 1 : 0) : 0, lawn = front0 >= 9.5 && $('plawn').value !== 'no' ? Math.max(0, Math.floor((w - 1) / 15)) : 0, inside = Math.max(1, bays + lawn);
+    if (cars > inside) qs.push({ id: 'cars-room', kind: 'note', text: `${inside} of the ${cars} cars park inside the plot; the rest park outside the gate.`, opts: [{ label: `Only ${inside} car${inside > 1 ? 's' : ''}`, apply: () => setField('pcars', inside) }] });
+    if (cars >= 2 && porchOn && rule.front >= 10 && front < 15 && w >= 22) {
+      qs.push({ id: 'cars-depth', kind: 'note', text: `${cars} cars nose-in need about 15 ft of front space; the usual front for ${marla} marla is ${rule.front} ft, which is what I use, so your rooms stay big.${two ? ' (More front space comes out of the rooms on both floors.)' : ''}`, opts: [
+        { label: `Make the front 15 ft`, apply: () => setField('psbf', 15) },
       ] });
     }
   }
@@ -234,34 +212,25 @@ function questions() {
 }
 function renderAdvice() {
   const qs = questions();
-  const gone = Object.entries(answered).filter(([id]) => !qs.some((q) => q.id === id));          // answered, and the clash it solved is gone: still shown as done
   ADV.innerHTML = '';
-  const draw = (q, done, canChange = true) => {
+  for (const q of qs) {
     const el = document.createElement('div');
-    el.className = `ask ${q.kind}${done ? ' done' : ''}`;
+    el.className = 'ask note';
     const p = document.createElement('p'); p.textContent = localize(q.text); el.appendChild(p);
-    const row = document.createElement('div'); row.className = 'asks';
-    if (done) {
-      const t = document.createElement('span'); t.className = 'asked'; t.textContent = done; row.appendChild(t);
-      if (canChange) {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'ask-opt link'; b.textContent = 'Change';
-        b.onclick = () => { delete answered[q.id]; renderAdvice(); };
+    if (q.opts.length) {
+      const row = document.createElement('div'); row.className = 'asks';
+      q.opts.forEach((o) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'ask-opt'; b.textContent = localize(o.label);
+        b.onclick = () => { o.apply(); readPlot(); renderAdvice(); };
         row.appendChild(b);
-      }
-    } else q.opts.forEach((o) => {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'ask-opt'; b.textContent = localize(o.label);
-      b.onclick = () => { o.apply(); answered[q.id] = o.label; asked[q.id] = q; readPlot(); renderAdvice(); };
-      row.appendChild(b);
-    });
-    el.appendChild(row);
+      });
+      el.appendChild(row);
+    }
     ADV.appendChild(el);
-  };
-  for (const q of qs) { asked[q.id] = q; draw(q, answered[q.id]); }
-  for (const [id, label] of gone) if (asked[id]) draw(asked[id], label, false);
+  }
   return qs;
 }
-/** A clash the visitor has not answered yet (shown under the text box): Generate waits for the answer. */
-const openConflict = () => questions().find((q) => q.kind === 'conflict' && !answered[q.id]);
+const openConflict = () => null;                                    // nothing blocks Generate any more
 ['nl', 'pwu', 'pdu'].forEach((id) => $(id).addEventListener('input', renderAdvice));
 ['pfloors', 'pcars', 'pporch', 'pb'].forEach((id) => $(id).addEventListener('change', renderAdvice));
 
@@ -401,6 +370,67 @@ $('voicesay').onclick = async () => {                          // answer by voic
   if (a === 'yes') { $('voiceok').hidden = true; $('gen').click(); }
   else if (a === 'no') { $('voiceok').hidden = true; say('Okay. Say it again, or type the changes.'); mic.click(); }
   else if (text) say(`I heard "${text}". Say "yes" to go ahead or "no" to change it, or use the buttons.`);
+};
+
+// ---------- guided questions: a few short questions, each answered by a tap or by voice ----------
+const GUIDE = { on: false, i: 0, qs: [], aloud: false, busy: false, note: '' };
+const guideKnown = (k) => {                                          // what the sentence already said
+  const r = readOf($('nl').value);
+  return k === 'plot' ? !!r.plot : k === 'floors' ? !!r.floors : k === 'beds' ? !!(r.beds || r.upBeds) : r.cars != null || r.porch === 'no';
+};
+function guideApply(k, v) {
+  if (k === 'plot') { setField('pw', v.w); setField('pd', v.d); plotTouched = true; }
+  else if (k === 'floors') { setField('pfloors', v); floorsTouched = true; syncFloors(); }
+  else if (k === 'beds') {
+    if (floors() === 2 && v >= 2) { const up = Math.min(4, Math.floor(v / 2)); setField('pup', up); setField('pb', v - up); } else setField('pb', v);
+    userBeds = true; syncFloors();
+  } else if (k === 'cars') { setField('pcars', v); setField('pporch', v > 0 ? 'yes' : 'no'); }
+  readPlot(); renderAdvice(); refreshForms();
+}
+const guideSummary = () => {
+  const w = +$('pw').value, d = +$('pd').value, two = floors() === 2, cars = +$('pcars').value;
+  return `${(w * d / MARLA).toFixed(1)} marla (${fmtLen(w)} x ${fmtLen(d)}) · ${two ? 'two floors' : 'one floor'} · ${two ? `${+$('pb').value} down, ${+$('pup').value} up` : `${+$('pb').value}`} bedrooms · ${cars ? `${cars} car${cars > 1 ? 's' : ''}` : 'no car'}`;
+};
+function guideRender() {
+  const host = $('guide');
+  host.hidden = !GUIDE.on; $('guidebtn').textContent = GUIDE.on ? 'Close the questions' : 'Or answer a few quick questions';
+  if (!GUIDE.on) { if (window.speechSynthesis) speechSynthesis.cancel(); return; }
+  const q = GUIDE.qs[GUIDE.i];
+  if (!q) {                                                          // all answered: one summary and one button
+    host.innerHTML = `<div class="gdone"><span class="gcheck" aria-hidden="true">&#10003;</span><div><b>Here is your house</b><p>${guideSummary()}</p></div></div><div class="gacts"><button class="btn primary" id="ggo" type="button">Draft layouts</button><button class="btn" id="gredo" type="button">Change an answer</button></div>`;
+    $('ggo').onclick = () => { GUIDE.on = false; guideRender(); $('gen').click(); };
+    $('gredo').onclick = () => { GUIDE.qs = QUESTIONS.slice(); GUIDE.i = 0; guideRender(); };
+    return;
+  }
+  const cur = q.k === 'plot' ? `${+$('pw').value}x${+$('pd').value}` : q.k === 'floors' ? floors() : q.k === 'beds' ? (floors() === 2 ? +$('pb').value + +$('pup').value : +$('pb').value) : +$('pcars').value;
+  host.innerHTML = `<div class="gtop"><span class="gstep">Question ${GUIDE.i + 1} of ${GUIDE.qs.length}</span><div class="gdots" aria-hidden="true">${GUIDE.qs.map((_, i) => `<i class="${i < GUIDE.i ? 'done' : i === GUIDE.i ? 'now' : ''}"></i>`).join('')}</div></div>`
+    + `<h4 class="gq">${localize(q.q)}</h4>`
+    + `<div class="gchips" role="group" aria-label="Answers">${q.chips.map(([label, val], i) => `<button type="button" class="gchip${String(typeof val === 'object' ? `${val.w}x${val.d}` : val) === String(cur) ? ' cur' : ''}" data-i="${i}">${localize(label)}</button>`).join('')}</div>`
+    + `<div class="gvoice"><button type="button" class="btn sm" id="gsay" ${canListen() || LIVE ? '' : 'disabled'}>Say it instead</button><span class="fine" id="gnote">${GUIDE.note || localize(q.say)}</span></div>`
+    + `<div class="gnav">${GUIDE.i ? '<button type="button" class="btn sm ghost" id="gback">Back</button>' : ''}<button type="button" class="btn sm ghost" id="gskip">Keep what is there</button>${window.speechSynthesis ? `<label class="galoud"><input type="checkbox" id="galoud" ${GUIDE.aloud ? 'checked' : ''}> Read the questions aloud</label>` : ''}</div>`;
+  host.querySelectorAll('.gchip').forEach((b) => { b.onclick = () => guideAnswer(q, q.chips[+b.dataset.i][1]); });
+  $('gskip').onclick = () => { GUIDE.note = ''; GUIDE.i++; guideRender(); };
+  if ($('gback')) $('gback').onclick = () => { GUIDE.note = ''; GUIDE.i--; guideRender(); };
+  if ($('galoud')) $('galoud').onchange = () => { GUIDE.aloud = $('galoud').checked; if (GUIDE.aloud) guideSpeak(q.q); else speechSynthesis.cancel(); };
+  $('gsay').onclick = async () => {
+    if (GUIDE.busy || voiceBusy) return;
+    GUIDE.busy = true; $('gsay').disabled = true; voiceMode = 'answer';
+    const text = await listenOnce();
+    voiceMode = 'request'; GUIDE.busy = false;
+    const v = text ? parseShort(q.k, text) : null;
+    if (v != null) guideAnswer(q, v);
+    else { GUIDE.note = text ? `I heard "${text}", which I could not use. Tap an answer or try again.` : 'I did not hear anything. Tap an answer or try again.'; guideRender(); }
+  };
+  if (GUIDE.aloud) guideSpeak(q.q);
+}
+function guideSpeak(text) {
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'en-GB'; u.rate = 1; speechSynthesis.speak(u); } catch { /* no voice on this device */ }
+}
+function guideAnswer(q, v) { guideApply(q.k, v); GUIDE.note = ''; GUIDE.i++; guideRender(); }
+$('guidebtn').onclick = () => {
+  GUIDE.on = !GUIDE.on;
+  if (GUIDE.on) { GUIDE.qs = QUESTIONS.filter((q) => !guideKnown(q.k)); if (!GUIDE.qs.length) GUIDE.qs = QUESTIONS.slice(); GUIDE.i = 0; GUIDE.note = ''; }
+  guideRender();
 };
 
 // ---------- preferences: washrooms and bigger rooms ----------
@@ -599,10 +629,10 @@ function readPrefs() {
   return { beds: +$('pb').value, baths: +$('pbaths').value, focus: $('pfocus').value, porch: $('pporch').value, cars: +$('pcars').value, family: $('pfamily').value,
     setbacks: Object.keys(setbacks).length ? setbacks : null, entrance: $('pentr').value, stairs: $('pstairs').value,
     lawn: $('plawn').value, omit, guestBath: $('pgbath').value,
-    storeys: floors(), upBeds: +$('pup').value, upBaths: +$('pupbaths').value, terrace: $('pterr').value, upDrawing: $('pupdraw').value === 'yes' };
+    storeys: floors(), upBeds: +$('pup').value, upBaths: +$('pupbaths').value, terrace: $('pterr').value, upDrawing: $('pupdraw').value === 'yes', upOver: $('pupover').value === 'yes' };
 }
 const GROUND = ['beds', 'baths', 'focus', 'porch', 'cars', 'family', 'setbacks', 'entrance', 'stairs', 'lawn', 'omit', 'storeys', 'guestBath'];
-const FIRST = ['upBeds', 'upBaths', 'terrace', 'upDrawing'];
+const FIRST = ['upBeds', 'upBaths', 'terrace', 'upDrawing', 'upOver'];
 const same = (a, b, keys) => keys.every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k]));
 
 $('gen').onclick = async () => {
@@ -645,7 +675,7 @@ mountFloorForm($('gformhost'), 'ground');
 mountFloorForm($('uformhost'), 'first');
 
 // ---------- step 2 ----------
-const upKeyOf = (L) => JSON.stringify(boxAndStairs(L.rects));
+const upKeyOf = (L) => JSON.stringify(boxAndStairs(L.rects)) + (S.prefs && S.prefs.upOver ? 'over' : '');
 const terraceTag = (L) => { const t = terraceArea(L.rects); return t >= 40 ? `terrace ${fmtArea(t)}` : 'no terrace'; };
 /** The card of a ground-floor layout: with its first floor beside it once that is drafted. */
 function layoutCard(L, i) {
@@ -766,7 +796,7 @@ async function upperFor(ground, { regen, quick = false, retry = false }, onStatu
     onStatus(String(m).replace(q[0], `(${shownPct}%)`));
   };
   for (const [beds, baths, msg] of quick ? tries.slice(0, 1) : tries) {                // quick: the houses are drafted without the step-downs
-    const layouts = await upperLayouts(ground, { beds, baths, terrace, upDrawing, upOmit: ['store', 'study'] }, status,
+    const layouts = await upperLayouts(ground, { beds, baths, terrace, upDrawing, upOver: S.prefs.upOver, upOmit: ['store', 'study'] }, status,
       { exclude: regen ? S.seenUp : new Set(), temperature: regen || retry ? 0.95 : 0.8, n: regen || retry ? 18 : 12, quick });
     if (layouts.length) return { layouts, note: [msg, layouts.note].filter(Boolean).join(' ') };
     if (regen) break;                                            // Regenerate keeps the request; only the first try relaxes it

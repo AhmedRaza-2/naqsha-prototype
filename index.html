@@ -43,6 +43,8 @@
                 <span id="miclabel">Speak</span>
               </button>
             </div>
+            <div class="guiderow"><button class="btn ghost" id="guidebtn" type="button">Or answer a few quick questions</button></div>
+            <div class="guide" id="guide" hidden aria-live="polite"></div>
             <div class="examples" id="examples" aria-label="Examples you can tap"><span class="fine">Try</span></div>
             <div class="quickfloors" id="quickfloors"><span class="fine">Floors</span>
               <div class="seg" id="fseg2" role="radiogroup" aria-label="Number of floors">
@@ -151,6 +153,7 @@
           <label id="pupbl">Washrooms upstairs <select id="pupbaths"></select></label>
           <label id="pterrl">Terrace <select id="pterr"><option value="both" selected>both</option><option value="with">with</option><option value="without">without</option></select></label>
           <select id="pupdraw"><option value="no" selected>no</option><option value="yes">yes</option></select>
+          <select id="pupover"><option value="no" selected>no</option><option value="yes">yes</option></select>
           <select id="pporch"><option value="yes" selected>yes</option><option value="any">any</option><option value="no">no</option></select>
           <select id="pcars"><option value="0" selected>Standard (1 car)</option><option value="1">1 car</option><option value="2">2 cars</option><option value="3">3 cars</option><option value="4">4 cars</option><option value="5">5 cars</option><option value="6">6 cars</option></select>
           <select id="pgbath"><option value="yes" selected>yes</option><option value="no">no</option></select>
