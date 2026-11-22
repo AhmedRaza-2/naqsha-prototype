@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT / "real"))
 import bands  # noqa: E402
 from assemble import assemble, norm_type  # noqa: E402
 
-INDIAN = re.compile(r"\+91|toilet|parking|balcony|vastu|pooja|puja|sit ?out|bhk", re.I)
+INDIAN = re.compile(r"\+91|vastu|pooja|puja|bhk", re.I)       # strong markers only: parking, toilet, balcony are used in Pakistani plans too
 PLOT = re.compile(r"(\d{2,3})\s*['’`´\-]?\s*(?:\d{1,2})?[\"”°*~]*\s*[xX×]\s*(\d{2,3})")
 NUM = r"(\d{1,2})\s*['’`´\-]\s*(\d{1,2})?"
 DIM = re.compile(NUM + r"[\"”°*~'’`´\-]*\s*[xX×*/]+\s*[\"”°*~'’`´\-/]*\s*" + NUM)

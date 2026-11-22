@@ -154,6 +154,7 @@ export function parseRequest(raw) {
 
   // ---- roof stairs
   if (/\b(?:no|without|bina)\s*(?:roof\s*)?(?:stairs|seerhi|seedhi|zeena)\b/.test(t)) { out.stairs = 'none'; say('Stairs', 'none'); }
+  else if (/\b(?:separate|alag|outside|bahar)\s*(?:stairs|seerhi|seedhi|zeena)\b|\bseparate\s*entrance\s*(?:for|to)\s*(?:the\s*)?(?:upper|first|top)/.test(t)) { out.stairs = 'separate'; say('Stairs', 'separate, door from outside'); }
   else if (/\broof\s*(?:stairs|access)\b|\bstairs\s*(?:to|for)\s*(?:the\s*)?roof\b/.test(t)) { out.stairs = 'inside'; say('Stairs', 'to the roof'); }
 
   // ---- style and colours: "modern", "white house", "cream and brown"

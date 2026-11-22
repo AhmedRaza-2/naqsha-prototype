@@ -130,7 +130,7 @@
                 <select id="pentr"><option value="auto" selected>Automatic (separate from 10 marla)</option><option value="never">No separate entrance</option><option value="keep">Keep an entrance room</option></select>
               </label>
               <label class="field">Stairs to the roof
-                <select id="pstairs"><option value="auto" selected>Automatic (inside from 6 marla)</option><option value="inside">Keep stairs inside</option><option value="none">No stairs</option></select>
+                <select id="pstairs"><option value="auto" selected>Automatic (none up to 7 marla on one floor)</option><option value="inside">Keep stairs inside</option><option value="separate">Separate stairs, door from outside</option><option value="none">No stairs</option></select>
               </label>
             </div>
             <p class="fine" id="prefnote">Whatever you type here is what the plan is built to, so no yard is left empty beyond it.</p>
@@ -185,7 +185,7 @@
       <div class="work">
       <section class="card editor" id="editor" hidden>
         <div class="editor-head">
-          <div><h3>Adjust the layout</h3><ul class="legend" aria-label="How to edit"><li><i class="lg wall"></i>Drag a wall to resize the rooms on both sides</li><li><i class="lg door"></i>Gold dot: slide a door</li><li><i class="lg win"></i>Blue dot: slide a window</li><li><i class="lg furn"></i>Drag furniture, or click it to turn or remove it</li><li><i class="lg room"></i>Click an empty floor to change what the room is</li></ul></div>
+          <div><h3>Adjust the layout</h3><ul class="legend" aria-label="How to edit"><li><i class="lg wall"></i>Drag a wall to resize the rooms on both sides</li><li><i class="lg door"></i>Gold dot: slide a door</li><li><i class="lg win"></i>Blue dot: slide a window</li><li><i class="lg furn"></i>Drag furniture, or click it to turn or remove it</li><li><i class="lg room"></i>Click an empty floor to change a room, split it, join it to the room beside it (L-shapes) or move it</li></ul></div>
           <div class="editor-actions"><button class="btn" id="edfurn">Hide furniture</button><button class="btn" id="edundo" disabled>Undo</button><button class="btn" id="edreset" disabled>Reset</button></div>
         </div>
         <div id="edhost" class="edhost"></div>
@@ -216,7 +216,7 @@
       <div class="work">
       <section class="card editor" id="ueditor" hidden>
         <div class="editor-head">
-          <div><h3>Adjust the first floor</h3><ul class="legend" aria-label="How to edit"><li><i class="lg wall"></i>Drag a wall to resize the rooms on both sides</li><li><i class="lg door"></i>Gold dot: slide a door</li><li><i class="lg win"></i>Blue dot: slide a window</li><li><i class="lg furn"></i>Drag furniture, or click it to turn or remove it</li><li><i class="lg room"></i>Click an empty floor to change what the room is</li><li><i class="lg stair"></i>Walls beside the stairs stop where the stairs below end, so the two floors stay joined</li></ul></div>
+          <div><h3>Adjust the first floor</h3><ul class="legend" aria-label="How to edit"><li><i class="lg wall"></i>Drag a wall to resize the rooms on both sides</li><li><i class="lg door"></i>Gold dot: slide a door</li><li><i class="lg win"></i>Blue dot: slide a window</li><li><i class="lg furn"></i>Drag furniture, or click it to turn or remove it</li><li><i class="lg room"></i>Click an empty floor to change a room, split it, join it to the room beside it (L-shapes) or move it</li><li><i class="lg stair"></i>Walls beside the stairs stop where the stairs below end, so the two floors stay joined</li></ul></div>
           <div class="editor-actions"><button class="btn" id="uedfurn">Hide furniture</button><button class="btn" id="uedundo" disabled>Undo</button><button class="btn" id="uedreset" disabled>Reset</button></div>
         </div>
         <div id="uedhost" class="edhost"></div>

@@ -5,7 +5,7 @@ import { toRects as treeRects, check as treeCheck } from './tree.js';
 import { finalize, ruleFor, turningStair } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
 import { tidyRects } from './tidy.js';
-import { balconyRoom, reshapeFor, applyReshape, dropTerrace, dropGuestBath, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox, growUpperStairs, varyBaths } from './plantweak.js';
+import { balconyRoom, reshapeFor, applyReshape, dropTerrace, dropGuestBath, dropLoungeBath, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox, growUpperStairs, varyBaths } from './plantweak.js';
 import { draftPlans, sampleDrafts, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -59,6 +59,7 @@ export function planToLayout(item, index) {
   let bedNo = mains.some((r) => r.t === 'master') ? 1 : 0;
   const seenType = {};
   for (const r of mains) {
+    if (r.join) continue;                                          // part of a neighbouring room: added after its host below
     if (!KNOWN.has(r.t)) continue;
     let type = r.t, name, id;
     seenType[r.t] = (seenType[r.t] || 0) + 1;
@@ -70,6 +71,19 @@ export function planToLayout(item, index) {
     }
     const room = { id, type, name, x: r.x, z: r.y, w: r.w, d: r.d };
     if (type === 'bed') room.band = Math.abs(r.y - y0) < 0.01 ? 'front' : 'back';
+    rooms.push(room);
+    byRect.set(r.i, room);
+  }
+  // an L-shaped room (joined in the editor): the extra part is the same room as its neighbour, with no wall between
+  for (const r of mains.filter((m) => m.join)) {
+    const sh = (a, b) => { const e = 0.02;
+      if (Math.abs(a.x + a.w - b.x) < e || Math.abs(b.x + b.w - a.x) < e) return Math.min(a.y + a.d, b.y + b.d) - Math.max(a.y, b.y);
+      if (Math.abs(a.y + a.d - b.y) < e || Math.abs(b.y + b.d - a.y) < e) return Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      return 0; };
+    const host = mains.filter((m) => !m.join && m.t === r.join && byRect.get(m.i)).map((m) => [m, sh(r, m)]).filter(([, v]) => v >= 3).sort((a, b) => b[1] - a[1])[0];
+    if (!host) continue;
+    const H = byRect.get(host[0].i);
+    const room = { id: `${H.id}_x${r.i}`, type: H.type, name: H.name, annex: H.id, x: r.x, z: r.y, w: r.w, d: r.d };
     rooms.push(room);
     byRect.set(r.i, room);
   }
@@ -95,7 +109,7 @@ export function planToLayout(item, index) {
   }
   // doors to outside: the same rule the checker uses
   const rmains = rects0.filter((r) => !OPEN.has(r.t) && r.t !== 'bath');
-  const od = outsideDoors(rects0, rmains, y0);
+  const od = outsideDoors(rects0, rmains, y0, !!plan.sepStairs);
   if (T && od.main) {                                                // the entrance moved with a swapped room: its front door goes where the entrance now is
     const g = T.gone.find((x) => x.i === od.main.i);
     if (g && od.wall && od.wall[0] === 'h') od.wall = ['h', od.wall[1], g.rect.x, g.rect.x + g.rect.w];
@@ -142,7 +156,7 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
   // small plots: no entrance room (the front door opens into the drawing room); single-storey houses may drop the roof stairs
   const tidy = {};
   if (entrance === 'never' || (entrance === 'auto' && marla < 10)) tidy.entrance = true;
-  if (stairs === 'none' || (stairs === 'auto' && marla <= 6 && request.storeys !== 2)) tidy.stairs = false;
+  if (stairs === 'none' || (stairs === 'auto' && marla <= 7.01 && request.storeys !== 2)) tidy.stairs = false;
   if (Object.keys(tidy).length) request.tidy = tidy;
   const wantPorch = porch === 'any' ? null : porch === 'yes';
   // a model trained on layout families drafts each family that fits, so the three layouts differ in arrangement
@@ -154,7 +168,12 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
   const inner = rsh ? { w: rsh.w, d: rsh.d } : plot;
   const styles = (await knowsStyles()) ? (family !== 'any' ? [family] : familiesFor(inner, request.beds)) : [null];
   const hasPorch = (it) => it.rects.some((r) => r.t === 'porch' || r.t === 'garage');
-  const keep = (it) => (wantPorch === null || hasPorch(it) === wantPorch) && (family === 'any' || !it.style || it.style === family);
+  // stairs the house cannot reach (no entrance, lounge, passage or dining room beside them) are never shown: they would open into a store or bedroom
+  const stairsCut = (it) => it.checks.some((c) => c.name === 'every room reachable' && c.level !== 'ok' && /stairs/.test(c.detail || ''));
+  let sepStairs = stairs === 'separate' && !request.floor;        // separate stairs: a door from the porch or lawn straight onto the flight
+  const outDoorStairs = (it) => outsideDoors(it.rects, it.rects.filter((r) => !OPEN.has(r.t) && r.t !== 'bath'), Math.min(...it.rects.filter((r) => !OPEN.has(r.t) && r.t !== 'bath').map((r) => r.y)), true).guests.some(([r]) => r.t === 'stairs');
+  const keep = (it) => (wantPorch === null || hasPorch(it) === wantPorch) && (family === 'any' || !it.style || it.style === family) && !stairsCut(it)
+    && (!sepStairs || !it.rects.some((r) => r.t === 'stairs') || outDoorStairs(it));
   // a ground floor leaves the model with a proper stair (a 7 x 13.5 ft room for a two-storey house, smaller for a small house) and a car porch as
   // wide as the cars asked for. A draft whose neighbouring rooms cannot give the stair its room is left out; more are drawn when that leaves fewer
   // than three, and only when none has room for a proper stair is the steeper straight stair let in.
@@ -165,6 +184,7 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
       let q = rsh ? applyReshape(p, plot.w, plot.d, rsh, own) : p;
       q = standardStairs(q, strictStairs);
       q = varyBaths(q, plot.w);                                       // washrooms of different shapes, not all one box
+      if (sepStairs) q = { ...q, sepStairs: true };
       for (const t of omit) q = dropRoom(q, t);                      // rooms the visitor chose to leave out (dining, drawing room ...)
       if (guestBath === 'no') q = dropGuestBath(q);                  // no washroom in the drawing room
       if (lawn === 'no') q = lawnToPorch(q);                          // no lawn: the front strip is all car porch
@@ -173,6 +193,9 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
     ...extra,
   });
   let items = await run();
+  let sepNote = '';
+  if (sepStairs && !items.length) items = await run({ n: 24 });       // separate stairs need the flight beside the porch or lawn: draw more before giving up
+  if (sepStairs && !items.length) { sepStairs = false; sepNote = 'No draft had its stairs beside the porch or lawn, so these have the stairs inside.'; items = await run(); }
   if (strictStairs && items.length < 3) {                          // a proper stair is worth more than a third option: draw more before settling for fewer
     const more = await run({ n: 14, exclude: new Set([...(opts.exclude || []), ...items.map((it) => it.text)]) });
     items = [...items, ...more].slice(0, 3);
@@ -181,7 +204,9 @@ export async function modelLayouts(plot, prefs, onStatus, opts = {}) {
     strictStairs = false;
     items = await run({ n: 10 });
   }
-  return items.map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
+  const res = items.map((it, i) => Object.assign(planToLayout(it, i), it.style ? { tag: FAMILY[it.style] || 'Naqsha model', family: it.style } : {}));
+  if (sepNote) res.note = sepNote;
+  return res;
 }
 
 /** The ground floor's built box and its stairs (inside the box), the two things a first floor is drafted around.
@@ -401,7 +426,9 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
     };
     attempt(refitBox(it.plan, fb.box));
     attempt(varyBaths(cur.plan, 1));                                   // washrooms of different shapes, when that breaks no rule
-    for (const t of prefs.upOmit || []) attempt(dropRoom(cur.plan, t));       // rooms that are not offered (store, study) are left out upstairs too, when the plan still passes without them
+    for (const t of prefs.upOmit || []) attempt(dropRoom(cur.plan, t));
+    { const p = dropLoungeBath(cur.plan);                               // no common washroom in the family lounge upstairs
+      if (p !== cur.plan) { const rects = treeRects(p), checks = treeCheck(p, prefs.beds); if (!checks.some((c) => c.level === 'err')) cur = { ...cur, plan: p, rects, checks, grid: undefined }; } }       // rooms that are not offered (store, study) are left out upstairs too, when the plan still passes without them
     return cur;
   });
   const out = items.map((it, i) => {

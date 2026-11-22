@@ -213,10 +213,14 @@ footer { text-align: center; font-size: 0.78rem; color: var(--ink-soft); padding
 .pair figure { margin: 0; text-align: center; }
 .pair figcaption { font-weight: 600; margin-bottom: 6px; }
 
-.edhost .retype { position: absolute; z-index: 5; background: #fbf8f1; border: 1px solid #394845; border-radius: 8px; padding: 8px 10px; box-shadow: 0 6px 18px #39484533; width: 190px; font-size: 13px; }
+.edhost .retype { position: absolute; z-index: 5; background: #fbf8f1; border: 1px solid #394845; border-radius: 8px; padding: 8px 10px; box-shadow: 0 6px 18px #39484533; width: 210px; font-size: 13px; }
 .edhost .retype label { display: grid; gap: 4px; }
 .edhost .retype select { font: inherit; padding: 4px 6px; }
 .edhost .retype .msg { display: block; margin-top: 6px; color: #8a3b2b; font-size: 12px; }
+.edhost .retype label + label { margin-top: 6px; }
+.edhost .retype .rm { margin-top: 6px; }
+.edhost.swapping, .edhost.swapping svg { cursor: crosshair; }
+.edhost.swapping::after { content: "Click the room it changes places with (Esc to cancel)"; position: absolute; left: 8px; top: 8px; background: #394845; color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 6px; pointer-events: none; }
 
 .edhost .fp { cursor: move; }
 .edhost .fp:hover > :first-child { stroke: #394845; stroke-width: 1.2; }

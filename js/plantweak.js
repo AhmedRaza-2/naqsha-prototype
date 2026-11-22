@@ -456,8 +456,9 @@ function turningStairRoom(plan) {
   for (const [wid, len, minArea] of STAIR_TIERS) {
     if (area < minArea) continue;
     let best = null;
-    for (const long of ['H']) {                                       // the room runs along the depth of the plot, like the stairs the first-floor model has seen
-      const short = 'V';
+    const across = f0.w > f0.d * 1.15;                                 // the model drew the flight across the plot: keep that direction (stairs are not all one way)
+    for (const long of across ? ['V', 'H'] : ['H', 'V']) {
+      const short = long === 'H' ? 'V' : 'H';
       const p = clone(plan);
       resizeLeaf(p, locate(p, (n) => n.t === 'stairs'), short, wid, isOpen);
       resizeLeaf(p, locate(p, (n) => n.t === 'stairs'), long, len, isOpen);
@@ -465,7 +466,7 @@ function turningStairRoom(plan) {
       const m1 = marginsOf(p);
       if (m0 && m1 && ['l', 'r', 'f', 'b'].some((k) => m1[k] < m0[k] - 0.05)) continue;     // the house must not grow into its open space
       if (!turningStair({ w: c.w, d: c.d })) continue;
-      const off = Math.abs(Math.min(c.w, c.d) - wid) + Math.abs(Math.max(c.w, c.d) - len);
+      const off = Math.abs(Math.min(c.w, c.d) - wid) + Math.abs(Math.max(c.w, c.d) - len) + (long === (across ? 'V' : 'H') ? 0 : 3);    // the model's own direction first
       if (!best || off < best.off) best = { p, off };
     }
     if (best) return best.p;
@@ -524,6 +525,16 @@ export function dropGuestBath(plan) {
   const f = locate(p, (n) => n.t === 'drawing' && n.bath);
   if (!f) return plan;
   delete f.leaf.bath;
+  return p;
+}
+/** No washroom in the lounge (a first floor's family lounge needs none: its bedrooms have their own). */
+export function dropLoungeBath(plan) {
+  if (!plan.tree) return plan;
+  const p = clone(plan);
+  let f, n = 0;
+  while ((f = locate(p, (q) => q.t === 'lounge' && q.bath))) { delete f.leaf.bath; n += 1; }
+  if (!n) return plan;
+  if (p.baths != null) p.baths = Math.max(0, p.baths - n);
   return p;
 }
 /** Leave a room out: its neighbour (a room before an open strip, never the stairs) takes its space. Returns the plan unchanged when there is no such room. */

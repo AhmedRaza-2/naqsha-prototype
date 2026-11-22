@@ -124,7 +124,7 @@ export function shared(a, b) {
 
 const PREF = { lobby: ['lounge', 'dining', 'passage'], drawing: ['lobby', 'lounge'], kitchen: ['dining', 'lounge', 'lobby', 'passage'], dining: ['lounge', 'kitchen'] };
 const BED_FRONT = ['drawing', 'lobby', 'lounge', 'passage'];
-const BED_BACK = ['lounge', 'dining', 'lobby', 'passage', 'drawing', 'kitchen'];
+const BED_BACK = ['lounge', 'dining', 'lobby', 'passage', 'drawing'];          // never through the kitchen
 const OTHER = ['lounge', 'passage', 'lobby', 'dining'];
 const MINSZ = { bed: [95, 9], master: [110, 9], drawing: [110, 9], lounge: [100, 8], kitchen: [55, 6.5], lobby: [20, 4.5], dining: [70, 7] };
 const WINDOW_W = { kitchen: 3.5, bed: 4, master: 4, lobby: 3 };
@@ -133,6 +133,10 @@ function links(rects, mains, y0) {
   const out = [];
   for (const r of mains) {
     if (r.t === 'lounge') continue;
+    if (r.join) {                                                   // part of the room beside it (an L-shaped room drawn in the editor): no wall between them
+      const h = mains.find((q) => q !== r && q.t === r.join && (s => s && s[3] - s[2] >= 3)(shared(r, q)));
+      if (h) { out.push([r.i, h.i]); continue; }
+    }
     const prefs = BEDS.has(r.t) ? (Math.abs(r.y - y0) < 0.01 ? BED_FRONT : BED_BACK) : (PREF[r.t] || OTHER);
     let pick = null;
     for (const t of prefs) {
@@ -179,7 +183,7 @@ function guestWall(r, rects) {
  *   wall  = where its door goes; faces = it opens onto the road side
  *   guests = [[drawing room, wall]] for drawing rooms next to the porch or lawn (their own guest door)
  */
-export function outsideDoors(rects, mains, y0) {
+export function outsideDoors(rects, mains, y0, sepStairs = false) {
   const lob = mains.find((r) => r.t === 'lobby');
   let main = null, wall = null, faces = false;
   if (lob) { main = lob; wall = frontOpen(lob, rects); faces = Math.abs(lob.y - y0) < 0.01 && !!wall; }
@@ -189,7 +193,7 @@ export function outsideDoors(rects, mains, y0) {
       if (r) { main = r; wall = frontOpen(r, rects); faces = true; break; }
     }
   }
-  const guests = mains.filter((r) => r.t === 'drawing' && r !== main).map((r) => [r, guestWall(r, rects)]).filter(([, w]) => w);
+  const guests = mains.filter((r) => (r.t === 'drawing' || (sepStairs && r.t === 'stairs')) && r !== main).map((r) => [r, guestWall(r, rects)]).filter(([, w]) => w);   // separate stairs: their own door from the porch or lawn
   return { main, wall, faces, guests };
 }
 
@@ -307,7 +311,7 @@ export function checkRects(plan, rects, beds = plan.beds, out = [], errs = 0) {
   const nobath = mains.filter((r) => BEDS.has(r.t) && !r.bath && !r.ensuite).map((r) => r.t);
   add(nobath.length ? 'warn' : 'ok', 'attached baths', `${nobath.length} bedroom(s) without`);
   // main entrance: a lobby, or (common in real plans) a lounge / dining room entered straight from the porch or lawn
-  const out_ = outsideDoors(rects, mains, y0);
+  const out_ = outsideDoors(rects, mains, y0, !!plan.sepStairs);
   add(out_.faces ? 'ok' : 'warn', 'entrance on road side');
 
   const lk = links(rects, mains, y0);

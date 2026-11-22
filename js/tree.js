@@ -126,7 +126,7 @@ export function parse(text) {
 
 // ---------------------------------------------------------------- geometry
 function layout(node, x, y, w, d, out, errs) {
-  if (node.k === 'room') { out.push({ t: node.t, x, y, w, d, bath: node.bath || null }); return; }
+  if (node.k === 'room') { out.push({ t: node.t, x, y, w, d, bath: node.bath || null, ...(node.join ? { join: node.join } : {}) }); return; }
   const total = node.k === 'H' ? d : w;
   const rest = Math.round((total - node.sizes.reduce((s, v) => s + v, 0)) * 100) / 100;
   if (rest <= 0 || Math.min(...node.sizes) <= 0) errs.push(`${node.k} cut: sizes ${node.sizes.join(',')} do not fit ${total}`);
@@ -153,7 +153,7 @@ export function familyOf(plan, rects) {
 /** Same rectangles as bands.toRects: rooms first, then washrooms (overlay or standalone) with parent = room index. */
 export function toRects(plan) {
   const { rooms } = leaves(plan);
-  const rects = rooms.filter((r) => r.t !== 'bath').map((r, k) => ({ i: k, t: r.t, x: r.x, y: r.y, w: r.w, d: r.d, band: 0, bath: r.bath }));
+  const rects = rooms.filter((r) => r.t !== 'bath').map((r, k) => ({ i: k, t: r.t, x: r.x, y: r.y, w: r.w, d: r.d, band: 0, bath: r.bath, ...(r.join ? { join: r.join } : {}) }));
   const out = [...rects];
   for (const r of rects) {
     if (r.bath) {

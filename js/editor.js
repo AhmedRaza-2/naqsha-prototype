@@ -123,6 +123,63 @@ function removeLeaf(plan, idx) {
   return p;
 }
 
+/** Copy of a slicing-tree plan with its i-th room (same order as leafAt) replaced by fn(leaf, w, d); null when there is no such room. */
+function mapLeaf(plan, idx, fn) {
+  if (!plan.tree) return null;
+  const p = clone(plan);
+  let k = -1, done = false;
+  const go = (node, w, d) => {
+    if (node.k === 'room') {
+      if (node.t === 'bath') return node;
+      k += 1;
+      if (k !== idx || done) return node;
+      done = true;
+      return fn(node, w, d);
+    }
+    const total = node.k === 'H' ? d : w;
+    const parts = [...node.sizes, total - node.sizes.reduce((a, b) => a + b, 0)];
+    node.kids = node.kids.map((kid, j) => (node.k === 'H' ? go(kid, w, parts[j]) : go(kid, parts[j], d)));
+    return node;
+  };
+  p.tree = go(p.tree, p.plot.w, p.plot.d);
+  return done ? p : null;
+}
+
+/** Cut a room in two across its longer side: one half stays what it was (with its washroom), the other becomes a room of its own. */
+function splitLeaf(plan, idx) {
+  let ok = false;
+  const p = mapLeaf(plan, idx, (leaf, w, d) => {
+    const deep = d >= w, len = deep ? d : w, a = snap(len / 2);
+    if (a < 4 || len - a < 4) return leaf;
+    ok = true;
+    const extra = { k: 'room', t: 'other' }, keep = { ...leaf };
+    if (deep) return { k: 'H', sizes: [a], kids: [extra, keep] };          // a washroom sits at the back of its room: the back half keeps it
+    return { k: 'V', sizes: [a], kids: leaf.bath && leaf.bath[2] === 'R' ? [extra, keep] : [keep, extra] };
+  });
+  return ok ? p : null;
+}
+
+/** Make a room part of the room beside it (type `into`): no wall between them, so that room becomes L- or T-shaped. */
+function joinLeaf(plan, idx, into) {
+  const old = leafAt(plan, idx);
+  const p = mapLeaf(plan, idx, () => ({ k: 'room', t: 'other', join: into }));
+  if (!p || !old) return null;
+  if (old.t === 'bed' || old.t === 'master') p.beds = Math.max(0, p.beds - 1);
+  if (old.bath && p.baths != null) p.baths = Math.max(0, p.baths - 1);
+  return p;
+}
+
+/** Two rooms change places (what each is and its washroom); the walls stay where they are. */
+function swapLeaves(plan, i, j) {
+  const a = leafAt(plan, i), b = leafAt(plan, j);
+  if (!a || !b || i === j) return null;
+  const pick = (n) => ({ t: n.t, bath: n.bath, join: n.join });
+  const A = pick(a), B = pick(b);
+  const put = (leaf, v) => { const n = { ...leaf, t: v.t }; delete n.bath; delete n.join; if (v.bath) n.bath = [...v.bath]; if (v.join) n.join = v.join; return n; };
+  const p = mapLeaf(plan, i, (leaf) => put(leaf, B));
+  return p && mapLeaf(p, j, (leaf) => put(leaf, A));
+}
+
 const stairsTooBig = (lay) => (lay.rects || []).some((r) => r.t === 'stairs' && Math.min(r.w, r.d) > 4.01 && Math.max(r.w, r.d) >= 14 || r.t === 'stairs' && Math.max(r.w, r.d) > 18.01);
 
 /** Wall positions of a plan (rows of rooms or a slicing tree), in feet. */
@@ -281,7 +338,7 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
   }
 
   // click a room (without dragging) to change what it is
-  let pick = null;
+  let pick = null, swapFrom = null;                              // swapFrom: "Move" was chosen on this room, the next room clicked changes places with it
   const closePick = () => { pick?.remove(); pick = null; };
   function openPick(e) {
     const svg = host.querySelector('svg');
@@ -291,17 +348,56 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     const hit = (L.rects || []).filter((r) => r.t !== 'bath' && x >= r.x && x <= r.x + r.w && z >= r.y && z <= r.y + r.d)
       .sort((a, b) => a.w * a.d - b.w * b.d)[0];
     closePick();
+    const box = host.getBoundingClientRect();
+    const place = (el) => { el.style.left = Math.min(box.width - 220, Math.max(0, e.clientX - box.left - 20)) + 'px'; el.style.top = Math.max(0, e.clientY - box.top + 10) + 'px'; };
+    if (swapFrom != null) {                                        // second click of "Move": the room it changes places with
+      const from = swapFrom;
+      swapFrom = null; host.classList.remove('swapping');
+      if (!hit || hit.i === from) return;
+      const next = !FIXED_TYPES.has(hit.t) && swapLeaves(L.plan, from, hit.i);
+      if (next && accept(next)) { set(next, true); return; }
+      pick = document.createElement('div'); pick.className = 'retype'; place(pick);
+      pick.innerHTML = '<span class="msg" role="status">Those two rooms cannot change places: the stairs, entrance and washrooms stay put, and a room must keep its washroom fitting.</span>';
+      host.append(pick);
+      return;
+    }
     if (!hit || FIXED_TYPES.has(hit.t)) return;
     const leaf = leafAt(L.plan, hit.i);
     if (!leaf || leaf.t !== hit.t) return;
+    // rooms beside this one (a wall of 3 ft or more in common) it can be joined to
+    const common = (a, b) => {
+      const e = 0.02;
+      if (Math.abs(a.x + a.w - b.x) < e || Math.abs(b.x + b.w - a.x) < e) return Math.min(a.y + a.d, b.y + b.d) - Math.max(a.y, b.y);
+      if (Math.abs(a.y + a.d - b.y) < e || Math.abs(b.y + b.d - a.y) < e) return Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      return 0;
+    };
+    const nbrs = [...new Set((L.rects || []).filter((r) => r !== hit && r.t !== 'bath' && !r.join && !OPEN.has(r.t) && !['stairs', 'void'].includes(r.t) && common(hit, r) >= 3).map((r) => r.t))];
+    const label = (t) => RETYPE[t] || ({ lobby: 'Entrance', passage: 'Corridor' })[t] || t;
     pick = document.createElement('div');
     pick.className = 'retype';
-    const box = host.getBoundingClientRect();
-    pick.style.left = Math.min(box.width - 190, Math.max(0, e.clientX - box.left - 20)) + 'px';
-    pick.style.top = Math.max(0, e.clientY - box.top + 10) + 'px';
-    pick.innerHTML = `<label>This room is a<select>${Object.entries(RETYPE).map(([k, v]) => `<option value="${k}"${k === hit.t ? ' selected' : ''}>${v}</option>`).join('')}</select></label><button type="button" class="rm">Remove this room</button><span class="msg" role="status"></span>`;
+    place(pick);
+    pick.innerHTML = hit.join
+      ? `<b>Part of the ${label(hit.join).toLowerCase()}</b><div class="row"><button type="button" class="unjoin">Separate it</button></div><span class="msg" role="status"></span>`
+      : `<label>This room is a<select class="type">${Object.entries(RETYPE).map(([k, v]) => `<option value="${k}"${k === hit.t ? ' selected' : ''}>${v}</option>`).join('')}</select></label>`
+        + (nbrs.length ? `<label>Join it to<select class="join"><option value="">a room beside it...</option>${nbrs.map((t) => `<option value="${t}">${label(t)}</option>`).join('')}</select></label>` : '')
+        + `<div class="row"><button type="button" class="split">Split in two</button><button type="button" class="move">Move</button></div>`
+        + `<button type="button" class="rm">Remove this room</button><span class="msg" role="status"></span>`;
     host.append(pick);
-    const sel = pick.querySelector('select'), msg = pick.querySelector('.msg');
+    const msg = pick.querySelector('.msg');
+    const tryIt = (next, why) => {
+      if (!next) { msg.textContent = why; return; }
+      if (!accept(next)) { msg.textContent = 'That would break a rule this floor must keep (a kitchen, a drawing room, the number of bedrooms).'; return; }
+      closePick(); set(next, true);
+    };
+    if (hit.join) {
+      pick.querySelector('.unjoin').onclick = () => tryIt(mapLeaf(L.plan, hit.i, (lf) => { const n = { ...lf }; delete n.join; return n; }), 'This part cannot be separated.');
+      return;
+    }
+    pick.querySelector('.split').onclick = () => tryIt(splitLeaf(L.plan, hit.i), 'This room is too small to split (each half needs 4 ft).');
+    pick.querySelector('.move').onclick = () => { swapFrom = hit.i; host.classList.add('swapping'); closePick(); };
+    const js = pick.querySelector('.join');
+    if (js) js.onchange = () => js.value && tryIt(joinLeaf(L.plan, hit.i, js.value), 'This room cannot be joined.');
+    const sel = pick.querySelector('select.type');
     sel.focus();
     pick.querySelector('.rm').onclick = () => {
       if (hit.t === 'kitchen' || hit.t === 'drawing') { msg.textContent = `A house needs a ${hit.t === 'kitchen' ? 'kitchen' : 'drawing room'}; change what it is instead.`; return; }
@@ -361,7 +457,7 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5 && !e.target.closest('.retype')) openPick(e);
     down = null;
   }, sig);
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePick(); }, sig);
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closePick(); swapFrom = null; host.classList.remove('swapping'); } }, sig);
 
   host.addEventListener('pointerdown', (e) => {
     const g = e.target.closest('g.h');
@@ -391,4 +487,4 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
 }
 
 // the same wall moves, for the automatic polish (polish.js)
-export { wallHandles, apply as applyEdit };
+export { wallHandles, apply as applyEdit, splitLeaf, joinLeaf, swapLeaves, leafAt };

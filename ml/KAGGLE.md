@@ -1,3 +1,5 @@
+> Current: see `MODELS.md` (live model, weights, training code). The newest run script is `ml/run_v18.sh`; `ml/run_v13.sh` is the recipe of the live v13. Older sections below are history (their scripts are in git history).
+
 # Training on Kaggle (2 x T4, about 35 minutes)
 
 1. Build the package locally: `python tools/build_v12.py --workers 10` writes `data/pk12`; zip `ml/`, `tools/bands.py`,
@@ -27,3 +29,20 @@ supervised models (GPU 1), then evaluation of the RL model and the real-plan com
   style_followed% (plans with the layout family the request named).
 - Real Pakistani plans (gold, never trained on): gold_ppl (lower = the model finds real plans more likely), valid% and
   size_gap% (room sizes against the real plans).
+
+## v14: more real layouts (CubiCasa5k + checked vision readings), one command
+Upload `kaggle_upload/naqsha-v14.zip` (211 MB: scripts, pk13 / world / real datasets, the 1,111 candidate plan images, `rl_v13_model.pt`)
+as a Kaggle dataset. New notebook, add the dataset, **Accelerator: GPU T4 x2**, **Internet: On** (phone-verified account). One cell:
+
+```bash
+%cd /kaggle/working
+!F=$(find /kaggle/input -name run_v14.sh | head -1); SRC=$(dirname $(dirname $F)); cp -r $SRC/ml $SRC/tools $SRC/real $SRC/data $SRC/runs .
+!bash ml/run_v14.sh 600 8 400
+```
+Arguments: plans to read with the vision model (0 = skip it, CubiCasa only), fine-tune epochs, RL steps, optional vision model name.
+It downloads CubiCasa5k from zenodo and converts it while the vision model reads the Pakistani plans (every reading is checked by the
+rule checker and sent back with the reason when it fails, up to 3 rounds), builds `data/world_cc11` and `data/real14`, fine-tunes v13 on
+everything (real plans repeated 20x), runs RL, and prints held-out validity plus likelihood of real gold plans for v13 vs v14.
+Resumable: if the session stops, run the same cell again. Download `rl_v14_model.pt` and `runs_v14.zip`, then locally
+`python ml/export_onnx.py --ckpt runs/rl_v14_model.pt --out runs/v14/layout` and compare with `python ml/coverage_styles.py --onnx runs/v14/layout.onnx`
+before replacing `models/layout.onnx` (only ship it if gold_ppl and validity are no worse than v13).

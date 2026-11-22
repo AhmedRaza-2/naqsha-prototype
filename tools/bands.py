@@ -208,7 +208,7 @@ def _shared(a, b):
 PREF = {"lobby": ["lounge", "dining", "passage"], "drawing": ["lobby", "lounge"], "kitchen": ["dining", "lounge", "lobby", "passage"],
         "dining": ["lounge", "kitchen"]}
 BED_FRONT = ["drawing", "lobby", "lounge", "passage"]
-BED_BACK = ["lounge", "dining", "lobby", "passage", "drawing", "kitchen"]
+BED_BACK = ["lounge", "dining", "lobby", "passage", "drawing"]          # never through the kitchen
 OTHER = ["lounge", "passage", "lobby", "dining"]
 MINSZ = {"bed": (95, 9), "master": (110, 9), "drawing": (110, 9), "lounge": (100, 8), "kitchen": (55, 6.5),
          "lobby": (20, 4.5), "dining": (70, 7)}

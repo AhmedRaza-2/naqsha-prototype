@@ -98,13 +98,21 @@ export function finalize(L) {
     kitchen: ['dining', 'lounge', 'lobby', 'passage'],
     dining: ['lounge', 'kitchen'],
   };
+  // the parts of an L-shaped room: no wall between them, one opening the full length and height of the wall they share
+  for (const r of mains.filter((m) => m.annex)) {
+    const h = byId(r.annex), s = h && shared(r, h);
+    if (!s) continue;
+    openings.push({ o: s.o, c: s.c, at: (s.lo + s.hi) / 2, span: [s.lo, s.hi], w: s.hi - s.lo, kind: 'opening', join: true, sill: 0, top: 10, room: r.id, to: h.id });
+    links.push([r.id, h.id]);
+  }
   for (const r of [...mains].sort((a, b) => (b.type === 'stairs') - (a.type === 'stairs'))) {   // the stairs first: their one door is then known to the rooms after
-    if (r.type === 'lounge') continue;
+    if (r.type === 'lounge' || r.annex) continue;
     const prefs = r.type === 'bed'
-      ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge', 'passage'] : ['lounge', 'dining', 'lobby', 'passage', 'drawing', 'kitchen'])
+      ? (r.band === 'front' ? ['drawing', 'lobby', 'lounge', 'passage'] : ['lounge', 'dining', 'lobby', 'passage', 'drawing'])
       : (PREF[r.type] || ['lounge', 'passage', 'lobby', 'dining']);
+    if (r.type === 'stairs' && (dOut.guests || []).some((g) => g.room === r.id)) continue;      // separate stairs: their one door is from outside
     if (r.type === 'stairs') {                                      // the flight needs its doors at the two ends: ground floor at the low end, first floor at the high end
-      const alongX = r.w > r.d, lo = alongX ? r.x : r.z, hi = lo + (alongX ? r.w : r.d), turn = turningStair(r), up = L.upper || turn, order = L.upper ? ['lounge', 'terrace', 'passage', 'dining', 'study', 'store', 'lobby', 'bed'] : ['lobby', 'lounge', 'passage', 'drawing', 'dining', 'kitchen', 'bed'];
+      const alongX = r.w > r.d, lo = alongX ? r.x : r.z, hi = lo + (alongX ? r.w : r.d), turn = turningStair(r), up = L.upper || turn, order = L.upper ? ['lounge', 'terrace', 'passage', 'dining', 'lobby'] : ['lobby', 'lounge', 'passage', 'dining', 'drawing'];   // a hall, never a store, kitchen or bedroom
       const w = 3; let best = null;
       const wayOut = L.upper ? (L.open || []).filter((p) => p.type === 'terrace').map((p) => ({ id: 'terrace', type: 'terrace', x: p.x, z: p.z, w: p.w, d: p.d, att: null })) : [];      // the stairs open into the lounge or onto the terrace, not into a bedroom
       // a turning stair has both its doors at the same end of the room (the foot strip), on the ground floor and on the first floor: the first pass keeps to that end
@@ -120,6 +128,7 @@ export function finalize(L) {
           if (longWall) { const target = up ? hi - w / 2 - 0.2 : lo + w / 2 + 0.2; at = Math.max(a2 + w / 2, Math.min(b2 - w / 2, target)); if (b2 - a2 < w) at = (a2 + b2) / 2; dist = Math.abs(at - target); }
           else { at = (a2 + b2) / 2; const endWall = alongX ? s0.c : s0.c; dist = Math.abs(endWall - (up ? hi : lo)) < 0.3 ? 0 : 60; }
           if (strict && dist > 1.3) continue;
+          if (order.indexOf(q.type) < 0 && q.id !== 'terrace') continue;           // the flight opens onto a hall only (see 'stairs open onto a hall' in bands.js)
           const rank = order.indexOf(q.type) < 0 ? 9 : order.indexOf(q.type);
           const key = (L.upper && rank > 1 ? 1000 : 0) + dist * 10 + rank;                // on a first floor the stairs open onto the lounge or the terrace before any other room
           if (!best || key < best.key) best = { q, s: { ...s0, lo: a2, hi: b2 }, at, key, w: Math.min(w, Math.max(2.2, b2 - a2 - 0.2)) };
@@ -152,7 +161,9 @@ export function finalize(L) {
     }
     if (!pick && !narrow) {                                         // any other neighbour with a clear stretch of wall
       for (const q of mains) {
-        if (q === r || (r.type === 'bed' && q.type === 'kitchen') || (q.type === 'stairs' && !L.upper)) continue;   // the flight has the one door at its foot, no other room opens onto it
+        if (q === r || (r.type === 'bed' && q.type === 'kitchen') || (q.type === 'stairs' && !L.upper)) continue;
+        if (r.type === 'stairs' && !['lounge', 'passage', 'lobby', 'dining', 'drawing'].includes(q.type)) continue;   // no stair door into a store, kitchen or bedroom
+        if (q.type === 'kitchen' && r.type !== 'dining' && r.type !== 'lounge') continue;     // the kitchen is not a passage to other rooms   // the flight has the one door at its foot, no other room opens onto it
         const s0 = shared(r, q);
         if (!s0) continue;
         const [a1, b1] = doorSpan(r, s0.o, s0.c, s0.lo, s0.hi), [a2, b2] = doorSpan(q, s0.o, s0.c, a1, b1);

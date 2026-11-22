@@ -198,19 +198,24 @@ def asked_style(prompt):
     return m[1] if m else None
 
 
-def reward_styled(prompt, completion_ids, miss=0.5):
+def reward_styled(prompt, completion_ids, miss=0.5, qual=0.0):
     """RL reward: the rule score, scaled by `miss` when the prompt names a layout family (STYLE) and the plan has another
     one (read from its geometry, tree.family_of). The checker alone rewards falling back to rows, the easiest family to
     get right, so v11 drew a bedroom wing for only 38% of the wing requests. Returns (reward, failed, followed or None)."""
     try:
         plan, cs, rects, _ = parse_plan(ids_to_plan_text(prompt, completion_ids))
     except Exception:
-        return 0.0, ["unparseable"], None
+        return 0.0, ["unparseable"], None, None
     r, failed = bands.score(cs), bands.failed(cs)
+    q = None
+    if qual > 0 and r > 0:                                 # v16: how well the plan uses its plot (ml/quality.py), on top of the rules
+        from quality import quality
+        q = quality(plan, rects)[0]
+        r = r * (1 - qual + qual * q)
     want = asked_style(prompt)
-    if want is None or r == 0: return r, failed, None
+    if want is None or r == 0: return r, failed, None, q
     followed = tree.family_of(plan, rects) == want
-    return (r if followed else r * miss), failed + ([] if followed else ["style"]), followed
+    return (r if followed else r * miss), failed + ([] if followed else ["style"]), followed, q
 
 
 def device():

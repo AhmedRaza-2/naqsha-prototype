@@ -43,7 +43,7 @@ export function furnish(L) {
   const out = [];
   const ops = (L.openings || []).filter((o) => o.kind !== 'window' || true);
   for (const room of L.rooms) {
-    if (room.type === 'stairs' || room.type === 'passage') continue;
+    if (room.type === 'stairs' || room.type === 'passage' || room.annex) continue;     // the extra part of an L-shaped room is kept clear
     out.push(...furnishRoom(room, L, ops));
   }
   for (const sp of L.open || []) if (sp.type === 'terrace') out.push(...terraceItems(sp));

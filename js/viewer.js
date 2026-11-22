@@ -378,8 +378,8 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     planning = true;
     const stopOf = (r, lay, l) => ({ l, x: r.x + r.w / 2, z: r.z + r.d / 2, name: r.name, w: r.w, d: r.d, sqft: Math.round(r.w * r.d), point: sellingPoint(r, lay) });
     const rooms = [
-      ...L.rooms.filter((r) => !r.parent && r.type !== 'stairs' && r.type !== 'passage').map((r) => stopOf(r, L, 0)),
-      ...(U ? U.rooms.filter((r) => !r.parent && r.type !== 'stairs' && r.type !== 'passage').map((r) => stopOf(r, U, 1)) : []),
+      ...L.rooms.filter((r) => !r.parent && !r.annex && r.type !== 'stairs' && r.type !== 'passage').map((r) => stopOf(r, L, 0)),
+      ...(U ? U.rooms.filter((r) => !r.parent && !r.annex && r.type !== 'stairs' && r.type !== 'passage').map((r) => stopOf(r, U, 1)) : []),
       ...(U ? (U.open || []).filter((o) => o.type === 'terrace' && o.w * o.d >= 40).map((o) => ({ l: 1, x: o.x + o.w / 2, z: o.z + o.d / 2, name: 'Terrace', w: o.w, d: o.d, sqft: Math.round(o.w * o.d), point: 'Open-air sitting space for cool evenings' })) : []),
     ];
     // a door-to-door route: nearest room first, ground floor before the first floor

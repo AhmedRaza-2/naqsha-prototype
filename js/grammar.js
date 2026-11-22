@@ -32,7 +32,7 @@ export function tokenTable(vocab) {
   T.forEach((t, i) => {
     if (/^\d+(?:\.\d+)?$/.test(t)) val[i] = parseFloat(t);
     else if (/^[a-z_]+$/.test(t) && !HEADER.has(t)) room[i] = 1;
-    if (['[', ']', 'H', 'V', '+', 'x', 'L', 'R', 'bath', 'bed', 'master', 'stairs', 'kitchen', 'drawing', 'terrace'].includes(t)) id[t] = i;
+    if (['[', ']', 'H', 'V', '+', 'x', 'L', 'R', 'bath', 'bed', 'master', 'stairs', 'kitchen', 'drawing', 'lounge', 'terrace'].includes(t)) id[t] = i;
   });
   return { n, val, room, id, eos: vocab.eos, name: T };
 }
@@ -45,7 +45,7 @@ export class Guide {
     this.stack = [];                                                // open cuts: { k, x, y, w, d, ext, sizes, sum, kids, touched }
     this.state = 'start';
     this.leaf = null;                                               // the room being written: { t, w, d, stage, bw }
-    this.beds = 0; this.baths = 0; this.stairs = 0; this.kitchen = 0; this.drawing = 0;
+    this.beds = 0; this.baths = 0; this.stairs = 0; this.kitchen = 0; this.drawing = 0; this.lounge = 0;
     this.hurry = false;                                             // set when the writer is running out of room: no new cuts, no more sizes, no washrooms
     this.ok = true;                                                 // false once the model wrote something the guide does not know: it then stands aside
   }
@@ -79,12 +79,13 @@ export class Guide {
   /** Rooms the request still needs: the bedrooms, and on a ground floor a kitchen, a drawing room and (two storeys) the stairs. */
   needed() {
     const q = this.req, ground = !q.up;
-    return Math.max(0, (q.beds ?? 0) - this.beds) + (q.stairs && !this.stairs ? 1 : 0) + (ground && q.must && !this.kitchen ? 1 : 0) + (ground && q.must && !this.drawing ? 1 : 0);
+    return Math.max(0, (q.beds ?? 0) - this.beds) + (q.stairs && !this.stairs ? 1 : 0) + (ground && q.must && !this.kitchen ? 1 : 0) + (ground && q.must && !this.drawing ? 1 : 0) + (q.lounge && !this.lounge ? 1 : 0);
   }
   required(t) {
     const { id } = this.tt, q = this.req;
     return ((t === id.bed || t === id.master) && this.beds < (q.beds ?? 0)) || (t === id.stairs && q.stairs && !this.stairs)
-      || (!q.up && q.must && ((t === id.kitchen && !this.kitchen) || (t === id.drawing && !this.drawing)));
+      || (!q.up && q.must && ((t === id.kitchen && !this.kitchen) || (t === id.drawing && !this.drawing)))
+      || (q.lounge && t === id.lounge && !this.lounge);                // a hall the rooms open from: without one the kitchen becomes the passage
   }
 
   /** May token `t` come next? */
@@ -186,6 +187,7 @@ export class Guide {
         if (t === id.stairs) this.stairs += 1;
         if (t === id.kitchen) this.kitchen += 1;
         if (t === id.drawing) this.drawing += 1;
+        if (t === id.lounge) this.lounge += 1;
         if (t === id.bath) this.baths += 1;
         this.leaf = { t: name[t], w: r.w, d: r.d, stage: 0, bw: 0 }; this.state = 'leaf'; return;
       }

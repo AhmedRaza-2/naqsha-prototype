@@ -52,6 +52,11 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
       o += op.o === 'h'
         ? `<line x1="${X(op.at) - half}" x2="${X(op.at) + half}" y1="${Y(op.c)}" y2="${Y(op.c)}" stroke="${col}" stroke-width="4"/>`
         : `<line y1="${Y(op.at) - half}" y2="${Y(op.at) + half}" x1="${X(op.c)}" x2="${X(op.c)}" stroke="${col}" stroke-width="4"/>`;
+    } else if (op.join) {                                          // the parts of an L-shaped room: the wall between them is painted out
+      const r = L.rooms.find((q) => q.id === op.room), col = FILL[r ? r.type : 'other'] || PAPER, t = 2.6;
+      o += op.o === 'h'
+        ? `<line x1="${X(op.at) - half + t}" x2="${X(op.at) + half - t}" y1="${Y(op.c)}" y2="${Y(op.c)}" stroke="${col}" stroke-width="3.2"/>`
+        : `<line y1="${Y(op.at) - half + t}" y2="${Y(op.at) + half - t}" x1="${X(op.c)}" x2="${X(op.c)}" stroke="${col}" stroke-width="3.2"/>`;
     } else {
       const wpx = op.w * s;
       if (op.o === 'h') {
@@ -70,6 +75,7 @@ export function planSVG(L, { maxW = 320, maxH = 470, labels = true, overlay = nu
     const halo = `paint-order="stroke" stroke="${PAPER}" stroke-width="2.4" stroke-linejoin="round"`;
     const fit = (txt, fs, maxPx) => Math.max(5.2, Math.min(fs, maxPx / (txt.length * 0.56)));   // shrink text that would not fit its room
     for (const r of L.rooms) {
+      if (r.annex) continue;                                         // one name per room, on its main part
       const cx = X(r.x + r.w / 2), cy = Y(r.z + r.d / 2);
       const across = frame.turn ? r.d : r.w;                       // the room's width as the viewer sees it
       const small = r.parent || across * s < 62;

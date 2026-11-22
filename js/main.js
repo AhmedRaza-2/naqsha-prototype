@@ -583,6 +583,7 @@ async function generate(regen, btnId) {
       const next = await draft(prefs);
       if (next.length && (!layouts.length || perfect(next))) { layouts = next; S.note = note; }
     }
+    if (layouts.note && !S.note) S.note = layouts.note;
     // guarantee porch: if user requested "yes" but model couldn't fit one, try to add it after generation
     if (S.prefs.porch === 'yes' && layouts.length && !layouts.some((L) => L.rects.some((r) => r.t === 'porch'))) {
       const withPorches = layouts.map((L, idx) => {

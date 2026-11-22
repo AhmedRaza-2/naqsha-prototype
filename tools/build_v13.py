@@ -16,10 +16,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import bands, tree, gen_tree, gen_upper  # noqa: E402
-from build_v11 import row_of  # noqa: E402
 
 MARLA = bands.MARLA
 TAG = 0.7
+
+
+def row_of(plan, style, tag):
+    """A plan as a training row; the layout family is named in the prompt when tag is true."""
+    p = dict(plan)
+    if tag: p["style"] = style
+    head, comp = tree.serialize(p).split("\n", 1)
+    cs = tree.check(plan, plan["beds"])
+    return {"prompt": head, "completion": comp, "plot": [plan["plot"]["w"], plan["plot"]["d"]], "beds": plan["beds"], "baths": plan.get("baths"),
+            "focus": plan.get("focus"), "style": style, "score": round(tree.score(cs), 3)}
 
 
 def encodable(text):

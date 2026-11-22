@@ -161,7 +161,7 @@ async function sample(request, styles, { temperature = 0.8, maxNew = 200 } = {},
   for (const rows of groups.values()) {
     g += 1;
     const rect = request.floor ? { w: request.floor.box.w, d: request.floor.box.d } : { w: request.w, d: request.d };      // what the tree divides: the plot, or the built box of a first floor
-    const req = { beds: request.beds, baths: stoi.has('BATHS') && request.baths != null ? request.baths : null, stairs: request.storeys === 2 && !request.floor, must: !request.floor, up: request.floor ? request.floor.up : null };      // what the plan must have (grammar.js)
+    const req = { beds: request.beds, baths: stoi.has('BATHS') && request.baths != null ? request.baths : null, stairs: request.storeys === 2 && !request.floor, must: !request.floor, lounge: (request.beds ?? 0) >= 2 && !(request.omit || []).includes('lounge'), up: request.floor ? request.floor.up : null };      // what the plan must have (grammar.js)
     const texts = await sampleBatch(rows, temperature, maxNew, expectedLength(request), rect, req, (pct) => onStatus?.(`Drafting layouts (${Math.min(99, Math.round(((g - 1 + pct) / groups.size) * 100))}%)`));
     rows.forEach((r, i) => out.push({ text: texts[i], style: r.style }));
   }

@@ -431,6 +431,7 @@ export function buildScene(renderer, L, styleId, U = null, { colors = {}, furnit
       for (const p of ops) {
         const o0 = p.at - p.w / 2, o1 = p.at + p.w / 2;
         solid(cur, o0);
+        if (p.join) { cur = o1; continue; }                          // the two parts of an L-shaped room: no wall between them at all
         if (p.kind === 'door' && lowSpans.some(([l0, l1]) => p.at > l0 && p.at < l1)) { piece(o0, o1, p.top, H, false); cur = o1; continue; }     // the kitchen's door becomes a plain opening beside the counter
         if (p.sill > 0) piece(o0, o1, 0, p.sill, true);
         piece(o0, o1, p.top, H, false);

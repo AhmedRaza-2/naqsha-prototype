@@ -55,6 +55,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--style-miss", type=float, default=0.5, help="share of the score kept by a plan of another family than the STYLE asked for (1 = ignore STYLE)")
     ap.add_argument("--styled", type=float, default=0.6, help="share of RL prompts that name a layout family")
+    ap.add_argument("--quality", type=float, default=0.0, help="weight of the plot-use quality (ml/quality.py) in the reward: reward = rules * (1 - w + w * quality); 0 = rules only")
     a = ap.parse_args()
     random.seed(a.seed); torch.manual_seed(a.seed)
     import multiprocessing as mp
@@ -78,7 +79,7 @@ def main():
         pol.eval()
         comps = pol.sample(ps, temperature=a.temp)
         t_s = time.time()
-        args_ = [(p, c, a.style_miss) for p, c in zip(ps, comps)]
+        args_ = [(p, c, a.style_miss, a.quality) for p, c in zip(ps, comps)]
         scored = pool.starmap(L.reward_styled, args_, chunksize=8) if pool else [L.reward_styled(*x) for x in args_]
         t_score = time.time() - t_s
         rs = torch.tensor([r[0] for r in scored], device=dev).view(a.prompts, a.group)
@@ -95,8 +96,9 @@ def main():
         torch.nn.utils.clip_grad_norm_(pol.parameters(), 1.0)
         opt.step()
         fol = [r[2] for r in scored if r[2] is not None]
+        qs = [r[3] for r in scored if len(r) > 3 and r[3] is not None]
         h = {"step": step, "reward": rs.mean().item(), "perfect": (rs == 1).float().mean().item(), "zero": (rs == 0).float().mean().item(),
-             "style_followed": round(sum(fol) / len(fol), 3) if fol else None,
+             "style_followed": round(sum(fol) / len(fol), 3) if fol else None, "quality": round(sum(qs) / len(qs), 3) if qs else None,
              "kl": ((kl * m).sum() / m.sum()).item(), "sec": round(time.time() - t0, 1), "score_sec": round(t_score, 2)}
         hist.append(h)
         if step % 10 == 0 or step == 1: print(h, flush=True)
