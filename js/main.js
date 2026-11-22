@@ -238,12 +238,18 @@ const openConflict = () => null;                                    // nothing b
 const mic = $('mic'), micstat = $('micstat'), meter = $('meter').firstElementChild;
 const LIVE = hasLiveSpeech();                                       // Chrome, Edge, Safari: the browser writes the words as they are spoken
 const MIC_IDLE = LIVE
-  ? 'Press Speak and talk: your words appear as you say them and the form fills in. Chrome and Edge send the audio to their speech service to write it down.'
-  : 'Press Speak and talk. A small speech model runs on your device (about 40 MB the first time); the words appear every few seconds.';
+  ? 'Pick English or اردو, press Speak and talk: your words appear as you say them and the form fills in. Chrome and Edge send the audio to their speech service to write it down.'
+  : 'Pick English or اردو, press Speak and talk. A speech model runs on your device (40 MB for English, more for Urdu, the first time); the words appear every few seconds.';
 let rec = null, voiceBusy = false, voiceMode = 'request';          // 'request': the first sentence; 'answer': a yes or no
 let whisperOnly = !LIVE;                                           // set when the browser's own speech service cannot be reached
 const say = (t) => { micstat.textContent = t; };
 const quick = $('blk-describe');
+// the language spoken: English or Urdu (live recognition in that language; Urdu script is read by urdu.js). Remembered on this device.
+const micLang = () => $('miclang').value;
+// Urdu text runs right to left: the box turns round when it holds Urdu letters
+$('nl').addEventListener('input', () => { $('nl').dir = /[؀-ۿ]/.test($('nl').value) ? 'rtl' : 'ltr'; });
+try { const l = localStorage.getItem('naqsha.miclang'); if (l) $('miclang').value = l; } catch { /* no storage here */ }
+$('miclang').addEventListener('change', () => { try { localStorage.setItem('naqsha.miclang', micLang()); } catch { /* no storage here */ } });
 function micState(on) {
   mic.setAttribute('aria-pressed', String(on));
   mic.classList.toggle('on', on);
@@ -264,7 +270,7 @@ function listenLive(onText) {
   return new Promise((resolve) => {
     let h = null, done = false;
     const end = (r) => { if (done) return; done = true; rec = null; mic.onclick = onMic; resolve(r); };
-    h = startLive({ onText, onEnd: end });
+    h = startLive({ onText, onEnd: end, lang: micLang() === 'ur' ? 'ur-PK' : 'en-PK' });
     rec = h;
     mic.onclick = () => { say('Finishing...'); h.stop(); };
   });
@@ -273,7 +279,8 @@ function listenLive(onText) {
 /** Fallback path (no browser speech service): record, and every 2.5 seconds turn what has been said so far into text on this device. */
 async function listenWhisper(onText) {
   let dl = 0, finished = false, working = false, lastN = 0, text = '';
-  const model = loadSpeechModel((p) => { dl = p; });
+  const lang = micLang();
+  const model = loadSpeechModel((p) => { dl = p; }, lang);
   model.catch(() => {});
   let r;
   try { r = await startListening({ onLevel: (v) => { meter.style.width = `${Math.round(v * 100)}%`; }, onSilence: () => { if (!finished) stopNow(); } }); }
@@ -288,7 +295,7 @@ async function listenWhisper(onText) {
     const a = r.peek();
     if (a.length < 16000 * 1.2 || a.length > 16000 * 20 || a.length === lastN) return;      // partial text only for the first 20 seconds; the full text comes when you stop
     working = true; lastN = a.length;
-    try { const t = await transcribe(a, (p) => { dl = p; }); if (!finished && t) { text = t; onText(t); } } catch { /* the next tick tries again */ }
+    try { const t = await transcribe(a, (p) => { dl = p; }, lang); if (!finished && t) { text = t; onText(t); } } catch { /* the next tick tries again */ }
     working = false;
   }, 2500);
   say(dl < 0.995 ? 'Listening. The speech model is still downloading, so words appear a little later.' : 'Listening. Words appear every few seconds.');
@@ -296,7 +303,7 @@ async function listenWhisper(onText) {
   const out = r.stop(); rec = null; mic.onclick = onMic;
   if (out.speechMs < 300) return { text: '', error: 'no-speech' };
   const tick = setInterval(() => say(dl < 0.995 ? `Downloading the speech model: ${Math.round(dl * 100)}%` : 'Writing it down...'), 300);
-  try { return { text: await transcribe(out.audio, (p) => { dl = p; }) || text }; }
+  try { return { text: await transcribe(out.audio, (p) => { dl = p; }, lang) || text }; }
   catch (err) { console.warn('speech to text failed', err); return { text, error: 'model' }; }
   finally { clearInterval(tick); }
 }
@@ -323,11 +330,10 @@ async function listenOnce() {
       if (res.error === 'not-allowed' || res.error === 'audio-capture') { say(MIC_ERR[res.error]); return ''; }
       if (out.speechMs < 600) { say('I did not hear anything. Press Speak and try again.'); return ''; }
       whisperOnly = true;                                            // there was speech but the browser wrote nothing: use the model on this device
-      const model = loadSpeechModel(() => {}); model.catch(() => {});
       let dl = 0;
-      loadSpeechModel((p) => { dl = p; }).catch(() => {});
+      loadSpeechModel((p) => { dl = p; }, micLang()).catch(() => {});
       const tick = setInterval(() => say(dl < 0.995 && dl > 0 ? `Downloading the speech model: ${Math.round(dl * 100)}%` : 'Writing it down on this device...'), 300);
-      try { const t = await transcribe(out.audio, (p) => { dl = p; }); if (t) { show(t); return t; } }
+      try { const t = await transcribe(out.audio, (p) => { dl = p; }, micLang()); if (t) { show(t); return t; } }
       catch (err) { console.warn('speech to text failed', err); say('The speech model could not load on this connection. You can type the request instead.'); return ''; }
       finally { clearInterval(tick); }
       say('I could not make out the words. Press Speak and try again, or type the request.');

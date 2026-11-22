@@ -2,6 +2,7 @@
 // English and Roman Urdu, numbers as digits or words, loose spelling. Nothing is sent anywhere: it is a set of patterns.
 // parseRequest(text) -> { plot, beds, baths, floors, upBeds, focus, porch, family, setbacks, stairs, style, colors, notes, understood[] }
 // Every field is only present when the text says something about it, so typing never overwrites what the visitor chose by hand.
+import { fromUrdu } from './urdu.js';
 
 const WORD_NUM = {
   zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, fifteen: 15, twenty: 20,
@@ -25,6 +26,7 @@ function plotFromArea(sqft) {
 }
 
 export function parseRequest(raw) {
+  raw = fromUrdu(raw);                                             // a request in Urdu script reads the same as in English
   const out = { understood: [], notes: [] };
   if (!raw || !raw.trim()) return out;
   let t = ' ' + raw.toLowerCase().replace(/[×✕]/g, 'x').replace(/[,;]+/g, ' , ').replace(/\s+/g, ' ') + ' ';

@@ -2,21 +2,22 @@
 // Fallback: speech to text with a deep-learning model (OpenAI Whisper, the English-only "tiny.en" size), run in the
 // visitor's browser with onnxruntime through transformers.js. The audio never leaves the device; only the model files
 // (about 40 MB, kept in the browser cache after the first use) are downloaded, from the Hugging Face hub.
-// English only for now. The text it returns is read by the same sentence reader as typed text (nlp.js).
+// English (tiny.en) or Urdu (the multilingual "base" model, on the GPU through WebGPU where the browser has it). The text it
+// returns is read by the same sentence reader as typed text (nlp.js; Urdu script is turned into its words by urdu.js).
 const TRANSFORMERS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2/dist/transformers.min.js';
-const MODELS = { tiny: 'Xenova/whisper-tiny.en', base: 'Xenova/whisper-base.en' };
-const MODEL = MODELS[(typeof window !== 'undefined' && window.__ASR) || 'tiny'];      // tiny.en: about 2.5 times faster than base.en on a laptop's single thread, which matters more for words that appear while you speak
-
-let asrPromise = null;
-/** Download (once) and start the speech model. onProgress(0..1) reports the download. */
-export function loadSpeechModel(onProgress) {
-  if (!asrPromise) {
-    asrPromise = (async () => {
+const MODELS = { en: 'Xenova/whisper-tiny.en', ur: 'Xenova/whisper-base' };      // tiny.en: about 2.5 times faster than base.en on a laptop, which matters for words that appear while you speak; Urdu needs the multilingual model
+const asrPromises = {};
+/** Download (once) and start the speech model for 'en' or 'ur'. onProgress(0..1) reports the download. */
+export function loadSpeechModel(onProgress, lang = 'en') {
+  const MODEL = MODELS[lang] || MODELS.en;
+  if (!asrPromises[lang]) {
+    asrPromises[lang] = (async () => {
       const tf = await import(/* @vite-ignore */ TRANSFORMERS);
       tf.env.allowLocalModels = false;
       const files = new Map();
+      const gpu = lang !== 'en' && typeof navigator !== 'undefined' && navigator.gpu && (await navigator.gpu.requestAdapter().catch(() => null));
       return tf.pipeline('automatic-speech-recognition', MODEL, {
-        dtype: 'q8', device: 'wasm',
+        dtype: gpu ? { encoder_model: 'fp32', decoder_model_merged: 'q4' } : 'q8', device: gpu ? 'webgpu' : 'wasm',     // the mix transformers.js uses for Whisper on WebGPU
         progress_callback: (e) => {
           if (e.status === 'progress' && e.total) {
             files.set(e.file, [e.loaded, e.total]);
@@ -27,9 +28,9 @@ export function loadSpeechModel(onProgress) {
         },
       });
     })();
-    asrPromise.catch(() => { asrPromise = null; });          // a failed download can be tried again
+    asrPromises[lang].catch(() => { delete asrPromises[lang]; });     // a failed download can be tried again
   }
-  return asrPromise;
+  return asrPromises[lang];
 }
 
 /** True when this browser can record from a microphone. */
@@ -105,7 +106,7 @@ export const hasLiveSpeech = () => !!SR();
 
 /**
  * Listen and write the words down as they are spoken. onText(textSoFar) is called on every partial result.
- * It ends by itself after 2.5 s of quiet following speech (or 9 s with no speech), or when stop() is called.
+ * It ends by itself after 1.5 s of quiet following speech (or 9 s with no speech), or when stop() is called.
  * onEnd({ text, error }) error: 'not-allowed', 'audio-capture', 'no-speech', 'network' or 'unsupported' (use the on-device model instead).
  */
 export function startLive({ onText, onEnd, lang = 'en-PK' }) {
@@ -129,8 +130,8 @@ export function startLive({ onText, onEnd, lang = 'en-PK' }) {
     };
     r.onerror = (e) => { err = e.error; };
     r.onend = () => {
-      if (err === 'language-not-supported' && !retried && lg !== 'en-US') {          // en-PK is not offered everywhere: try plain English
-        retried = true; err = null; prefix = text(); current = ''; begin('en-US'); return;
+      if (err === 'language-not-supported' && !retried && (lg === 'en-PK' || lg === 'ur-PK')) {     // a Pakistani variant is not offered everywhere: try the nearest one
+        retried = true; err = null; prefix = text(); current = ''; begin(lg === 'ur-PK' ? 'ur-IN' : 'en-US'); return;
       }
       finish();
     };
@@ -138,7 +139,7 @@ export function startLive({ onText, onEnd, lang = 'en-PK' }) {
   };
   const watch = setInterval(() => {
     const now = Date.now();
-    if (!stopping && ((gotAny && now - lastAt > 2500) || (!gotAny && now - t0 > 9000) || now - t0 > 60000)) { stopping = true; try { r.stop(); } catch { finish(); } }
+    if (!stopping && ((gotAny && now - lastAt > 1500) || (!gotAny && now - t0 > 9000) || now - t0 > 60000)) { stopping = true; try { r.stop(); } catch { finish(); } }
   }, 300);
   begin(lang);
   return { stop() { stopping = true; try { r.stop(); } catch { finish(); } } };
@@ -146,14 +147,14 @@ export function startLive({ onText, onEnd, lang = 'en-PK' }) {
 
 /** Speech (16 kHz mono) to text, or '' when nothing was said. */
 let busy = Promise.resolve();                                       // the model runs one recording at a time: a partial result and the final one must not overlap
-export function transcribe(audio, onProgress) {
-  const run = busy.then(() => transcribeNow(audio, onProgress));
+export function transcribe(audio, onProgress, lang = 'en') {
+  const run = busy.then(() => transcribeNow(audio, onProgress, lang));
   busy = run.catch(() => {});
   return run;
 }
-async function transcribeNow(audio, onProgress) {
-  const asr = await loadSpeechModel(onProgress);
-  const out = await asr(audio, { chunk_length_s: 30, stride_length_s: 5 });
+async function transcribeNow(audio, onProgress, lang) {
+  const asr = await loadSpeechModel(onProgress, lang);
+  const out = await asr(audio, { chunk_length_s: 30, stride_length_s: 5, ...(lang === 'ur' ? { language: 'urdu', task: 'transcribe' } : {}) });
   const text = (Array.isArray(out) ? out.map((o) => o.text).join(' ') : out.text) || '';
   return text.replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();     // drop tags like [BLANK_AUDIO]
 }

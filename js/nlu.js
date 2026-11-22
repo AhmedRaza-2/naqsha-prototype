@@ -2,6 +2,7 @@
 // in a typed or spoken request means and what the sentence asks for. It runs in the browser on the same runtime as the
 // layout model. The patterns in nlp.js read first (they are exact where they match); the model fills in what they missed:
 // loose word order, speech slips, Roman Urdu spellings the patterns do not list.
+import { fromUrdu } from './urdu.js';
 import { parseRequest, MARLA_PLOTS } from './nlp.js';
 import { preloadModel, runtime } from './model.js';
 
@@ -42,6 +43,7 @@ const valueOf = (tok) => (/^\d/.test(tok) ? parseFloat(tok) : WORD[tok] ?? null)
 /** What the model reads in a sentence: { tokens: [{ w, tag, p }], labels: { name: probability } } or null when it is not loaded. */
 export async function readNeural(text) {
   if (!session) return null;
+  text = fromUrdu(text);
   const toks = tokenize(text);
   if (!toks.length) return { tokens: [], labels: {} };
   const G = cfg.grams, ids = new BigInt64Array(cfg.maxT * G);       // always the full length, the unused places empty: the exported model has a fixed sentence length

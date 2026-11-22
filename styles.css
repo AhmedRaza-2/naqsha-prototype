@@ -579,6 +579,8 @@ footer { color: var(--ink-soft); }
 .nlrow { display: flex; gap: 10px; }
 .nlrow #nl { flex: 1; min-width: 0; height: 54px; font-size: 1.05rem; padding: 0 16px; }
 .nlrow .btn.mic { height: 54px; padding: 0 18px; flex: none; }
+.nlrow .miclang { width: auto; max-width: 120px; height: 54px; flex: none; padding: 0 10px; font: inherit; border-radius: 10px; border: 1px solid var(--line, #cfd6d2); background: var(--card, #fff); color: inherit; }
+#nl:lang(ur), #nl[dir="rtl"] { font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", serif; }
 .examples { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
 .examples .ex { font: inherit; font-size: 0.8rem; padding: 5px 11px; border-radius: 8px; border: 1px dashed var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; transition: color .15s, border-color .15s, background-color .15s; }
 .examples .ex:hover { color: var(--accent); border-color: var(--accent); background: var(--surface); }
