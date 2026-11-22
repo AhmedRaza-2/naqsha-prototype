@@ -713,3 +713,9 @@ footer { color: var(--ink-soft); }
 .gdone p { margin: 4px 0 0; color: var(--ink-soft); font-size: 0.92rem; }
 .gcheck { width: 28px; height: 28px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; flex: none; }
 .gacts { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+.planread { display: flex; gap: 14px; align-items: center; margin-top: 10px; padding: 10px; border: 1px solid var(--line, #cfd6d2); border-radius: 10px; }
+.planread canvas { width: 128px; height: 128px; border-radius: 6px; background: #fff; flex: none; image-rendering: auto; }
+.planread p { margin: 0 0 6px; }
+.lg-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+#planbtn { cursor: pointer; }

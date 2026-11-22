@@ -19,6 +19,7 @@ import { onModelState, preloadModel } from './model.js';
 import { pickColor, closeWheel } from './colorwheel.js';
 import { UNITS, getUnit, setUnit, fromFt, toFt, num, fmtLen, fmtArea, localize } from './units.js';
 import { mountFloorForm, refreshForms, readFloor, onFormChange } from './floorform.js';
+import { hasPlanReader, loadPlanReader, readPlan, CLASSES, COLORS } from './planreader.js';
 import { canListen, hasLiveSpeech, startLive, loadSpeechModel, startListening, transcribe, readAnswer } from './voice.js';
 
 const $ = (id) => document.getElementById(id);
@@ -233,6 +234,25 @@ function renderAdvice() {
 const openConflict = () => null;                                    // nothing blocks Generate any more
 ['nl', 'pwu', 'pdu'].forEach((id) => $(id).addEventListener('input', renderAdvice));
 ['pfloors', 'pcars', 'pporch', 'pb'].forEach((id) => $(id).addEventListener('change', renderAdvice));
+
+// ---------- a plan photo: a CNN (js/planreader.js) reads the rooms and fills the form ----------
+hasPlanReader().then((yes) => { if (yes) $('planbtn').hidden = false; });
+$('planfile').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const box = $('planread'), say = $('plansay');
+  box.hidden = false; say.textContent = 'Reading the plan on this device...';
+  try {
+    if (!(await loadPlanReader())) throw new Error('model');
+    const r = await readPlan(f);
+    const c = $('plancanvas').getContext('2d'); c.clearRect(0, 0, 256, 256); c.drawImage(r.canvas, 0, 0);
+    const s = r.summary;
+    $('planlegend').innerHTML = [1, 4, 5, 6, 7, 8].map((k) => `<span class="lg-dot" style="background:rgb(${COLORS[k].join(',')})"></span>${CLASSES[k]}`).join(' &nbsp; ');
+    if (!s.beds) { say.textContent = 'I could not find bedrooms in this picture. A flat, straight-on photo or scan of one floor works best.'; return; }
+    say.textContent = `Found ${s.beds} bedroom${s.beds > 1 ? 's' : ''}, ${s.baths} washroom${s.baths === 1 ? '' : 's'}, ${s.kitchens ? 'a kitchen' : 'no kitchen'} and about ${Math.round(s.marla * 10) / 10} marla of plot (the size is a guess: a photo has no ruler). I filled in the line above: change it if it is off, then generate.`;
+    $('nl').value = r.request; $('nl').dispatchEvent(new Event('input'));
+  } catch (err) { console.warn('plan reader', err); say.textContent = 'The plan reader could not run here. You can type the request instead.'; }
+});
 
 // ---------- voice: speak the request; the words appear (and the form fills in) while you speak, then you confirm before anything is drafted ----------
 const mic = $('mic'), micstat = $('micstat'), meter = $('meter').firstElementChild;

@@ -44,7 +44,9 @@
                 <span id="miclabel">Speak</span>
               </button>
             </div>
-            <div class="guiderow"><button class="btn ghost" id="guidebtn" type="button">Or answer a few quick questions</button></div>
+            <div class="guiderow"><button class="btn ghost" id="guidebtn" type="button">Or answer a few quick questions</button>
+              <label class="btn ghost" id="planbtn" hidden>Or start from a plan photo<input type="file" id="planfile" accept="image/*" hidden></label></div>
+            <div class="planread" id="planread" hidden aria-live="polite"><canvas id="plancanvas" width="256" height="256" aria-label="The plan as the network read it"></canvas><div><p id="plansay"></p><p class="fine" id="planlegend"></p></div></div>
             <div class="guide" id="guide" hidden aria-live="polite"></div>
             <div class="examples" id="examples" aria-label="Examples you can tap"><span class="fine">Try</span></div>
             <div class="quickfloors" id="quickfloors"><span class="fine">Floors</span>
