@@ -108,8 +108,8 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
   orbit.enabled = false;
   orbit.target.set(W / 2, 0, D / 2);
   orbit.enableDamping = true; orbit.dampingFactor = 0.09;           // smooth stop instead of a jerk
-  orbit.zoomToCursor = false; orbit.zoomSpeed = 0.9;                // the wheel zooms straight in and out of the middle of the view: no sideways drift
-  orbit.minDistance = 6; orbit.maxDistance = Math.max(W, D) * 3.2;  // cannot zoom through the house or lose it in the sky
+  orbit.zoomToCursor = true; orbit.zoomSpeed = 1.6;                 // the wheel zooms towards what the pointer is on (a room, a corner of the plot)
+  orbit.minDistance = 2.5; orbit.maxDistance = Math.max(W, D) * 3.2;  // cannot zoom through the house or lose it in the sky
   orbit.panSpeed = 0.9; orbit.rotateSpeed = 0.8; orbit.screenSpacePanning = true;
 
   function build(keepPos) {
@@ -253,7 +253,14 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     if (drag && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 5 && MOVING.has(state.mode)) clickDoor(e);   // a click, not a drag
     drag = null;
   };
-  const onWheel = (e) => { if (state.mode === 'walk') { e.preventDefault(); setFov(state.fov + Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 120) * 0.03); hooks.onFov?.(state.fov); } };
+  // walking: the wheel (or a trackpad) steps forward and back, smoothly; with Ctrl (a trackpad pinch) it widens or narrows the view
+  const onWheel = (e) => {
+    if (state.mode !== 'walk') return;
+    e.preventDefault();
+    const d = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 120);
+    if (e.ctrlKey) { setFov(state.fov + d * 0.05); hooks.onFov?.(state.fov); return; }
+    state.glide = Math.max(-6, Math.min(6, (state.glide || 0) - d / 120 * 1.6));      // feet still to glide; the loop walks them off
+  };
   el.addEventListener('pointerdown', onDown);
   el.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
@@ -287,8 +294,24 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
    *  deck; on the last flight up to it (above one and a half storeys, below the deck) the stairwell's own walls are the ones that count. */
   const collLvl = () => (state.hs >= STOREY * 2 - 0.6 ? 2 : state.hs > STOREY * 1.5 ? 1 : level());
   function move(dx, dz) {
-    if (!blocked(state.pos.x + dx, state.pos.z, R, collLvl())) state.pos.x += dx;
-    if (!blocked(state.pos.x, state.pos.z + dz, R, collLvl())) state.pos.z += dz;
+    const lv = collLvl(), list = lv === 2 ? roofColliders : lv ? upperColliders : colliders;
+    const hits = (x, z) => list.filter((c) => x > c.x0 - R && x < c.x1 + R && z > c.z0 - R && z < c.z1 + R && solid(c));
+    // a shut door in the way opens by itself as the visitor walks into it (as on the guided tour)
+    for (const c of [...hits(state.pos.x + dx, state.pos.z), ...hits(state.pos.x, state.pos.z + dz)]) if (c.door && !c.door.target) c.door.target = 1;
+    // already touching something (came up the stairs beside a cupboard, a door swung shut on the visitor): never locked in, any step
+    // that leads away from what is touched is taken
+    // how deep the visitor stands in things (each one grown by the body's radius): a step that goes no deeper is always allowed
+    const depth = (x, z) => list.reduce((s, c) => (solid(c) ? s + Math.max(0, Math.min(x - (c.x0 - R), c.x1 + R - x, z - (c.z0 - R), c.z1 + R - z)) : s), 0);
+    const d0 = depth(state.pos.x, state.pos.z);
+    if (d0 > 1e-6) {
+      const nx = state.pos.x + dx, nz = state.pos.z + dz;
+      if (depth(nx, nz) <= d0 + 1e-6) { state.pos.x = nx; state.pos.z = nz; }
+      else if (depth(nx, state.pos.z) <= d0 + 1e-6) state.pos.x = nx;          // slide along it
+      else if (depth(state.pos.x, nz) <= d0 + 1e-6) state.pos.z = nz;
+      return settle();
+    }
+    if (!blocked(state.pos.x + dx, state.pos.z, R, lv)) state.pos.x += dx;
+    if (!blocked(state.pos.x, state.pos.z + dz, R, lv)) state.pos.z += dz;
     return settle();
   }
   // the height under the visitor: on the flight it follows the steps; leaving the flight at the top lands on the first floor
@@ -471,7 +494,9 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
         str = (k.has('d') ? 1 : 0) - (k.has('a') ? 1 : 0);
         sp = 7 * run * dt;
         const fx = -Math.sin(state.yaw), fz = -Math.cos(state.yaw), rx = Math.cos(state.yaw), rz = -Math.sin(state.yaw);
-        const dx = (fx * fwd + rx * str) * sp, dz = (fz * fwd + rz * str) * sp;
+        let g = 0;
+        if (state.glide) { g = Math.sign(state.glide) * Math.min(Math.abs(state.glide), Math.max(0.05, Math.abs(state.glide) * dt * 8)); state.glide -= g; if (Math.abs(state.glide) < 0.01) state.glide = 0; }
+        const dx = (fx * fwd + rx * str) * sp + fx * g, dz = (fz * fwd + rz * str) * sp + fz * g;
         const h = move(dx, dz);
         state.hs += (h - state.hs) * Math.min(1, dt * 12);
         state.speed = (fwd || str) ? 7 * run : 0;

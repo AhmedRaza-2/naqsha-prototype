@@ -1110,10 +1110,10 @@ $('dl').onclick = downloadSheet;
 // ---------- step 4 ----------
 let music = null;
 const VIEW_HINT = {
-  walk: 'Drag to look. W/A/S/D or arrows to move, Shift to run. Every door and the gate start shut: walk up to one and press F (or click it) to open or close it.',
+  walk: 'Drag to look. Scroll or W/A/S/D to move, Shift to run, Ctrl + scroll to widen the view. Doors open as you walk into them; press F (or click one) to close it.',
   follow: 'You are the visitor: W/A/S/D to walk, drag to turn the camera. Doors and the gate start shut: press F near one (or click it) to open or close it.',
   tour: 'A guided tour through every room. Press Stop tour (or pick another view) to take over.',
-  doll: 'The whole home with the roof off. Drag to turn it, scroll to zoom, right-drag to pan.',
+  doll: 'The whole home with the roof off. Drag to turn it, scroll to zoom in on what the pointer is on, right-drag to pan.',
   rise: 'The whole home, from above.',
   top: 'Looking straight down. Scroll to zoom, right-drag to pan.',
   street: 'The street view. Drag to look around the house.',
