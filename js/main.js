@@ -1180,7 +1180,7 @@ function openViewer() {
     $(id).value = String(S.site[key]);
     $(id).onchange = () => { const val = cast ? cast($(id).value) : $(id).value; S.site[key] = val; v.setSite({ [key]: val }); };
   }
-  $('vfov').value = 70;
+  $('vfov').value = 95;
   $('vfov').oninput = () => v.setFov(+$('vfov').value);
   $('vview').onchange = () => { const m = $('vview').value; if (m === 'tour') v.startTour(); else { if (v.touring) v.stopTour(); v.setMode(m); } };
   $('vtour').textContent = 'Start tour'; $('vmusic').hidden = true;

@@ -69,7 +69,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
 
   // everything that depends on the built scene is rebuilt together when the site (boundary wall, floors ...) changes
   let S, scene, roofG, colliders, upperColliders, roofColliders, stairs, doors, pool = [], person, lastFloorLevel = 0;
-  const state = { mode: 'walk', yaw: Math.PI, pitch: 0, pos: new THREE.Vector3(0, EYE, 2.5), hs: 0, keys: new Set(), floor: 0, cutaway: 'all', fov: 70, phase: 0, speed: 0, inS: false, lastH: 0 };
+  const state = { mode: 'walk', yaw: Math.PI, pitch: 0, pos: new THREE.Vector3(0, EYE, 2.5), hs: 0, keys: new Set(), floor: 0, cutaway: 'all', fov: 95, phase: 0, speed: 0, inS: false, lastH: 0 };
   let start = 0;
 
   let planning = false;                                                  // while the tour is planned every door counts as open (the visitor opens each as it comes near)
@@ -159,7 +159,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
       else { camera.position.set(cx + dist * 0.35, dist * 0.95, -D * 0.35); orbit.target.set(cx, 0, cz); }
       orbit.update();
     }
-    if (mode === 'walk') { camera.fov = state.fov; camera.updateProjectionMatrix(); }
+    if (mode === 'walk') { camera.fov = vfov(); camera.updateProjectionMatrix(); }
     person.visible = mode === 'follow';
     if (mode !== 'tour') tour.on = false;
     shadowDirty = true;
@@ -182,7 +182,10 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     placeLights();
     hooks.onFloor?.(f);
   }
-  function setFov(v) { state.fov = Math.max(45, Math.min(90, v)); }                  // the loop eases the camera towards it
+  // state.fov is how wide the visitor sees side to side (degrees), like a person's eyes (about 95: natural, no tunnel); the camera's
+  // own angle is the vertical one, worked out for the window's shape so a tall or narrow window does not crop the sides
+  function setFov(v) { state.fov = Math.max(70, Math.min(115, v)); }                 // the loop eases the camera towards it
+  const vfov = () => Math.max(40, Math.min(88, 2 * Math.atan(Math.tan((state.fov * Math.PI) / 360) / Math.max(0.3, camera.aspect)) * 180 / Math.PI));
 
   // ---------- doors ----------
   const hint = () => (state.inS ? (state.lastH > STOREY / 2 ? 1 : 0) : state.floor);   // on a turning stair, the floor at its foot is the one the visitor came from
@@ -444,6 +447,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     const w = host.clientWidth, h = host.clientHeight;
     renderer.setSize(w, h);
     camera.aspect = w / h;
+    if (state.mode === 'walk') camera.fov = vfov();                   // the same side-to-side view in any window shape
     camera.updateProjectionMatrix();
   }
   const ro = new ResizeObserver(resize);
@@ -456,7 +460,7 @@ export function createViewer(host, L, styleId, hooks = {}, U = null, colors = {}
     raf = requestAnimationFrame(loop);
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    if (state.mode === 'walk' && Math.abs(camera.fov - state.fov) > 0.02) { camera.fov += (state.fov - camera.fov) * Math.min(1, dt * 10); camera.updateProjectionMatrix(); }       // smooth zoom
+    if (state.mode === 'walk' && Math.abs(camera.fov - vfov()) > 0.02) { camera.fov += (vfov() - camera.fov) * Math.min(1, dt * 10); camera.updateProjectionMatrix(); }       // smooth zoom
     for (const d of doors) {                                       // doors swing and slide
       if (Math.abs(d.t - d.target) > 0.001) {
         d.t += (d.target - d.t) * Math.min(1, dt * 7);
