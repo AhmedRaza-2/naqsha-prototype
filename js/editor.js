@@ -5,6 +5,7 @@
 //   inner edges of a washroom        -> the washroom gets wider / deeper inside its room
 import { planFrame, planSVG } from './svg.js';
 import { OPEN } from './bands.js';
+import { turningStair } from './layout.js';
 
 const SNAP = 0.5;
 const snap = (v) => Math.round(v / SNAP) * SNAP;
@@ -180,7 +181,11 @@ function swapLeaves(plan, i, j) {
   return p && mapLeaf(p, j, (leaf) => put(leaf, A));
 }
 
-const stairsTooBig = (lay) => (lay.rects || []).some((r) => r.t === 'stairs' && Math.min(r.w, r.d) > 4.01 && Math.max(r.w, r.d) >= 14 || r.t === 'stairs' && Math.max(r.w, r.d) > 18.01);
+const stairRects = (lay) => (lay.rects || []).filter((r) => r.t === 'stairs');
+/** A straight stair is at most 4 ft wide and 18 ft long, a turning stair (two flights side by side) at most 9 x 18: the wall stops there. */
+const stairsTooBig = (lay) => stairRects(lay).some((r) => { const wid = Math.min(r.w, r.d), len = Math.max(r.w, r.d); return wid >= 5.4 ? wid > 9.01 || len > 18.01 : (wid > 4.01 && len >= 14) || len > 18.01; });
+/** A proper turning stair (flights of 2.5 ft or more, 9 steps each) never drags down to a stair that is cut short: the wall stops there. */
+const stairsTooSmall = (lay, was) => stairRects(was).some(turningStair) && !stairRects(lay).some(turningStair);
 
 /** Wall positions of a plan (rows of rooms or a slicing tree), in feet. */
 function handles(plan, L) {
@@ -315,7 +320,8 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
     if (!accept(next)) return;                                   // e.g. a wall that would move the stairs of a first floor stays put
     if (JSON.stringify(next) !== JSON.stringify(L.plan)) {
       const nl = rebuild(next);
-      if (stairsTooBig(nl) && !stairsTooBig(L)) return;           // a stair is at most 4 ft wide and 18 ft long: the wall stops there
+      if (stairsTooBig(nl) && !stairsTooBig(L)) return;           // the stairs do not grow past their proper size
+      if (stairsTooSmall(nl, L)) return;                           // ... nor shrink into a stair that is cut short: the wall stops there
       L = nl; drag.moved = true; render(); onChange(L, true);
     }
   }
@@ -487,4 +493,4 @@ export function mountEditor(host, layout, { rebuild, onChange, undoBtn, resetBtn
 }
 
 // the same wall moves, for the automatic polish (polish.js)
-export { wallHandles, apply as applyEdit, splitLeaf, joinLeaf, swapLeaves, leafAt };
+export { wallHandles, apply as applyEdit, splitLeaf, joinLeaf, swapLeaves, leafAt, stairsTooSmall, stairsTooBig };

@@ -675,3 +675,44 @@ export function varyBaths(plan, salt = 0) {
   });
   return p;
 }
+
+/** A room over the car porch when the porch is narrower than the house: the first-floor room along the front wall of the box that meets the
+ *  porch's width (the lounge first, then a bedroom) grows forward over the porch as an L-shaped part of the same room (no wall between: the
+ *  tree leaf gets `join`). Returns a changed copy with plan.overAnnex = { x, y, w, d, host } or null when no room beside the porch can.
+ *  porch: { x, y, w, d } of the car porch, in plot feet. */
+export function addPorchRoom(plan, porch) {
+  if (!plan.tree || !plan.floor || !plan.box) return null;
+  const p = clone(plan), rs = rooms(p), by0 = plan.box.y, bx = plan.box;
+  const PREF = ['lounge', 'master', 'bed', 'dining', 'study', 'store'];            // a store beside the porch becomes a study when it carries the extension
+  const ax0 = Math.max(porch.x, bx.x), ax1 = Math.min(porch.x + porch.w, bx.x + bx.w);      // the porch's width over the house
+  if (ax1 - ax0 < 6) return null;                                                // a part less than 6 ft wide is not a room
+  let best = null;
+  for (const r of rs) {
+    const rank = PREF.indexOf(r.t);
+    if (rank < 0 || Math.abs(r.y - by0) > 0.01) continue;                         // the rooms along the front wall of the box
+    const ov = Math.min(r.x + r.w, ax1) - Math.max(r.x, ax0);
+    if (ov < 3.2) continue;                                                      // the shared wall must take an opening
+    if (!best || rank < best.rank || (rank === best.rank && ov > best.ov)) best = { r, rank, ov };
+  }
+  if (!best) return null;
+  if (best.r.t === 'store') best.r.node.t = 'study';
+  best = { ...best, x0: ax0, x1: ax1 };
+  const ay0 = porch.y, ay1 = by0;
+  if (ay1 - ay0 < 6) return null;
+  const strip = rs.find((q) => q.t === 'void' && q.y <= ay0 + 0.01 && q.y + q.d >= ay1 - 0.01 && q.x <= best.x0 + 0.01 && q.x + q.w >= best.x1 - 0.01);
+  if (!strip) return null;
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const cut = (k, parts) => {                                                    // parts: [[size, node]], zero sizes dropped, the last part takes the rest
+    const keep = parts.filter(([s]) => s > 0.01);
+    if (keep.length === 1) return keep[0][1];
+    return { k, sizes: keep.slice(0, -1).map(([s]) => r2(s)), kids: keep.map(([, n]) => n) };
+  };
+  const V = () => ({ k: 'room', t: 'void' });
+  const annex = { k: 'room', t: 'other', join: best.r.node.t };
+  const mid = cut('V', [[best.x0 - strip.x, V()], [best.x1 - best.x0, annex], [strip.x + strip.w - best.x1, V()]]);
+  const node = cut('H', [[ay0 - strip.y, V()], [ay1 - ay0, mid], [strip.y + strip.d - ay1, V()]]);
+  for (const k of Object.keys(strip.node)) delete strip.node[k];
+  Object.assign(strip.node, node);
+  p.overAnnex = { x: best.x0, y: ay0, w: r2(best.x1 - best.x0), d: r2(ay1 - ay0), host: best.r.node.t };
+  return p;
+}

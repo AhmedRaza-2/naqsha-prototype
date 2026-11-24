@@ -91,7 +91,7 @@ function render(inst) {
   if (floor === 'ground') {
     rooms = `${room('drawing', 'Drawing room')}${room('lounge', 'TV lounge')}${room('dining', 'Dining room')}${pill('porch', 'Car porch', cfg.porch)}${pill('gbath', 'Drawing room washroom', cfg.gbath)}<span class="pill fixed"><span>Kitchen</span></span>${pill('openk', 'Open kitchen (counter, no wall)', cfg.openk)}`;
   } else {
-    rooms = `<span class="pill fixed"><span>Family lounge</span></span>${room('drawing', 'Drawing room')}${room('terrace', 'Open terrace')}${cfg.hasPorch ? pill('over', 'Over the car porch', cfg.over) : ''}`;
+    rooms = `<span class="pill fixed"><span>Family lounge</span></span>${room('drawing', 'Drawing room')}${room('terrace', 'Open terrace')}${cfg.hasPorch ? pill('over', 'Room over the car porch (bigger floor)', cfg.over) : ''}`;
   }
   const warn = [inst.note, ...a.msgs].filter(Boolean);
   inst.host.innerHTML = `${tabs}<div class="ffbody"><div class="ffsteps">${step('beds', 'Bedrooms', cfg.beds)}${step('baths', 'Washrooms', cfg.baths)}${floor === 'ground' ? step('cars', 'Cars to park', Math.max(1, +$('pcars').value)) : ''}</div>`

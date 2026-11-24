@@ -5,7 +5,7 @@ import { toRects as treeRects, check as treeCheck } from './tree.js';
 import { finalize, ruleFor, turningStair } from './layout.js';
 import { furnish, applyOverrides } from './furniture.js';
 import { tidyRects } from './tidy.js';
-import { balconyRoom, reshapeFor, applyReshape, dropTerrace, dropGuestBath, dropLoungeBath, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox, growUpperStairs, varyBaths } from './plantweak.js';
+import { balconyRoom, reshapeFor, applyReshape, dropTerrace, dropGuestBath, dropLoungeBath, addPorchRoom, standardStairs, sizePorch, dropRoom, lawnToPorch, scaleTerrace, upperDrawing, refitBox, growUpperStairs, varyBaths } from './plantweak.js';
 import { draftPlans, sampleDrafts, knowsStyles, knowsStoreys } from './model.js';
 
 const KNOWN = new Set(['drawing', 'lobby', 'lounge', 'dining', 'kitchen', 'bed', 'master', 'stairs', 'passage', 'store', 'dress', 'servant', 'study', 'prayer', 'other']);
@@ -304,16 +304,21 @@ export function overPorch(rects) {
   const px0 = Math.max(porch.x, bx0), px1 = Math.min(porch.x + porch.w, bx1);
   const asBuilt = rects.map((r) => (r === porch ? { ...r, t: 'store' } : r));       // a non-open type: the checks then see a floor that carries
   if (porch.y >= by0 - 0.01) return { fb: fb0, rects: asBuilt };               // the porch is inside the box already
-  if (Math.abs(porch.y + porch.d - by0) > 0.6 || px1 - px0 < 0.7 * fb0.box.w || porch.d < 6 || porch.d > 16) return null;
+  if (Math.abs(porch.y + porch.d - by0) > 0.6 || porch.d < 6 || porch.d > 16) return null;
+  if (px1 - px0 < 0.7 * fb0.box.w) {                                              // a porch narrower than the house: a room beside it grows forward over it (addPorchRoom), the box stays
+    return px1 - px0 >= 6 ? { fb: fb0, rects: asBuilt, annex: { x: px0, y: porch.y, w: px1 - px0, d: by0 - porch.y } } : null;
+  }
   const grow = Math.round((by0 - porch.y) * 100) / 100;
   const box = { x: fb0.box.x, y: porch.y, w: fb0.box.w, d: Math.round((fb0.box.d + grow) * 100) / 100 };
   return { fb: { box, up: { ...fb0.up, y: Math.round((fb0.up.y + grow) * 100) / 100 } }, rects: asBuilt };
 }
 
 export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
-  const over = prefs.upOver ? overPorch(ground.rects) : null;
-  const fb = over ? over.fb : boxAndStairs(ground.rects);
-  const groundRects = over ? over.rects : ground.rects;                 // what the first floor must stand on
+  const ov = prefs.upOver ? overPorch(ground.rects) : null;
+  const over = ov && !ov.annex ? ov : null;                              // a porch along the house: the box itself grows forward over it
+  const annexOv = ov && ov.annex ? ov : null;                            // a narrower porch: one room beside it grows over it (addPorchRoom)
+  const fb = ov ? ov.fb : boxAndStairs(ground.rects);
+  const groundRects = ov ? ov.rects : ground.rects;                     // what the first floor must stand on
   const porchRect = over ? ground.rects.find((r) => r.t === 'porch') : null;
   /** Share (0-1) of the car porch that a first floor's rooms cover. */
   const porchCover = (rects) => {
@@ -427,6 +432,7 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
     attempt(refitBox(it.plan, fb.box));
     attempt(varyBaths(cur.plan, 1));                                   // washrooms of different shapes, when that breaks no rule
     for (const t of prefs.upOmit || []) attempt(dropRoom(cur.plan, t));
+    if (annexOv) { const p = addPorchRoom(cur.plan, ground.rects.find((r) => r.t === 'porch')); if (p) attempt(p); }       // a room over the car porch
     { const p = dropLoungeBath(cur.plan);                               // no common washroom in the family lounge upstairs
       if (p !== cur.plan) { const rects = treeRects(p), checks = treeCheck(p, prefs.beds); if (!checks.some((c) => c.level === 'err')) cur = { ...cur, plan: p, rects, checks, grid: undefined }; } }       // rooms that are not offered (store, study) are left out upstairs too, when the plan still passes without them
     return cur;
@@ -435,12 +441,17 @@ export async function upperLayouts(ground, prefs, onStatus, opts = {}) {
     const L = Object.assign(planToLayout(it, i), { terrace: Math.round(terraceArea(it.rects)) });
     const share = stackShare(it.rects, ground.rects);              // shown as a rule line, so the visitor sees how well the plumbing lines up
     L.checks.push({ level: share >= 0.5 ? 'ok' : 'warn', title: 'Washrooms above washrooms', detail: share >= 0.5 ? `${Math.round(share * 100)}% of the first-floor washroom area sits over a ground-floor washroom, so the pipes can share a stack.` : `Only ${Math.round(share * 100)}% of the first-floor washrooms sit over a washroom below; moving them over the ones below saves plumbing.` });
-    const gp = outlineGap(it.rects, groundRects);
-    L.checks.push({ level: gp < 1 ? 'ok' : 'warn', title: 'Same outer walls as the ground floor', detail: gp < 1 ? `The first floor stands on exactly the ground floor's outline.` : `The outline differs from the ground floor's by about ${Math.round(gp)} sq ft.` });
+    const A = it.plan.overAnnex, stand = A ? groundRects.map((r) => (r.t === 'store' && r.x === ground.rects.find((q) => q.t === 'porch')?.x && r.y === ground.rects.find((q) => q.t === 'porch')?.y ? { ...r, x: A.x, y: A.y, w: A.w, d: A.d } : r)) : groundRects;   // the room over the porch stands on the porch's slab
+    const gp = outlineGap(it.rects, stand);
+    L.checks.push({ level: gp < 1 ? 'ok' : 'warn', title: 'Same outer walls as the ground floor', detail: gp < 1 ? (A ? `The first floor stands on the ground floor's outline, with a room over the car porch.` : `The first floor stands on exactly the ground floor's outline.`) : `The outline differs from the ground floor's by about ${Math.round(gp)} sq ft.` });
     L.score = L.checks.filter((c) => c.level === 'ok').length;
     return L;
   });
-  if (prefs.upOver && !over) note = `${note} A room over the car porch needs a porch that runs along most of the front of the house; this one is too narrow (or there is none), so the first floor stands on the ground floor as before.`.trim();
+  if (annexOv) {
+    const got = items.filter((it) => it.plan.overAnnex);
+    note = got.length ? `${note} A room over the car porch makes the first floor ${Math.round(Math.max(...got.map((it) => it.plan.overAnnex.w * it.plan.overAnnex.d)))} sq ft bigger.`.trim()
+      : `${note} No room beside the car porch could be extended over it in these layouts (it needs a lounge or bedroom of 6 ft or more along the porch), so the first floor stands on the ground floor as before.`.trim();
+  } else if (prefs.upOver && !over) note = `${note} A room over the car porch needs a car porch in front of the house, at least 6 ft wide along it; there is none here, so the first floor stands on the ground floor as before.`.trim();
   else if (over && out.length) note = `${note} The first floor reaches forward over the car porch.`.trim();
   out.note = note;
   return out;
