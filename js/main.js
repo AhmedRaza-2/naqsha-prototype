@@ -637,6 +637,15 @@ async function generate(regen, btnId) {
     return;
   }
   layouts.forEach((L) => S.seen.add(L.text));
+  // two floors: the stairs take room, so the ground floor may hold fewer bedrooms than asked for. The others go upstairs (the house keeps the bedrooms
+  // asked for), the bedroom boxes show what was really drafted, and the visitor is told in plain words
+  if (S.prefs.storeys === 2 && layouts.length && layouts[0].beds < S.prefs.beds) {
+    const got = layouts[0].beds, asked = S.prefs.beds, moved = asked - got, up = Math.min(4, S.prefs.upBeds + moved);
+    S.note = `${got} bedroom${got === 1 ? '' : 's'} fit on the ground floor of ${S.plot.w} x ${S.plot.d} ft together with the stairs, so ${moved === 1 ? 'the other one goes' : `the other ${moved} go`} upstairs: ${got} downstairs and ${up} upstairs${up < S.prefs.upBeds + moved ? ' (four is the most the first floor takes)' : ''}.`;
+    S.prefs = { ...S.prefs, beds: got, upBeds: up }; S.beds = got;
+    $('pb').value = String(got); $('pup').value = String(up);
+    syncFloors();
+  }
   // none passes every rule: say so plainly, and point to the fix (two floors hold more bedrooms on the same plot)
   if (layouts.every((L) => !L.checks.every((c) => c.level === 'ok' || (S.prefs.setbacks && Object.keys(S.prefs.setbacks).length && /coverage|natural light|ventilation/i.test(c.title))))) {
     const two = S.prefs.storeys !== 2 && knowsStoreysNow;
