@@ -1,0 +1,19 @@
+{
+ "pixel_acc": 0.7351442337036133,
+ "mIoU": 0.4034227132797241,
+ "iou": {
+  "background": 0.8272,
+  "wall": 0.1886,
+  "door/window": 0.1954,
+  "outdoor": 0.4681,
+  "kitchen": 0.448,
+  "living/dining": 0.5299,
+  "bedroom": 0.4873,
+  "bathroom": 0.333,
+  "hall/entrance": 0.3613,
+  "storage": 0.2415,
+  "other room": 0.3572
+ },
+ "parameters": 4416923,
+ "baseline_all_background_pixel_acc": 0.5248
+}

@@ -9,6 +9,7 @@ T0=$(date +%s)
 ls -la data/cubicasa/cc.zip
 python real/cubicasa_masks.py data/cubicasa/cc.zip --out data/planreader --workers 4
 echo "masks built at $(( ($(date +%s) - T0) / 60 )) min"
+pip install -q onnxruntime scipy 2>/dev/null || true
 python ml/planreader.py train --data data/planreader --out runs/planreader --epochs "$EP" --bs 32
 python ml/planreader.py eval --ckpt runs/planreader/model.pt --data data/planreader --out runs/planreader/test_iou.json
 python ml/planreader.py export --ckpt runs/planreader/model.pt --out runs/planreader/planreader.onnx

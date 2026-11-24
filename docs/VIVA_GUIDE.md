@@ -99,7 +99,7 @@ Where the plots come from: `tools/real_stats.py` compared room sizes in real pla
 |---|---|---|---|---|---|---|
 | 1 | **Layout model (v18)** | decoder-only **Transformer** (GPT-style), 6 layers, 8 heads, d=256, tied embeddings, learned positions, vocab 357 | 4.9 M params | yes, **from scratch** | writes the plan as tokens | `ml/layoutlm.py`, weights `weights/layout/v18_rl_model.pt`, browser `models/layout.onnx` (int8, 5.2 MB) |
 | 2 | **Request reader** | Transformer **encoder** (2 layers) with hashed character n-gram word embeddings, tags per word + sentence labels | 0.6 M | yes | reads "10 marla 2 floors 4 bed" typed or spoken, English / Roman Urdu | `ml/nlu.py`, `models/nlu.onnx` |
-| 3 | **Plan reader** | **U-Net CNN** (encoder-decoder with skip connections), 4.4 M params, 11 classes | 4.4 M | yes (training queued on Kaggle) | labels every pixel of a plan photo (wall, door, kitchen, bedroom...) | `ml/planreader.py`, `js/planreader.js` |
+| 3 | **Plan reader** | **U-Net CNN** (encoder-decoder with skip connections), 4.4 M params, 11 classes, mean IoU 0.40 | 4.4 M | yes (trained, not live) | labels every pixel of a plan photo (wall, door, kitchen, bedroom...) | `ml/planreader.py`, `js/planreader.js` |
 | 4 | Whisper tiny.en / base | pretrained speech transformer | | no (used as is, in the browser) | speech to text fallback | `js/voice.js` |
 | 5 | Qwen2.5-VL-7B (4-bit) | pretrained vision-language model | | no (tool) | read real plan images into training rows, with rule-checker feedback and retry | `real/extract_vlm2.py` |
 
@@ -123,9 +123,13 @@ Where the plots come from: `tools/real_stats.py` compared room sizes in real pla
 Be straightforward: the **layout generator is a transformer, not a CNN** (a CNN is for grids of pixels; the plan is a sequence).
 The CNN is the **plan reader** (U-Net) that takes an image of a plan. Data: CubiCasa5k, official split 4,199 / 399 / 399.
 Loss: weighted cross-entropy + Dice; metric: **IoU** per class and mean IoU on the test plans; augmentation: rotation, flip, contrast, blur, noise.
-Status to state honestly: code, data builder, browser module and Kaggle script are done and tested end to end on a small
-stand-in set; the full training run was waiting for a Kaggle GPU slot, so **report the IoU only once it has run**.
-
+**Results (trained on Kaggle T4, 60 epochs, ~50 s/epoch):** pixel accuracy 73.5 percent (baseline all-background 52.5), **mean IoU 0.403** on the
+held-out CubiCasa test plans (background 0.83, living 0.53, bedroom 0.49, kitchen 0.45, bathroom 0.33, wall 0.19, door/window 0.20; thin walls are hard at 256 px).
+Counting rooms (what the app needs): bedrooms exactly right 49.5 percent (within one 83.8), washrooms 52.2, kitchens 64.0.
+**Honest finding to say yourself:** on real Pakistani plan sheets the segmentation is blobby (domain gap: CubiCasa is Finnish apartments, our sheets
+have banners, two floors per page, dimension text, Urdu), see `docs/planreader_on_pakistani_plans.png`. So it is **trained and evaluated but not enabled
+on the website**. Fix: fine-tune on Pakistani images with pixel masks, 512 px input, crop one floor from a sheet.
+Files: `weights/planreader/` (weights, `test_iou.json`, training curves), `ml/planreader.py`, `ml/planreader_counts.py`, `real/cubicasa_masks.py`.
 ---
 
 ## 5. Results you can quote (from the evaluation logs)
@@ -249,7 +253,7 @@ Read these files in this order to understand the code: `tools/bands.py` (rules),
 | **Request reader** (train + export) | `ml/nlu.py` | yes |
 | **CNN plan reader** (train, eval, export) | `ml/planreader.py`, data builder `real/cubicasa_masks.py` | yes |
 | **Dataset builders / generators** | `tools/bands.py`, `tools/gen_tree.py`, `tools/gen_upper.py`, `tools/build_v13.py`, `tools/build_v17.py`, `real/*_convert.py` | yes |
-| **Weights (PyTorch, the trained numbers)** of every model that went live | `weights/layout/v09...v13, v18_rl_model.pt` (v18 is live), `weights/nlu/nlu.pt` (about 20 MB each) | yes |
+| **Weights (PyTorch, the trained numbers)** of every model that went live | `weights/layout/v09...v13, v18_rl_model.pt` (v18 is live), `weights/nlu/nlu.pt`, plus the CNN `weights/planreader/planreader_unet_cubicasa.pt` (trained, not live) | yes |
 | **Model files the website loads** (ONNX, int8) | `models/layout.onnx` (5.2 MB), `models/vocab.json`, `models/nlu.onnx`, `models/nlu.json`, `models/manifest.json` (version stamp) | yes |
 | **ONNX runtime for the browser** | `models/ort/` | yes |
 | **Training outputs and logs** (curves, checkpoints, results zips) | `runs/` (`runs/v18/` exported model, `runs/rl_v18_model.pt`, `runs_v13.zip` ...) | **no** (`.gitignore`) |

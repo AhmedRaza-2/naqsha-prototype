@@ -62,3 +62,17 @@ copy its `.pt` into `weights/layout/` and update the table above, then deploy (`
 Also tried: ranking the planner's drafts by `js/quality.js` among equal rule scores: 0.918 vs 0.928 without it (the planner's
 refine step already grows rooms toward real sizes after the pick), so it was taken out. `js/quality.js` stays as the measure
 `tools/ab_models.py` uses. Run-to-run noise of that A/B is about +-0.02 quality, so a model must beat v13 by more than that.
+
+## Plan reader (U-Net CNN): trained, not live
+
+`ml/planreader.py`, weights `weights/planreader/planreader_unet_cubicasa.pt` (4.4 M parameters, 11 pixel classes), trained on CubiCasa5k
+(4,199 train / 399 val / 399 test, 256 x 256, 60 epochs, about 50 s per epoch on a T4; recipe `ml/run_planreader.sh`).
+Results on the held-out test plans (`weights/planreader/test_iou.json`): pixel accuracy 73.5 percent (all-background baseline 52.5), **mean IoU 0.403**
+(background 0.83, living 0.53, bedroom 0.49, outdoor 0.47, kitchen 0.45, hall 0.36, bathroom 0.33, door/window 0.20, wall 0.19).
+Counting what the app needs (`ml/planreader_counts.py`, 400 test plans): bedrooms exactly right 49.5 percent (within one 83.8),
+washrooms 52.2 (83.8), kitchens 64.0 (95.8). Tuning the region-counting thresholds changed this by under 1 percent.
+**Why it is not on the website:** CubiCasa is mostly Finnish and European apartments. On real Pakistani plan sheets
+(banners, two floors on one sheet, printed dimensions, Urdu text, `docs/planreader_on_pakistani_plans.png`) the picture is blobby and the
+counts are not reliable. The browser side (`js/planreader.js`, the "start from a plan photo" button) is in the code and stays hidden until
+`models/planreader.onnx` + `models/planreader.json` exist. Next steps that would fix it: fine-tune on Pakistani plan images with pixel masks
+(needs annotation), train at 512 px for thin walls, add a plan-sheet detector that crops one floor.
