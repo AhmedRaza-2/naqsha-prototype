@@ -232,3 +232,33 @@ python ml/planreader.py eval --ckpt runs/planreader/model.pt --data data/planrea
 
 Read these files in this order to understand the code: `tools/bands.py` (rules), `tools/tree.py` (plan language),
 `ml/layoutlm.py` (model), `ml/train.py`, `ml/rl.py`, `js/grammar.js` (constrained decoding), `js/modelplans.js` (planner), `MODELS.md` (history).
+
+---
+
+## 11. File map: training code, weights, model files (where is what)
+
+| What | Where | In GitHub? |
+|---|---|---|
+| **Model definition** (the transformer, tokenizer, vocabulary of 357 tokens) | `ml/layoutlm.py` | yes |
+| **Training** (pretrain / fine-tune) | `ml/train.py` | yes |
+| **Reinforcement learning** | `ml/rl.py` (reward in `ml/layoutlm.py: reward_styled`, `ml/quality.py`) | yes |
+| **Self-distillation data** | `tools/distill.py` | yes |
+| **Evaluation** | `ml/evaluate.py`, `ml/eval_real.py`, `ml/eval_quality.py`, `tools/ab_models.py`, `tools/e2e_rules.py` | yes |
+| **Export to the browser** | `ml/export_onnx.py` (check: `ml/onnx_check.py`) | yes |
+| **One-command Kaggle recipes** | `ml/run_v13.sh` (v13), `ml/run_v18.sh` (v18, live), `ml/run_planreader.sh` (CNN), guide `ml/KAGGLE.md` | yes |
+| **Request reader** (train + export) | `ml/nlu.py` | yes |
+| **CNN plan reader** (train, eval, export) | `ml/planreader.py`, data builder `real/cubicasa_masks.py` | yes |
+| **Dataset builders / generators** | `tools/bands.py`, `tools/gen_tree.py`, `tools/gen_upper.py`, `tools/build_v13.py`, `tools/build_v17.py`, `real/*_convert.py` | yes |
+| **Weights (PyTorch, the trained numbers)** of every model that went live | `weights/layout/v09...v13, v18_rl_model.pt` (v18 is live), `weights/nlu/nlu.pt` (about 20 MB each) | yes |
+| **Model files the website loads** (ONNX, int8) | `models/layout.onnx` (5.2 MB), `models/vocab.json`, `models/nlu.onnx`, `models/nlu.json`, `models/manifest.json` (version stamp) | yes |
+| **ONNX runtime for the browser** | `models/ort/` | yes |
+| **Training outputs and logs** (curves, checkpoints, results zips) | `runs/` (`runs/v18/` exported model, `runs/rl_v18_model.pt`, `runs_v13.zip` ...) | **no** (`.gitignore`) |
+| **Datasets** | `data/` (see section 3) | **no** (only `real_plans/` and `real/hand` are committed) |
+| **Model history, numbers, why each version was shipped or rejected** | `MODELS.md` | yes |
+
+Weights vs model files, in one line: **weights** (`.pt`) are what PyTorch trains and saves (full precision, to keep training or
+re-export); the **model file** (`.onnx`) is the same network converted and shrunk (int8) so the browser can run it without Python.
+The live website only reads `models/`; `weights/` is your archive of every shipped model.
+
+To train again from scratch you need: the code in `ml/` and `tools/`, the datasets in `data/` (rebuild with the builders above
+or copy the folder), and a GPU (Kaggle T4 x 2). The whole recipe of the live model is `ml/run_v18.sh`.
