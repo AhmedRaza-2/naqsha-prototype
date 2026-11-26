@@ -15,6 +15,8 @@ for src in ("data/synth_v1_loose/train.jsonl", "data/synth/train.jsonl", "data/s
     if not (ROOT / src).exists(): continue                 # flawed + perfect plans
     rows = [json.loads(l) for l in open(ROOT / src, encoding="utf-8")]
     texts += [r["prompt"] + "\n" + r["completion"] for r in rng.sample(rows, 250)]
+if not texts:                                              # fresh clone (data/ is git-ignored): generate the plans instead
+    texts += [r["prompt"] + "\n" + r["completion"] for r in bands.build(500, seed=5, min_score=0.0)[0]]
 gold = ROOT / "real/gold.jsonl"                                                             # real plans: entrances without a lobby
 if gold.exists():
     sys.path.insert(0, str(ROOT / "real"))
@@ -58,6 +60,21 @@ if (ROOT / "data/pk13/test.jsonl").exists():
         trees.append(head + "\n" + body)
     for t in rng.sample([t for t in picked if "STOREYS" in t], 20):
         trees.append(t.replace("[stairs]", "[store]"))
+if not trees:                                              # fresh clone: generate slicing-tree plans and first floors over them
+    import gen_tree, gen_upper
+    while len(trees) < 400:
+        W, D = bands.sample_plot(rng)
+        if W < 25: continue
+        beds = rng.randint(2, 4)
+        two = rng.random() < 0.4
+        g = gen_tree.generate(W, D, beds, rng, beds + rng.choice([0, 1, 1]), stairs=two)
+        if g is None: continue
+        if two: g["storeys"] = 2
+        trees.append(tree.serialize(g))
+        if two:
+            ub = rng.randint(1, 3)
+            up = gen_upper.upper(g, rng, ub, ub + rng.choice([0, 1]))
+            if up is not None: trees.append(tree.serialize(up))
 for t in rng.sample(trees, min(80, len(trees))):
     head, body = t.split("\n", 1)
     mode = rng.choice(["size", "type", "bracket", "bath"])
