@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { useMotion } from './lib/motion.js';
 import { startLenis, stopLenis } from './lib/lenis.js';
 import Nav from './components/Nav.jsx';
@@ -26,6 +27,7 @@ export default function App() {
         <Results />
       </main>
       <Footer />
+      <Analytics />
     </>
   );
 }
